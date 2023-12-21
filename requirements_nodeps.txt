@@ -1,0 +1,1 @@
+pygeoapi-prefect @ git+https://github.com/kommonitor/pygeoapi-prefect.git@feature/kommonitor

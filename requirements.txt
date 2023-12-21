@@ -1,0 +1,13 @@
+requests~=2.28.2
+Authlib~=1.2.1
+Flask~=2.2.3
+oauthlib~=3.2.2
+prefect~=2.14.5
+geopandas~=0.14.1
+gunicorn
+pydantic~=2.5.1
+urllib3~=1.26.15
+pygeoapi @ git+https://github.com/geopython/pygeoapi.git@e7264e8
+python-dateutil~=2.8.2
+setuptools~=67.6.0
+rtree

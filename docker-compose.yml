@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  kommonitor-processes-api:
+    image: kommonitor/processes-api:latest
+    environment:
+    - KC_CLIENT_ID=kommonitor-importer
+    - KC_CLIENT_SECRET=ZcrTia5Xzlq5KirsU2zGoi6vtk0Teksj
+    ports:
+      - 9999:9999
+    networks:
+      - kommonitor
+
+networks:
+  kommonitor:
+    name: kommonitor
+    external: true

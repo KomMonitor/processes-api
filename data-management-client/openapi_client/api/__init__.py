@@ -1,0 +1,16 @@
+# flake8: noqa
+
+# import apis into api package
+from openapi_client.api.georecources_controller_api import GeorecourcesControllerApi
+from openapi_client.api.georecources_public_controller_api import GeorecourcesPublicControllerApi
+from openapi_client.api.home_controller_api import HomeControllerApi
+from openapi_client.api.indicators_controller_api import IndicatorsControllerApi
+from openapi_client.api.indicators_public_controller_api import IndicatorsPublicControllerApi
+from openapi_client.api.roles_controller_api import RolesControllerApi
+from openapi_client.api.script_controller_api import ScriptControllerApi
+from openapi_client.api.script_public_controller_api import ScriptPublicControllerApi
+from openapi_client.api.spatial_units_controller_api import SpatialUnitsControllerApi
+from openapi_client.api.spatial_units_public_controller_api import SpatialUnitsPublicControllerApi
+from openapi_client.api.topics_controller_api import TopicsControllerApi
+from openapi_client.api.topics_public_controller_api import TopicsPublicControllerApi
+
