@@ -9,19 +9,21 @@ from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_
 
 from authlib.integrations.flask_oauth2 import ResourceProtector
 
-KC_CLIENT_ID = os.getenv('KC_CLIENT_ID')
-KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET')
+KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
+KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "secret")
+KC_HOSTNAME = os.getenv('KC_HOSTNAME', "http://keycloak:8080")
+KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor")
+KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 
 
 class MyIntrospectTokenValidator(IntrospectTokenValidator):
     def introspect_token(self, token_string):
-        url = 'http://keycloak:8080/realms/kommonitor/protocol/openid-connect/token/introspect'
+        url = f"{KC_HOSTNAME}/{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token/introspect"
         data = {'token': token_string, 'token_type_hint': 'access_token'}
         auth = (KC_CLIENT_ID, KC_CLIENT_SECRET)
         resp = requests.post(url, data=data, auth=auth)
         resp.raise_for_status()
         token = resp.json()
-
         # Store username and roles in context
         if token["active"]:
             g.user = token["username"]
@@ -44,7 +46,7 @@ def landing_page():
 
 @APP.route('/processes')
 @APP.route('/processes/<process_id>')
-@require_oauth()
+# @require_oauth()
 def get_processes(process_id=None):
     return flask_app.get_processes(process_id)
 

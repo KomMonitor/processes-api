@@ -1,4 +1,5 @@
 import ast
+import os
 from enum import Enum
 from logging import Logger
 from typing import Dict
@@ -10,7 +11,6 @@ from prefect import task
 
 from pygeoapi_prefect import schemas
 
-
 class AggregationType(Enum):
     SUM = 1
     AVERAGE = 2
@@ -21,7 +21,9 @@ def as_geojson(raw_string: str) -> Dict:
     return ast.literal_eval(raw_string)
 
 
-URL = "https://demo.kommonitor.de/data-management"
+KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "keycloak:8080")
+KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
+KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "secret")
 
 
 @task
@@ -30,8 +32,6 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
     # Maybe migrate into manager?
 
     if private:
-        from processor import KC_CLIENT_ID
-        from processor import KC_CLIENT_SECRET
         payload = {
             "client_id": KC_CLIENT_ID,
             "client_secret": KC_CLIENT_SECRET,
@@ -49,13 +49,13 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
 
         token = a['access_token']
         configuration = openapi_client.Configuration(
-            host=URL,
+            host=KOMMONITOR_DATA_MANAGEMENT_URL,
             access_token=token
         )
         return openapi_client.ApiClient(configuration)
     else:
         logger.debug(f"Using Public API without token")
         configuration = openapi_client.Configuration(
-            host=URL
+            host=KOMMONITOR_DATA_MANAGEMENT_URL
         )
         return openapi_client.ApiClient(configuration)
