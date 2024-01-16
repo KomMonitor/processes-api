@@ -30,8 +30,8 @@
 server:
     bind:
         host: 0.0.0.0
-        port: 9999
-    url: http://localhost:9999/
+        port: 8095
+    url: http://localhost/kommonitor/api/processor
     mimetype: application/json; charset=UTF-8
     encoding: utf-8
     gzip: false
