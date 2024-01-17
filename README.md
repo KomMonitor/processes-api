@@ -1,14 +1,20 @@
-# processes-api
+# KomMonitor Process API
 
-Proof of Concept for OAPIP-based processor in KomMonitor
-
+This repository aims as a proof of concept for introducing a new processing component in KomMonitor, which is based on the OGC Open API - Processes. For this purpose the repository provides an prototype setup, including a processing API with exemplary processes based on [pygeoapi](https://pygeoapi.io/), Keycloak for access control within pygeoapi and [prefect ](https://www.prefect.io/) as process manager for pygeoapi. To get in touch with it, just follow the instructions below.
 
 # Get Started:
-
 ## Docker Setup
 
-A `Dockerfile` is provided for building a image of the pygeoapi. A full infrastructure with all required associated KomMonitor components is provided as a `docker-compose` in the `docker` subdirectory.
+A [Dockerfile](https://github.com/KomMonitor/processes-api/blob/master/Dockerfile) is provided for building an image of the Processes API. A full infrastructure with all required associated KomMonitor components is provided as a `docker-compose` in the [docker](https://github.com/KomMonitor/processes-api/tree/master/docker) subdirectory.
 
+#### 1. Build your own image of the KomMonitor Processing API
+  ```
+  docker build -t kommonitor/processes-api .
+  ```
+#### 2. Run the full stack from the [docker](https://github.com/KomMonitor/processes-api/tree/master/docker) subdirector
+```
+docker compose up
+```
 
 ## Usage 
 
@@ -24,7 +30,7 @@ curl --request POST \
   --data client_id=kommonitor-web-client
 ```
 
-Using this token the endpoints provided by the OGC API Processes can be queried. Refer to the [OGC API - Processes Specification](https://ogcapi.ogc.org/processes/) for a list of available Endpoints and Operations. Note that not all Workflows are currently supported.
+By using this token the endpoints provided by the OGC API Processes can be queried. Refer to the [OGC API - Processes Specification](https://ogcapi.ogc.org/processes/) for a list of available Endpoints and Operations. Note, that not all workflows are currently supported.
 
 ### Example Requests
 
@@ -51,10 +57,10 @@ curl --request POST \
 
 # Development
 
-The project includes several python packages and submodules
+The project includes several python packages and submodules, which are listed below. These files can be used as a starting point for custom enhancements.
 
 ## processor
-Subfolder: `processor`
+Subfolder: [processor](https://github.com/KomMonitor/processes-api/tree/master/processor)
 
 Provides the core implementation of the KomMonitor processes-api. 
 
@@ -97,9 +103,9 @@ Subfolder: `api-specs`
 Local submodule integrating [https://github.com/KomMonitor/api-specs/](KomMonitor api-specs Repository), providing OpenAPI specifications of KomMonitor APIs.
 
 ## data-management-client
-Subfolder: `data-management-client`
+Subfolder: [data-management-client](https://github.com/KomMonitor/processes-api/tree/master/data-management-client)
 
-Client to connect to the KomMonitor data-management API.
+Client to connect to the KomMonitor Data Management API.
 
 ### Building 
 
