@@ -3,6 +3,7 @@ import necessary Node Module Dependencies
 
 
 """
+import geojson.feature
 from scipy import stats
 import geopandas as gpd
 import requests
@@ -615,6 +616,12 @@ def asFeatureCollection(features):
 API_HELPER_METHODS_GEOMETRIC_OPERATIONS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+# class gdf:
+#     def __init__(self, input):
+#         self.gdf = geoJSONtoGDF(input)
+#         self.geoJsonType = input["type"]
+
+    
 def geoJSONtoGDF(geoJSON):
     """writes the submitted GeoJSON 'Feature' or 'FeatureCollection' to a GeoPandas GeoDataFrame.
 
@@ -624,14 +631,37 @@ def geoJSONtoGDF(geoJSON):
     Returns:
         GeoDataFrame: returns a GeoDataFrame containing a row with properties and geometry for every submitted Feature.
     """
-    if isGeoJSONFeature(geoJSON):
-        gdf = gpd.GeoDataFrame.from_features([geoJSON])
-        return gdf
-    elif isGeoJSONFeatureCollection(geoJSON):
-        gdf = gpd.GeoDataFrame.from_features(geoJSON)
-        return gdf
-    else:
-        throwError("Something is wrong with your submitted GeoJSON, whether it is a correct Feature nor is it a correct FeatureCollection")
+    #TODO: erweitern für GeoJSON Geometrie (außerhalb von Feature und FeatureCollection)?
+    try:
+        if isGeoJSONFeature(geoJSON):
+            gdf = gpd.GeoDataFrame.from_features([geoJSON])
+            return gdf
+        elif isGeoJSONFeatureCollection(geoJSON):
+            gdf = gpd.GeoDataFrame.from_features(geoJSON)
+            return gdf
+        elif bool(geoJSON["coordinates"]):
+            feature = asFeature(geoJSON)
+            gdf = gpd.GeoDataFrame.from_features([feature])
+            return gdf
+    except:
+            throwError("Something is wrong with your submitted GeoJSON, whether it is a correct Feature nor is it a correct FeatureCollection")
+
+def geom2Feature(geom):
+    try:    
+        if geom.geom_type == "Point":
+            return geojson.Feature(id=None, geometry=shapely.Point(geom))
+        elif geom.geom_type == "LineString":
+            return geojson.Feature(id=None, geometry=shapely.LineString(geom))
+        elif geom.geom_type == "Polygon":
+            return geojson.Feature(id=None, geometry=shapely.Polygon(geom))
+        elif geom.geom_type == "Multipoint":
+            return geojson.Feature(id=None, geometry=shapely.MultiPoint(geom))
+        elif geom.geom_type == "MultiLineString":
+            return geojson.Feature(id=None, geometry=shapely.MultiLineString(geom))
+        elif geom.geom_type == "MultiPolygon":
+            return geojson.Feature(id=None, geometry=shapely.MultiPolygon(geom))
+    except:
+        throwError("An Error occured in function 'geom2Feature'! The geom from which the feature shall be created is none of type (Point, Linestring, Polygon, MultiPoint, MultiLineString, MultiPolygon)")
 
 def area(geoJSON):
     """Encapsulated geopandas function 'area' to compute the area of the submitted Features in square meters
@@ -690,7 +720,7 @@ def bbox_feature(feature):
     gdf = geoJSONtoGDF(feature)
     gdf.loc[0, "geometry"] = gdf.envelope[0]
     featureOut = geojson.loads(gdf.to_json(drop_id=True))
-    return featureOut["features"]
+    return featureOut["features"][0]
 
 def bbox_featureCollection(featureCollection):
     """Computes the bounding boxes of all features of the submitted 'FeatureCollection'
@@ -708,11 +738,222 @@ def bbox_featureCollection(featureCollection):
     return asFeatureCollection(newFeatures)
 
 def buffer_feature(feature, radiusInMeters):
+    """Encapsulates Geopandas buffer function to compute the buffered geometry of a single submitted feature.
+
+    Args:
+        feature (Feature): a single GeoJSON Feature consisting of geometry and properties, for whom the buffer shall be computed
+        radiusInMeters (Number): the buffer radius in Meters
+
+    Returns:
+        Feature<Polygon>: the GeoJSON feature whose geometry has been replaced by the buffered geometry of type 'Polygon'.
+        The resulting feature contains all properties of the original feature
+    """
+    gdf = geoJSONtoGDF(feature)
+    gdf.loc[0, "geometry"] = gdf.buffer(radiusInMeters)[0]
+    featureOut = geojson.loads(gdf.to_json(drop_id=True))
+    return featureOut["features"][0]
+
+def buffer_featureCollection(featureCollection, radiusInMeters):
+    """Computes the buffered geometries of all features of the submitted 'FeatureCollection'.
+
+    Args:
+        featureCollection (FeatureCollection): a GeoJSON FeatureCollection consisting of multiple features, for whom the buffers shall be computed
+        radiusInMeters (Number): the buffer radius in meters
+
+    Returns:
+        FeatureCollection<Polygon>: the GeoJSON features whose geometry has been replaced by the buffered geometry of type 'Polygon' as GeoJSON FeatureCollection.
+        The resulting features contain all properties of the original features.
+    """
+    newFeatures = []
+    for feature in featureCollection["features"]:
+        newFeatures.append(buffer_feature(feature, radiusInMeters))
+    return asFeatureCollection(newFeatures)
+
+def center_geometric(geoJSON):
+    """compute the geometric center of the submitted geoJSON geometries. When more than one Feature is submitted it computes the total boundary rectangle and its center. 
+
+    Args:
+        geoJSON (GeoJSON): a valid GeoJSON geometry (i.e. Feature or FeatureCollection)
+
+    Returns:
+        Feature: returns a Feature containing the geometry of the center point and a property 'type':'Geometric Center'
+    """
+    gdf = geoJSONtoGDF(geoJSON)
+    box = shapely.box(*gdf.total_bounds)
+    center = shapely.centroid(box)
+    featureOut = geojson.Feature(id=None, geometry=shapely.Point(center),properties={'type':'Geometric Center'})
+    return featureOut
+
+def center_mass():
+    #TODO: braucht man wirklich alle drei Funktionen?
+    return None
+
+def centroid():
+    #TODO: 
+    return None
+
+def pointOnFeature(feature):
+    """compute a point which is guaranteed on the submitted Feature. Encapsulates geopandas function 'sample_points'. The number of points on the feature is variabel.
+
+    Args:
+        feature (Feature): a valid GeoJSON Feature
+
+    Returns:
+        Feature<Point>: the GeoJSON Point Feature on the surface of the submitted Feature. The submitted feature propertys are kept.
+    """
+    gdf = geoJSONtoGDF(feature)
+    gdf.loc[0, "geometry"] = gdf.sample_points(1)[0]
+    featureOut = geojson.loads(gdf.to_json(drop_id=True))
+    return featureOut["features"][0]
+
+def contains(feature_A, feature_B):
+    """Encapsulates geopandas function 'contains' to check if the submitted 'feature_A' contains the submitted 'feature_B'
+
+    Args:
+        feature_A (Feature): a valid GeoJSON Feature of any type
+        feature_B (Feature): a valid GeoJSON Feature of any type
+
+    Returns:
+        Bool: returns 'True' if 'feature_A' contains 'feature_B'
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+    return gdfA.contains(gdfB)[0]
+
+def difference(polygonFeature_A, polygonFeature_B):
+    """computes the difference between two polygonal GeoJSON Features using geopandas 'difference' function. 
+
+    Args:
+        polygonFeature_A (Feature<Polygon>): a GeoJSON Feature of type Polygon
+        polygonFeature_B (_type_): _description_
+
+    Returns:
+        Feature<Polygon|Multipolygon>: returns a Feature containing a polygonal or muli-polygonal geometry representing the difference. If the difference is an empty geometry the feature contains a 'null' geometry.
+    """
+    gdfA = geoJSONtoGDF(polygonFeature_A)
+    gdfB = geoJSONtoGDF(polygonFeature_B)
+    out = gdfA.difference(gdfB)[0]
+    return geom2Feature(out)
+    
+def dissolve(featureCollection, propertyName):
+    """Dissolve polygonal Features. 
+
+    Args:
+        featureCollection (FeatureCollection<Polygon|MultiPolygon>): a valid GeoJSON FeatureCollection with polygonal or multipolygonal geometries.
+        propertyName (string): Optional parameter that points to an existing attribute used by the features. If set, only features with the same attribute value will be dissolved.
+
+    Returns:
+        FeatureCollection<Polygon>: the GeoJSON FeatureCollection containing the dissolved features (Note that attributes are not merged/aggregated).
+    """
+    gdf = geoJSONtoGDF(featureCollection)
+    
+    if bool(propertyName):
+        gdf = gdf.dissolve(propertyName)
+    else:
+        gdf = gdf.dissolve()
+    
+    featureCollectionOut = geojson.loads(gdf.to_json(drop_id=True))
+    return featureCollectionOut
+
+def disjoint(feature_A, feature_B):
+    """Checks whether the submitted GeoJSON Features a disjoint or not
+
+    Args:
+        feature_A (Feature): a GeoJSON Feature of any type
+        feature_B (Feature): a GeoJSON feature of any type
+
+    Returns:
+        Bool: returns 'True' if the features are disjoint and do not intersect
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+    return gdfA.disjoint(gdfB)[0]
+
+def distance_direct_kilometers(feature_A, feature_B):
+    """Calculates the shortest distance between the submitted Feature. It makes no difference which geometry type the submitted features are. 
+
+    Args:
+        feature_A (Feature): a valid GeoJSON Feature of any type
+        feature_B (Feature): a valid GeoJSON Feature of any type
+
+    Returns:
+        Number: the distance between the submitted Features in kilometers
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+    return gdfA.distance(gdfB)[0]/1000
+
+def intersects(feature_A, feature_B):
+    """Negates the result of function 'disjoint' to check whether two features intersect each other
+
+    Args:
+        feature_A (Feature): a GeoJSON Feature of any type
+        feature_B (Feature): a GeoJSON Feature of any type
+
+    Returns:
+        Bool: returns 'True' if the submitted features intersect each other
+    """
+    return not disjoint(feature_A, feature_B)
+
+def intersection(feature_A, feature_B):
+    """Encapsulates geopandas function 'intersection' to compute the intersection between two GeoJSON Feature.
+
+    Args:
+        feature_A (Feature): a valid GeoJSON Feature of any type
+        feature_B (Feature): a valid GeoJSON Feature of any type
+
+    Returns:
+        Feature: returns a feature representing the geometry both submitted features share. If they dont share any points the output is an empty feature.
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+    
+    out = gdfA.intersection(gdfB)[0]
+    return geom2Feature(out)
+
+def nearesPoint_directDistance(targetPoint, pointCollection):
     #TODO
     return None
 
+
+def distance_waypath_kilometers():
+    #TODO: Take a look at OpenRouteService  
+    return None
+
+def distance_matrix_kilometers():
+    #TODO
+    return None
+
+def duration_matrix_seconds():
+    #TODO
+    return None
+
+def isochrones_byTime():
+    #TODO
+    return None
+
+def computeIsochrones_byTime():
+    #TODO
+    return None
+
+def isochrones_byDistance():
+    #TODO
+    return None
+
+def computeIsochrones_byDistance():
+    #TODO
+    return None
+
+def executeOrsQuery():
+    #TODO
+    return None
+
+
+
+
 #TODO
 
+# arbeitet Kommonitor nur mit features und featurecollections oder auch rohen geojson geometrien
 
 # braucht man ein object für Process Parameters oder genügt ein dictionary, weil eigentlich sind die ja auch nichts anderes als key value pairs also ist das array im moment doch überflüssig
 
