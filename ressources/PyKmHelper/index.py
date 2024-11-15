@@ -24,7 +24,9 @@ spatialUnitFeatureNamePropertyName = "NAME"
 indicator_date_prefix = "DATE_"
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 API_HELPER_METHODS_UTILITY
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 def getBaseIndicatorByName(indicatorName, baseIndicatorsDict):
@@ -610,10 +612,36 @@ def asFeatureCollection(features):
         FeatureCollection: a GeoJSON FeatureCollection containing all the submitted Features.
     """
     return geojson.FeatureCollection(features) 
+
+def hasMultiLineString():
+    #TODO
+    return None
+
+def transformMultiLineStringToLineStrings():
+    #TODO
+    return None
     
+def replaceMultiLineStringsByLineStrings():
+    #TODO
+    return None
+    
+def hasMultiPolygon():
+    #TODO
+    return None
+
+def transformMultiPolygonsToPolygons():
+    #TODO
+    return None
+    
+def replaceMultiPolygonsByPolygons():
+    #TODO
+    return None
+
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 API_HELPER_METHODS_GEOMETRIC_OPERATIONS
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 # class gdf:
@@ -647,8 +675,18 @@ def geoJSONtoGDF(geoJSON):
             throwError("Something is wrong with your submitted GeoJSON, whether it is a correct Feature nor is it a correct FeatureCollection")
 
 def geom2Feature(geom):
-    try:    
-        if geom.geom_type == "Point":
+    """transforms a GeoSeries like geometry into a GeoJSON Feature.
+
+    Args:
+        geom (GeoSeries): an Object of type GeoSeries with the properties 'is_empty' and 'geom_type'
+
+    Returns:
+        Feature: returns a GeoJSON Feature of the correct type
+    """
+    try:
+        if geom.is_empty == "True":
+            return None    
+        elif geom.geom_type == "Point":
             return geojson.Feature(id=None, geometry=shapely.Point(geom))
         elif geom.geom_type == "LineString":
             return geojson.Feature(id=None, geometry=shapely.LineString(geom))
@@ -785,7 +823,7 @@ def center_geometric(geoJSON):
     return featureOut
 
 def center_mass():
-    #TODO: braucht man wirklich alle drei Funktionen?
+    #TODO: eine Funktion für geometrisch (auch außerhalb) eine tatsächlich im Polygon
     return None
 
 def centroid():
@@ -911,10 +949,186 @@ def intersection(feature_A, feature_B):
     out = gdfA.intersection(gdfB)[0]
     return geom2Feature(out)
 
-def nearesPoint_directDistance(targetPoint, pointCollection):
+def nearestPoint_directDistance(targetPoint, pointCollection):
+    """Identify the nearest Point to a target Point within a submitted FeatureCollection<Point> using Geopandas function 'sjoin_nearest'
+
+    Args:
+        targetPoint (Feature<Point>): a GeoJSON feature with geometry type 'Point', for which the nearest point will be searched
+        pointCollection (FeatureCollection<Point>):  a GeoJSON FeatureCollection of features with geometry type  'Point'
+
+    Returns:
+        Feature<Point>: returns the nearest GeoJSON Point Feature with the shortest direct distance to 'targetPoint'.
+    """
+    if not isGeoJSONPointFeature(targetPoint):
+        throwError("The submitted object targetPoint is not a valid GeoJSON point feature. It was: " + str(targetPoint))
+    
+    for pointCandidate in pointCollection["features"]:
+        if not isGeoJSONPointFeature(targetPoint):
+            throwError("The submitted pointCollection contains features that are no valid GeoJSON point features. PointCandidate was: " + str(pointCandidate))
+    
+    gdfPoint = geoJSONtoGDF(targetPoint)
+    gdfCollection = geoJSONtoGDF(pointCollection)
+
+    joint = gpd.sjoin_nearest(gdfPoint, gdfCollection)
+    indexNearestPoint = joint.loc[0, "index_right"]
+
+    gdfOut = gpd.GeoDataFrame([gdfCollection.loc[indexNearestPoint]])
+    featureOut = geojson.loads(gdfOut.to_json(drop_id=True))
+    return featureOut["features"][0]
+
+
+
+def nearestPointOnLine_directDistance(targetPoint, lineString):
+    """Identifies the the closest Point to 'targetPoint' on the submitted 'lineString'. The used function 'shapely.ops.nearest_points' is also capable of calculating the distance to any other geometry type.
+
+    Args:
+        targetPoint (Feature<Point>): a GeoJSON feature with geometry type 'Point', for which the nearest point will be searched
+        lineString (Feature<LineString|MultiLineString>): a GeoJSON feature  with geometry type 'LineString' or 'MultiLineString'
+
+    Returns:
+        Feature<Point>: returns the nearest GeoJSON Point Feature with the shortest direct distance to 'targetPoint'. Furthermore it contains the property 'dist', which
+        contains the direct distance to 'targetPoint' in kilometers.
+    """
+    if not isGeoJSONPointFeature(targetPoint):
+        throwError("The submitted object targetPoint is not a valid GeoJSON point feature. It was: " + str(targetPoint))
+    
+    if not isGeoJSONLineStringFeature(lineString):
+        throwError("The submitted lineStringCandidate is not a valid GeoJSON LineString|MultiLineString feature. Candidate was: " + str(lineString))
+    
+    gdfPoint = geoJSONtoGDF(targetPoint)
+    gdfLine = geoJSONtoGDF(lineString)
+
+    nearestPoints = shapely.ops.nearest_points(gdfPoint.geometry, gdfLine.geometry)
+    dist = nearestPoints[0].distance(nearestPoints[1])
+
+    outFeature = geom2Feature(nearestPoints[1][0])
+    outFeature["properties"]["dist"] = dist[0] / 1000
+    return outFeature
+
+def nearestPointOnLines_directDistance(targetPoint, lineStringCollection):
+    """Identifies the the closest Point to 'targetPoint' on the submitted 'lineStringCollection'. The used function 'shapely.ops.nearest_points' is also capable of calculating the distance to any other geometry type.
+
+    Args:
+        targetPoint (Feature<Point>): a GeoJSON feature with geometry type 'Point', for which the nearest point will be searched
+        lineString (FeatureCollection<LineString|MultiLineString>): a GeoJSON featureCollection  with geometry types 'LineString' or 'MultiLineString'
+
+    Returns:
+        Feature<Point>: returns the nearest GeoJSON Point Feature with the shortest direct distance to 'targetPoint'. Furthermore it contains the property 'dist', which
+        contains the direct distance to 'targetPoint' in kilometers.
+    """
+    if not isGeoJSONPointFeature(targetPoint):
+        throwError("The submitted object targetPoint is not a valid GeoJSON point feature. It was: " + str(targetPoint))
+    
+    for lineStringCandidate in lineStringCollection["features"]:
+        if not isGeoJSONLineStringFeature(lineStringCandidate):
+            throwError("The submitted lineStringCandidate is not a valid GeoJSON LineString|MultiLineString feature. Candidate was: " + str(lineStringCandidate))
+    
+    shortestDistance = None
+    nearestPoint = None
+
+    for lineStringCandidate in lineStringCollection["features"]:
+        pointCandidate = nearestPointOnLine_directDistance(targetPoint, lineStringCandidate)
+
+        if shortestDistance == None or pointCandidate["properties"]["dist"] < shortestDistance:
+            shortestDistance = pointCandidate["properties"]["dist"]
+            nearestPoint = pointCandidate
+    
+    return nearestPoint
+
+def nearestPointOnPolygon_directDistance(targetPoint, polygon):
+    """Calculate the nearest Point of a submitted polygon to a target Point. Therefore the polygon gets splitted in its boundary 'LineString' and the distance to the nearest Point on this LineString gets identified.
+
+    Args:
+        targetPoint (Feature<Point>): a GeoJSON feature with geometry type 'Point', for which the nearest point will be searched
+        polygon (Feature<Polygon|MultiPolygon>): a GeoJSON feature with geometry type 'Polygon' or 'MultiPolygon'
+
+    Returns:
+        Feature<Point>: returns the nearest GeoJSON Point Feature with the shortest direct distance to 'targetPoint'. Furthermore it contains the property 'dist', which
+        contains the direct distance to 'targetPoint' in kilometers.
+    """
+    if not isGeoJSONPointFeature(targetPoint):
+        throwError("The submitted object targetPoint is not a valid GeoJSON point feature. It was: " + str(targetPoint))
+    
+    if not isGeoJSONPolygonFeature(polygon):
+        throwError("The submitted Polygon is not a valid GeoJSON Polygon feature. Candidate was: " + str(polygon))
+    
+    gdfPoint = geoJSONtoGDF(targetPoint)
+    gdfPolygon = geoJSONtoGDF(polygon)
+
+    bounds = gdfPolygon.boundary
+
+    nearestPoints = shapely.ops.nearest_points(gdfPoint.geometry, bounds)
+    dist = nearestPoints[0].distance(nearestPoints[1])
+
+    outFeature = geom2Feature(nearestPoints[1][0])
+    outFeature["properties"]["dist"] = dist[0] / 1000
+    return outFeature
+
+def nearestPointOnPolygons_directDistance(targetPoint, polygonCollection):
+    """Calculate the nearest Point of a submitted FeatureCollection<Polygon> to a target Point. Therefore the polygons gets splitted in its boundary 'LineString' and the distance to the nearest Point on this LineString gets identified.
+
+    Args:
+        targetPoint (Feature<Point>): a GeoJSON feature with geometry type 'Point', for which the nearest point will be searched
+        polygon (FeatureCollection<Polygon|MultiPolygon>): a GeoJSON feature collection with geometry types 'Polygon' or 'MultiPolygon'
+
+    Returns:
+        Feature<Point>: returns the nearest GeoJSON Point Feature with the shortest direct distance to 'targetPoint'. Furthermore it contains the property 'dist', which
+        contains the direct distance to 'targetPoint' in kilometers.
+    """
+    if not isGeoJSONPointFeature(targetPoint):
+        throwError("The submitted object targetPoint is not a valid GeoJSON point feature. It was: " + str(targetPoint))
+    
+    for polygonCandidate in polygonCollection["features"]:
+        if not isGeoJSONPolygonFeature(polygonCandidate):
+            throwError("The submitted polygonCandidate is not a valid GeoJSON Polygon feature. Candidate was: " + str(polygonCandidate))
+    
+    shortestDistance = None
+    nearestPoint = None
+
+    for polygonCandidate in polygonCollection["features"]:
+        pointCandidate = nearestPointOnPolygon_directDistance(targetPoint, polygonCandidate)
+
+        if shortestDistance == None or pointCandidate["properties"]["dist"] < shortestDistance:
+            shortestDistance = pointCandidate["properties"]["dist"]
+            nearestPoint = pointCandidate
+    
+    return nearestPoint
+
+def overlap(feature_A, feature_B):
+    """encapsulates Geopandas.GeoSeries function 'overlaps' to check whether the submitted Features overlap or not
+
+    Args:
+        feature_A (Feature): a GeoJSON Feature of any type
+        feature_B (Feature): a GeoJSON Feature of any type
+
+    Returns:
+        Bool: returns 'True' if 'feature_A' overlaps partially with 'feature_B'
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+
+    return gdfA.overlaps(gdfB)[0]
+
+def union():
+    #TODO
+    return None
+    
+def within():
+    #TODO
+    return None
+    
+def pointsWithinPolygon():
     #TODO
     return None
 
+def within_usingBBOX():
+    #TODO
+    return None
+    
+
+#
+#   From Here OpenRouteService
+#
 
 def distance_waypath_kilometers():
     #TODO: Take a look at OpenRouteService  
@@ -948,6 +1162,9 @@ def executeOrsQuery():
     #TODO
     return None
 
+def nearestPoint_waypathDistance():
+    #TODO
+    return None
 
 
 
@@ -955,7 +1172,9 @@ def executeOrsQuery():
 
 # arbeitet Kommonitor nur mit features und featurecollections oder auch rohen geojson geometrien
 
-# braucht man ein object für Process Parameters oder genügt ein dictionary, weil eigentlich sind die ja auch nichts anderes als key value pairs also ist das array im moment doch überflüssig
+# Process Parameter (Objekt oder Dictionary)
+
+
 
 
     
