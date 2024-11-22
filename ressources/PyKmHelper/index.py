@@ -3,13 +3,15 @@ import necessary Node Module Dependencies
 
 
 """
-import geojson.feature
 from scipy import stats
+import scipy
+import numpy
 import geopandas as gpd
 import requests
 import logging
 import geojson
 import math
+import scipy.sparse
 import shapely
 
 # Define custom CONSTANTS used within the script
@@ -613,29 +615,84 @@ def asFeatureCollection(features):
     """
     return geojson.FeatureCollection(features) 
 
-def hasMultiLineString():
-    #TODO
-    return None
+def hasMultiLineString(featureCollection):
+    """Inspects the submitted GeoJSON FeatureCollection for any features of type 'MultiLineString'
 
-def transformMultiLineStringToLineStrings():
-    #TODO
-    return None
-    
-def replaceMultiLineStringsByLineStrings():
-    #TODO
-    return None
-    
-def hasMultiPolygon():
-    #TODO
-    return None
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection
 
-def transformMultiPolygonsToPolygons():
-    #TODO
-    return None
+    Returns:
+        Bool: returns 'True' if the featurecollection contains any features of type 'MultiLineString', otherwise returns 'False'
+    """
+    for feature in featureCollection["features"]:
+        if feature["geometry"]["type"] == "MultiLineString":
+            return True
+    return False
+
+# This function should not be necessary, the function 'transformMultiLineStringsToLineStrings' does all necessary things to eliminate all MulitLineStrings in a submitted FeatureCollection
+# def replaceMultiLineStringsByLineStrings(featureCollection):
+#     """Replaces any feature of type 'MultiLineString' of the submitted featureCollection by the individual features of type 'LineString'.
+
+#     Args:
+#         featureCollection (FeatureCollection<LineString|MultiLineString>): valid GeoJSON FeatureCollection with line geometries (MultiLineStrings will be replaced by multiple lines).
+
+#     Returns:
+#         FeatureCollection<LineString>: the GeoJSON FeatureCollection where features of type 'MultiLineString' have been replaced by multiple features of type 'LineString'.
+#     """
+#     gdf = geoJSONtoGDF(featureCollection)
+#     gdf = gdf.explode(index_parts=False)
+
+#     featureOut = geojson.loads(gdf.to_json(drop_id=True))
+#     return featureOut
+
+def transformMultiLineStringToLineStrings(featureCollection):
+    """Replaces any feature of type 'MultiLineString' of the submitted featureCollection by the individual features of type 'LineString'.
+
+    Args:
+        featureCollection (FeatureCollection<LineString|MultiLineString>): valid GeoJSON FeatureCollection with line geometries (MultiLineStrings will be replaced by multiple lines).
+
+    Returns:
+        FeatureCollection<LineString>: the GeoJSON FeatureCollection where features of type 'MultiLineString' have been replaced by multiple features of type 'LineString'.
+    """
+    gdf = geoJSONtoGDF(featureCollection)
+    gdf = gdf.explode(index_parts=False)
+
+    featureOut = geojson.loads(gdf.to_json(drop_id=True))
+    return featureOut
+        
+def hasMultiPolygon(featureCollection):
+    """Inspects the submitted GeoJSON FeatureCollection for any features of type 'MultiPolygon'
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection
+
+    Returns:
+        Bool: returns 'True' if the featurecollection contains any features of type 'MultiPolygon', otherwise returns 'False'
+    """
+    for feature in featureCollection["features"]:
+        if feature["geometry"]["type"] == "MultiPolygon":
+            return True
+    return False
+
+def transformMultiPolygonsToPolygons(featureCollection):
+    """Replaces any feature of type 'MultiPolygon' of the submitted featureCollection by the individual features of type 'Polygon'.
+
+    Args:
+        featureCollection (FeatureCollection<Polygon|MultiPolygon>): valid GeoJSON FeatureCollection with line geometries (MultiPolygons will be replaced by multiple lines).
+
+    Returns:
+        FeatureCollection<Polygon>: the GeoJSON FeatureCollection where features of type 'MultiPolygon' have been replaced by multiple features of type 'Polygon'.
+    """
+    gdf = geoJSONtoGDF(featureCollection)
+    gdf = gdf.explode(index_parts=False)
+
+    featureOut = geojson.loads(gdf.to_json(drop_id=True))
+    return featureOut
     
-def replaceMultiPolygonsByPolygons():
-    #TODO
-    return None
+# def replaceMultiPolygonsByPolygons():
+#     # this function is not required (see LineStrings)
+#     return None
+
 
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -643,12 +700,6 @@ def replaceMultiPolygonsByPolygons():
 API_HELPER_METHODS_GEOMETRIC_OPERATIONS
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-# class gdf:
-#     def __init__(self, input):
-#         self.gdf = geoJSONtoGDF(input)
-#         self.geoJsonType = input["type"]
-
     
 def geoJSONtoGDF(geoJSON):
     """writes the submitted GeoJSON 'Feature' or 'FeatureCollection' to a GeoPandas GeoDataFrame.
@@ -711,7 +762,7 @@ def area(geoJSON):
         array<float>: returns an array containing the area from all submitted features 
     """
     gdf = geoJSONtoGDF(geoJSON)
-    return gdf.area
+    return gdf.area[0]
 
 def area_feature_asProperty(feature):
     """Compute the area of the submitted Feature in square meters and append it as a new property named 'area_SquareMeters'
@@ -807,8 +858,8 @@ def buffer_featureCollection(featureCollection, radiusInMeters):
         newFeatures.append(buffer_feature(feature, radiusInMeters))
     return asFeatureCollection(newFeatures)
 
-def center_geometric(geoJSON):
-    """compute the geometric center of the submitted geoJSON geometries. When more than one Feature is submitted it computes the total boundary rectangle and its center. 
+def center_usingBBOX(geoJSON):
+    """Computes the center of a submitted FeatureCollection. For that the BBOX of all submitted Features gets determined and its center gets computed.  
 
     Args:
         geoJSON (GeoJSON): a valid GeoJSON geometry (i.e. Feature or FeatureCollection)
@@ -822,13 +873,34 @@ def center_geometric(geoJSON):
     featureOut = geojson.Feature(id=None, geometry=shapely.Point(center),properties={'type':'Geometric Center'})
     return featureOut
 
-def center_mass():
-    #TODO: eine Funktion für geometrisch (auch außerhalb) eine tatsächlich im Polygon
-    return None
+def center_representative(geoJSON):
+    """Computes a representative Point which is safely inside a submitted Polygon. Its most likely the center of a geometry but for the exact geometric centroid use function 'centroid'. 
 
-def centroid():
-    #TODO: 
-    return None
+    Args:
+        geoJSON (GeoJSON): a valid GeoJSON Geometry (i.e. Feature) containing a polygonal Geomtry.
+
+    Returns:
+        Feature<Point>: returns a GeoJSON Feature containing the point geometry representing the most likely center inside a polygon.
+    """
+    gdf = geoJSONtoGDF(geoJSON)
+    geom = gdf.representative_point()[0]
+    return geom2Feature(geom)
+
+
+def centroid(geoJSON):
+    """Computes the centroid of a single submitted GeoJSON Geometry (i.e. Feature). Note that the Centroid of a geometry can also be outside of a polygon!
+
+    Args:
+        geoJSON (Feature): a single valid GeoJSON Geometry (i.e. Feature) containing the Polygon which centroid Point should get determined.
+
+    Returns:
+        Feature<Point>: returns a Feature containing the Point geometry representing the centroid.
+    """
+    gdf = geoJSONtoGDF(geoJSON)
+    geom = gdf.centroid[0]
+    return geom2Feature(geom)
+
+
 
 def pointOnFeature(feature):
     """compute a point which is guaranteed on the submitted Feature. Encapsulates geopandas function 'sample_points'. The number of points on the feature is variabel.
@@ -1109,29 +1181,139 @@ def overlap(feature_A, feature_B):
 
     return gdfA.overlaps(gdfB)[0]
 
-def union():
-    #TODO
-    return None
-    
-def within():
-    #TODO
-    return None
-    
-def pointsWithinPolygon():
-    #TODO
-    return None
+def union(polygonFeature_A, polygonFeature_B):
+    """Encapsulates GeoPandas function 'union' to compute the union of two or more polygonal GeoJSON Features.
 
-def within_usingBBOX():
-    #TODO
-    return None
+    Args:
+        polygonFeature_A (Feature<Polygon|MultiPolygon>): a GeoJSON Feature of type 'Polygon'
+        polygonFeature_B (Feature<Polygon|MultiPolygon>): a GeoJSON Feature of type 'Polygon'
+
+    Returns:
+        Feature<Polygon|MultiPolygon>|None: the GeoJSON feature of type Polygon or MultiPolygon representing the union of the submitted features.
+    """
+    gdfA = geoJSONtoGDF(polygonFeature_A)
+    gdfB = geoJSONtoGDF(polygonFeature_B)
+
+    geom = gdfA.union(gdfB)[0]
+    return geom2Feature(geom)
+
+
+def within(feature_A, feature_B):
+    """Encapsulates GeoPandas function 'within' to check whether 'feature_A' is completely inside 'feature_B'.
+
+    Args:
+        feature_A (Feature): a valid GeoJSON Feature of any type
+        feature_B (Feature): a valid GeoJSON Feature of any type
+
+    Returns:
+        Bool: returns if 'feature_A' lies completely within 'feature_B'
+    """
+    gdfA = geoJSONtoGDF(feature_A)
+    gdfB = geoJSONtoGDF(feature_B)
+
+    return gdfA.within(gdfB)[0]
+
+def pointsWithinPolygon(points, polygons):
+    """Find all points that lie completely within a submitted polygon. 
+
+    Args:
+        points (Feature|FeatureCollection): a GeoJSON Point feature
+        polygons (FeatureCollection|Feature|Geometry): a GeoJSON polygonal geometry (i.e. Feature, Geometry, FeatureCollection)
+
+    Returns:
+        FeatureCollection: returns a FeatureCollection that contains all points that lie within at least one polygon of the submitted polygons as FeatureCollection<Point>
+    """
+    gdfPoints = geoJSONtoGDF(points)
+    gdfPolygons = geoJSONtoGDF(polygons)
+
+    joint = gdfPoints.sjoin(gdfPolygons, predicate="within")
+    gdfOut = joint.drop(columns=["index_right", "id"])
     
+    featureOut = geojson.loads(gdfOut.to_json(drop_id=True))
+    return featureOut
+
+
+def within_usingBBOX(feature_A, feature_B):
+    """This method is an alternative implementation of a spatial 'within' function for spatial features.
+    First of all, it computes bounding boxes of the relevant features to speed up the spatial comparison.
+    Furthermore, instead of checking whether 'feature_A' lies completely within  'feature_B',
+    it inspects whether the bounding boxes overlap for more than 90.0%. If the features's geometries might contain faulty coordinates for whatever reason that would
+    cause a strict spatial 'within' comparison to output 'false', this alternative approach ensures that such small coordinate failures will still
+    result in a positive 'within' check.
+
+    Args:
+        feature_A (Feature<Polygon>): a base indicator (input) feature as GeoJSON Feature
+        feature_B (Feature<Polygon>): a target Feature as GeoJSON feature (for which indicator results shall be computed)
+
+    Returns:
+        Bool: returns 'true' if the 'feature_A' lies within 'feature_B'
+        (precisely, if their bounding boxes overlap for more than 90.0%); 'false 'otherwise
+    """
+    feature_A_bbox = bbox_feature(feature_A)
+    feature_B_bbox = bbox_feature(feature_B)
+    feature_A_bbox_area = area(feature_A_bbox)
+
+    intersect = intersection(feature_B_bbox, feature_A_bbox)
+
+    # if there is no intersection (features are disjoint) then skip this
+    if intersect == None:
+        return False
+    
+    intersectionArea = area(intersect)
+    overlapInPercent = abs(intersectionArea / feature_A_bbox_area) * 100
+
+    #if indicatorFeature overlaps for at least 90% with feature_B, the assign it for aggregation to feature_B
+    if overlapInPercent >= 90.0:
+        return True
+    
+    return False
+
+def intersectLineFeatureCollectionByPolygonFeature(lineStringCollection, polygonFeature):
+    """computes the intersections of linestrings of a featureCollection and a polygon feature
+
+    Args:
+        lineStringCollection (FeatureCollection<LineString>): a valid GeoJSON FeatureCollection of type LineString
+        polygonFeature (Feature<Polygon>): a valid GeoJSON Feature
+
+    Returns:
+        FeatureCollection<LineString>: returns the submitted FeatureCollection with the geometry replaced by the intersection
+    """
+    gdfLine = geoJSONtoGDF(lineStringCollection)
+    gdfPolygon = geoJSONtoGDF(polygonFeature)
+
+    featureCollection = geojson.FeatureCollection({})
+    i = 0
+
+    geoms = gdfLine.intersection(gdfPolygon.loc[0, "geometry"])
+
+    for geom in geoms:
+        gdfLine.loc[i, "geometry"] = geom
+        i = i + 1
+
+    featureOut = geojson.loads(gdfLine.to_json(drop_id=True))
+    return featureOut
+
+
+
+def summarizeLineSegmentLenghts(featureCollection):
+    """Computes the lenght of all line segments of a linestring feature Collection.
+
+    Args:
+        featureCollection (FeatureCollection<LineString>): a valid GeoJSON FeatureCollection containing LineString Features
+
+    Returns:
+        float64: returns the summarized length of all line segments
+    """
+    gdf = geoJSONtoGDF(featureCollection)
+    length = gdf.length
+    return length.sum()
 
 #
 #   From Here OpenRouteService
 #
 
 def distance_waypath_kilometers():
-    #TODO: Take a look at OpenRouteService  
+    #TODO:  
     return None
 
 def distance_matrix_kilometers():
@@ -1167,6 +1349,292 @@ def nearestPoint_waypathDistance():
     return None
 
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+API_HELPER_METHODS_STATISTICAL_OPERATIONS
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+def convertPropertyArrayToNumberArray(propertyArray):
+    """Takes a property array of arbitrary input objects and returns a valueArray of numeric values which have been converted to a number by. 
+    Any property value of the input array, whose conversion results in NaN using the check 'math.isnan(value)' or is boolean will be completely removed from the array
+    Thus the resulting array may have fewer entries than the original array.
+
+    Args:
+        propertyArray (Array<any>): an array of arbitrary values (i.e. String, Float, Bool, ...)
+
+    Returns:
+        Array<Float>: returns the array of all values that were successfully converted to a number. responseArray.length may be smaller than inputArray.length, if inputArray contains boolean items or items whose Number-conversion result in NaN
+    """
+    numericArray = []
+    
+    for value in propertyArray:
+        try:
+            if value is True or value is False:
+                
+                exit    
+            elif math.isnan(float(value)):
+                exit
+            else:
+                numericArray.append(float(value))
+        except:
+            print(str(value) + " is not convertible to float!")
+
+    return numericArray
+
+def convertPropertyDictToNumberDict_fromIdValueDict(indicatorIdValueDict):
+    """Takes a property dictionary of arbitrary input objects and returns a valueDict of numeric values which have been converted to a number. 
+    Any property value of the input dict, whose conversion results in NaN using the check 'math.isnan(value)' or is boolean will be completely removed from the dict
+    Thus the resulting dict may have fewer entries than the original dict.
+
+    Args:
+        indicatorIdValueDict (Dict<String, any>): a dictionary containing key value pairs where key=ID and value=indicatorValue
+
+    Returns:
+        Dict<String, Float>: returns the dictionary of all input entries which have been successfully converted to float. The size may be smaller than the original dict.
+    """
+    resultDict = {}
+
+    for key, value in indicatorIdValueDict.items():
+        try:
+            if value is True or value is False:
+                exit
+            elif math.isnan(float(value)):
+                exit
+            else:
+                resultDict[key] = float((value))
+        except:
+            print(str(value) + " is not convertible to float!")
+
+    return resultDict
+
+def sum(valueArray):
+    """Compute the sum of the submitted 'valueArray'
+
+    Args:
+        valueArray (Array<Any>): an array of arbitrary input object which should contain number values to calculate the sum. The array gets transformed using 'convertPropertyArrayToNumberArray'
+
+    Returns:
+        Float: returns the sum of the submitted Array
+    """
+    valueArray = convertPropertyArrayToNumberArray(valueArray)
+    return numpy.sum(valueArray)
+    
+
+def covariance(populationArray_A, populationArray_B):
+    """encapsulates numpys function 'cov' to compute the covariance of two arrays of the same lenght. 
+
+    Args:
+        populationArray_A (Array<Number>): first data array of numeric values (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        populationArray_B (Array<Number>): first data array of numeric values (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the covariance value of the submitted Arrays (or raises an Error if the submitted Arrays are not same length)
+    """
+    try:
+        valueArray_A = convertPropertyArrayToNumberArray(populationArray_A)
+        valueArray_B = convertPropertyArrayToNumberArray(populationArray_B)
+        return numpy.cov(valueArray_A, valueArray_B)[0, 1]
+    except ValueError:
+        throwError("The submitted Arrays are not the same length, cannot compute a covariance!")
+    
+def max(populationArray):
+    """Encapsulates numpys function 'max' to compute the max value of the submitted value array.
+
+    Args:
+        populationArray (Array<Float>): data array of numeric values (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the max value of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.max(populationArray)
+
+def min(populationArray):
+    """Encapsulates numpys function 'min' to compute the min value of the submitted value array.
+
+    Args:
+        populationArray (Array<Float>): data array of numeric values (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the min value of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.min(populationArray)
+
+def minMaxNormalization_singleValue(min, max, value):
+    """Implements a min max normalization value of the submitted value using the formula '(value - min) / (max) - (min)'
+
+    Args:
+        min (Float): the min value used in upper normalization formula
+        max (Float): the max value used in upper normalization formula
+        value (Float): the value to be normalized
+
+    Returns:
+        Float: returns the normalized value
+    """
+    normalizedValue = (float(value) - float(min)) / (float(max) - float(min))
+    return normalizedValue
+
+def minMaxNormalization_wholeValueArray(populationArray):
+    """Implements a min max normalization for a whole submitted value array using function 'minMaxNormalization_singleValue'
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the min max normalized value array shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Array<Float>: returns the submitted value where each value is normalized
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+
+    minValue = min(populationArray)
+    maxValue = max(populationArray)
+
+    normalizedArray = []
+
+    for value in populationArray:
+        normalizedArray.append(minMaxNormalization_singleValue(minValue, maxValue, value))
+
+    return normalizedArray
+
+def minMaxNormalization_inverted_singleValue(min, max, value):
+    """Implements an inverted min max normalization value of the submitted value using the formula '1 - ((value - min) / (max) - (min))'
+
+    Args:
+        min (Float): the min value used in upper normalization formula
+        max (Float): the max value used in upper normalization formula
+        value (Float): the value to be normalized
+
+    Returns:
+        Float: returns the inverted normalized value
+    """
+    normalizedValue = 1 - minMaxNormalization_singleValue(min, max, value)
+    return normalizedValue
+
+def minMaxNormalization_inverted_wholeValueArray(populationArray):
+    """Implements an inverted min max normalization for a whole submitted value array using function 'minMaxNormalization_inverted_singleValue'
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the inverted min max normalized value array shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Array<Float>: returns the submitted value where each value is inverted normalized
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+
+    minValue = min(populationArray)
+    maxValue = max(populationArray)
+
+    invNormalizedArr = []
+
+    for value in populationArray:
+        invNormalizedArr.append(minMaxNormalization_inverted_singleValue(minValue, maxValue, value))
+
+    return invNormalizedArr
+
+def minMaxNormalization_fromIdValueDict(indicatorIdValueDict):
+    """implements a min max normalization algorithm for an indicator id value dictionary. 
+
+    Args:
+        indicatorIdValueDict (Dict<String, Float>): Dictionary of all indicator id and value pairs where key=id and value=indicatorValue. Types get converted to float values if possible, if not possible the result dict is possibly shorter than the submitted.
+
+    Returns:
+        Dict<String, Float>: returns the same dict, but instead of the original indicator value the respective normalized value is set as the value for ech id.
+    """
+    resultDict = {}
+
+    numericEntriesDict = convertPropertyDictToNumberDict_fromIdValueDict(indicatorIdValueDict)
+
+    indicatorValues = getIndicatorValueArray_fromIdValueDict(numericEntriesDict)
+
+    normalizedArray = minMaxNormalization_wholeValueArray(indicatorValues)
+
+    if not len(normalizedArray) == len(numericEntriesDict):
+        log("Error deteced during 'minMaxNormalization_fromIdValueMap'. The size of input id value map is not equal to the size of the computed normalization array. Hence cannot continue compute normalization values for whole map. Some values may not be numeric, and thus get lost in between?")
+
+    i = 0
+
+    for key, value in numericEntriesDict.items():
+        resultDict[key] = normalizedArray[i]
+        i = i + 1
+    
+    return resultDict
+    
+def minMaxNormalization_inverted_fromIdValueDict(indicatorIdValueDict):
+    """implements an inverted min max normalization algorithm for an indicator id value dictionary. 
+
+    Args:
+        indicatorIdValueDict (Dict<String, Float>): Dictionary of all indicator id and value pairs where key=id and value=indicatorValue. Types get converted to float values if possible, if not possible the result dict is possibly shorter than the submitted.
+
+    Returns:
+        Dict<String, Float>: returns the same dict, but instead of the original indicator value the respective inverted normalized value is set as the value for ech id.
+    """
+    normalizedDict = minMaxNormalization_fromIdValueDict(indicatorIdValueDict)
+
+    invertedDict = {}
+    for key, value in normalizedDict.items():
+        invertedDict[key] = 1 - value
+
+    return invertedDict
+
+def rank(populationArray):
+    """encapsulates scipy.stats function 'rank' to compute the rank array of the submitted value array
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the mean shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to make sure only numeric values are ranked. Therefore the result can be shorter than the input)
+
+    Returns:
+        numpy.ndarray<Float>: returns the ranks of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return stats.rankdata(populationArray)
+
+def rank_fromIdValueDict(indicatorIdValueDict):
+    """encapsulates scipy.stats function 'rank' to compute the rank array of the submitted 'indicatorIdValueDict'
+
+    Args:
+        indicatorIdValueDict (Dict<String, Float>): a dictionary of key value pairs. Where key = id and value = indicatorValue 
+
+    Returns:
+        Dict<String, Float>: returns the same dictionary like the submitted, but the values have been replaced by their rank inside the dictionary.
+    """
+    resultDict = {}
+
+    numericEntriesDict = convertPropertyDictToNumberDict_fromIdValueDict(indicatorIdValueDict)
+
+    indicatorValues = getIndicatorValueArray_fromIdValueDict(numericEntriesDict)
+
+    rankedValues = rank(indicatorValues)
+
+    if not len(rankedValues) == len(numericEntriesDict):
+        log("Error deteced during 'rank_fromIdValueMap'. The size of input id value map is not equal to the size of the computed ranked array. Hence cannot continue compute rank values for whole map. Some values may not be numeric, and thus get lost in between?")
+
+    i = 0
+
+    for key, value in numericEntriesDict.items():
+        resultDict[key] = rankedValues[i]
+        i = i + 1
+    
+    return resultDict
+
+def geomean(populationArray):
+    """Encapsulates scipy.stats.mstats function 'gmean' to compute the geometric mean value of the submitted value array.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the mean shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to make sure only numeric values are ranked. Therefore the result can be shorter than the input)
+
+    Returns:
+        Float: returns the geometric mean value of the submitted array of numeric values. (If there are zero values in the input the output will be zero)
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return stats.mstats.gmean(populationArray)
+
+def geomean_fromIdValueDict(indicatorIdValueDictArray):
+    #TODO
+    return None
+
+
+
 
 #TODO
 
@@ -1174,6 +1642,7 @@ def nearestPoint_waypathDistance():
 
 # Process Parameter (Objekt oder Dictionary)
 
+# prefect get_run_logger() schon im KmHelper (schonmal vorbereiten)
 
 
 
