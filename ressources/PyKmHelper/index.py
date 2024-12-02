@@ -1,18 +1,15 @@
 """
-import necessary Node Module Dependencies
 
+import necessary Node Module Dependencies
 
 """
 from scipy import stats
-import scipy
 import numpy
 import geopandas as gpd
-import requests
-import logging
 import geojson
 import math
-import scipy.sparse
 import shapely
+import datetime
 
 # Define custom CONSTANTS used within the script
 
@@ -710,7 +707,6 @@ def geoJSONtoGDF(geoJSON):
     Returns:
         GeoDataFrame: returns a GeoDataFrame containing a row with properties and geometry for every submitted Feature.
     """
-    #TODO: erweitern für GeoJSON Geometrie (außerhalb von Feature und FeatureCollection)?
     try:
         if isGeoJSONFeature(geoJSON):
             gdf = gpd.GeoDataFrame.from_features([geoJSON])
@@ -1630,15 +1626,757 @@ def geomean(populationArray):
     return stats.mstats.gmean(populationArray)
 
 def geomean_fromIdValueDict(indicatorIdValueDictArray):
-    #TODO
-    return None
+    """Encapsulates scipy.stats.mstats function 'gmean' to compute the geometric mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
+
+    Args:
+        indicatorIdValueDictArray (Array<Dict<String, Float>>): an array of map objects containing indicator feature ID and numeric value pairs (will be piped through function  'convertPropertyMapToNumberMap_fromIdValueMap' to ensure that only numeric values are submitted)
+
+    Returns:
+        Dict<String, Float>: returns a map containing the indicator feature id and computed geometric mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
+    """
+    resultDict = {}
+
+    numericDictArray = []
+    for dict in indicatorIdValueDictArray:
+        numericDictArray.append(convertPropertyDictToNumberDict_fromIdValueDict(dict))
+    
+    refSize = len(numericDictArray[0])
+    for dict in numericDictArray:
+        if not len(dict) == refSize:
+            log("Problem detected while computing geomean from indicatorIdValueMapArray. The sizes of the input base indicator map entries are not equal. Results might not be correct. Will continue computation.")
+
+    # iterate over the first map entries; collect all values of all baseIndicators for each feature
+    # compute mean and set it in result map
+    refMap = numericDictArray[0]
+    for key, value in refMap.items():
+
+        baseIndicatorValues = []
+
+        for numericDict in numericDictArray:
+            # collect sub indicator values
+            if key in numericDict:
+                baseIndicatorValues.append(numericDict[key])
+
+        # If not all baseIndicator have the required value, then DO NOT SET the value at all!
+        # It seems to be the most transparent solution
+        if len(baseIndicatorValues) == len(numericDictArray):
+            resultDict[key] = stats.mstats.gmean(baseIndicatorValues)
+
+    return resultDict
+
+def mean(populationArray):
+    """Encapsulates numpys function 'mean' to compute the mean value of the submitted value array
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the mean shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        float: returns the mean value of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.mean(populationArray)
+
+def mean_fromIdValueDict(indicatorIdValueDictArray):
+    """Encapsulates numpys function 'mean' to compute the mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
+
+    Args:
+        indicatorIdValueDictArray (Array<Dict<String, Float>>): an array of map objects containing indicator feature ID and numeric value pairs (will be piped through function  'convertPropertyMapToNumberMap_fromIdValueMap' to ensure that only numeric values are submitted)
+
+    Returns:
+        Dict<String, Float>: returns a map containing the indicator feature id and computed mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
+    """
+    resultDict = {}
+
+    numericDictArray = []
+    for dict in indicatorIdValueDictArray:
+        numericDictArray.append(convertPropertyDictToNumberDict_fromIdValueDict(dict))
+    
+    refSize = len(numericDictArray[0])
+    for dict in numericDictArray:
+        if not len(dict) == refSize:
+            log("Problem detected while computing geomean from indicatorIdValueMapArray. The sizes of the input base indicator map entries are not equal. Results might not be correct. Will continue computation.")
+
+    # iterate over the first map entries; collect all values of all baseIndicators for each feature
+    # compute mean and set it in result map
+    refMap = numericDictArray[0]
+    for key, value in refMap.items():
+
+        baseIndicatorValues = []
+
+        for numericDict in numericDictArray:
+            # collect sub indicator values
+            if key in numericDict:
+                baseIndicatorValues.append(numericDict[key])
+
+        # If not all baseIndicator have the required value, then DO NOT SET the value at all!
+        # It seems to be the most transparent solution
+        if len(baseIndicatorValues) == len(numericDictArray):
+            resultDict[key] = numpy.mean(baseIndicatorValues)
+
+    return resultDict
+
+def meanSquareError(populationArray):
+    """Implements a function to compute the mean square error value of the submitted value array. For that the mean value is used as expectation.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the mean square error value shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the mean squared error value of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    
+    arithMean = numpy.mean(populationArray)
+    err = list(map(lambda x : x - arithMean, populationArray))
+    return   numpy.mean(err)
+
+def median(populationArray):
+    """Encapsulates numpys function 'median' to compute the median value of a submitted array.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the mean square error value shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the median value of the submitted array of numeric values.
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.median(populationArray)
+
+def min_fromIdValueDict(indicatorIdValueDictArray):
+    """Encapsulates numpys function 'min' to compute the min value of the submitted array of indicator id and value dict objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValuedictArray'.
+
+    Args:
+        indicatorIdValueDictArray (Array<Dict<String, Float>>): an array of dict objects containing indicator feature ID and numeric value pairs (will be piped through function 'convertPropertydictToNumberdict_fromIdValuedict' to ensure that only numeric values are submitted)
+
+    Returns:
+        Dict<String, Float>: returns a dict containing the indicator feature id and computed min value of the submitted array of indicator id and value dict objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValuedictArray'.
+    """
+    resultDict = {}
+
+    numericDictArray = []
+    for dict in indicatorIdValueDictArray:
+        numericDictArray.append(convertPropertyDictToNumberDict_fromIdValueDict(dict))
+    
+    refSize = len(numericDictArray[0])
+    for dict in numericDictArray:
+        if not len(dict) == refSize:
+            log("Problem detected while computing geomean from indicatorIdValueMapArray. The sizes of the input base indicator map entries are not equal. Results might not be correct. Will continue computation.")
+
+    # iterate over the first map entries; collect all values of all baseIndicators for each feature
+    # compute mean and set it in result map
+    refMap = numericDictArray[0]
+    for key, value in refMap.items():
+
+        baseIndicatorValues = []
+
+        for numericDict in numericDictArray:
+            # collect sub indicator values
+            if key in numericDict:
+                baseIndicatorValues.append(numericDict[key])
+
+        # If not all baseIndicator have the required value, then DO NOT SET the value at all!
+        # It seems to be the most transparent solution
+        if len(baseIndicatorValues) == len(numericDictArray):
+            resultDict[key] = numpy.min(baseIndicatorValues)
+
+    return resultDict
+
+def percentile(populationArray, k):
+    """Encapsulates numpys function 'percentile' to compute the percentile of the submitted value array.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the percentiles shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        k (Float): the value between 0 - 100 to specify the percentile
+
+    Returns:
+        Float: returns the k-th percentile of the submitted array.
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.percentile(populationArray, k)
+
+def quantiles(populationArray, quantilesArray):
+    """Encapsulates numpys function 'quantile' to compute the quantiles of a 'populationArray'. The Quantiles are submitted in an Array.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the quantiles shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        quantilesArray (Array<Float>): an array of quantile values in range (0 - 1).
+
+    Returns:
+        Array<Float>: returns the quantiles of the 'populationArray' according to the 'quantilesArray'
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.quantile(populationArray, quantilesArray)
+
+def quartiles(populationArray):
+    """Encapsulates numpys function 'quantile' including an array with quartile borders to compute the quartiles of a submitted 'populationArray'
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the quartiles shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Array<Float>: returns the quartiles of the submitted array of numeric values
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return numpy.quantile(populationArray, [0, 0.25, 0.5, 0.75, 1])
+
+def rangeValue(populationArray):
+    """Implements a function to compute the range value of the submitted value array.
+
+    Args:
+        populationArray (Array<Float>): an array of numeric values for which the range value shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+
+    Returns:
+        Float: returns the range value using the following function 'max(populationArray) - min(populationArray)'
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    return max(populationArray) - min(populationArray)
+
+def standardDeviation(values, computeSampledStandardDeviation):
+    """Encapsulates numpys function 'std' to compute the standard deviation of a submitted values array. 
+
+    Args:
+        values (Array<float>): an array of numeric values for which the standard deviation value shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        computeSampledStandardDeviation (bool): optionale value to specify the formula used to calculate the standard deviation. If set to 'True' the sample standard deviation gets calculated where the degrees of freedom are reduced by 1
+        if set to 'False' the population standard deviation gets calculated which is also the uncorrect standard deviation.
+
+    Returns:
+        float: returns the standard deviation
+    """
+    values = convertPropertyArrayToNumberArray(values)
+
+    if computeSampledStandardDeviation:
+        return numpy.std(values, ddof=1)
+    else:
+        return numpy.std(values, ddof=0)
+
+def variance(populationArray, computeSampledVariance):
+    """Encapsulates numpys function 'var' to compute the variance of a submitted values array
+
+    Args:
+        populationArray (Array<float>): an array of numeric values for which the variance value shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        computeSampledVariance (bool): optionale value to specify the formula used to calculate the standard deviation. If set to 'True' the sample standard deviation gets calculated where the degrees of freedom are reduced by 1
+        if set to 'False' the population standard deviation gets calculated which is also the uncorrect standard deviation.
+
+    Returns:
+        float: returns the variance of the samples.
+    """
+    populationArray = convertPropertyArrayToNumberArray(populationArray)
+
+    if computeSampledVariance:
+        return numpy.var(populationArray, ddof=1)
+    else:
+        return numpy.var(populationArray, ddof=0)
+
+def zScore_byMeanAndStdev(value, mean, stdev):
+    """Implements a function to calculate the zscore by a given value, mean-value and the standard deviation.
+
+    Args:
+        value (float): numeric value for which the zscore shall be computed.
+        mean (float): numeric value representing the mean value of a population.
+        stdev (float): numeric value representing the standard deviation value of a population.
+
+    Returns:
+        float: returns the zscore for the submitted 'value'.
+    """ 
+    return (value - mean) / stdev
+
+def zScore_byPopulationArray(value, populationArray, computeSampledStandardDeviation: bool):
+    """Implements a function to calculate the zscore for a given value by calculating mean and standard deviation of a submitted 'populationArray'.
+
+    Args:
+        value (float): the numeric value for which the zscore shall be computed
+        populationArray (Array<float>): an array of numeric values for which the standard deviation shall be computed (will be piped through function 'convertPropertyArrayToNumberArray()' to ensure that only numeric values are submitted)
+        computeSampledStandardDeviation (bool):  optionale value to specify the formula used to calculate the standard deviation. If set to 'True' the sample standard deviation gets calculated where the degrees of freedom are reduced by 1
+        if set to 'False' the population standard deviation gets calculated which is also the uncorrect standard deviation.
+
+    Returns:
+        value: returns the zscore of the submitted value.
+    """
+    meanPop = mean(populationArray)
+    stdPop = standardDeviation(populationArray, computeSampledStandardDeviation)
+
+    return (value - meanPop) / stdPop
+
+def formatDateAsString(date: datetime.date):
+    """Creates a string describing the date of a submitted datetime.date object.
+
+    Args:
+        date (datetime.date): a datetime.date Object (i.e. initialized by datetime.date(2024, 1, 1))
+
+    Returns:
+        string: the string representing the date in the format (YYYY-MM-DD) (i.e. 2024-01-01)
+    """
+    return date.__str__()
+    
+def formatStringAsDate(stringDate: str):
+    """Creates a datetime.date Object based on the submitted string representing a date in format (YYY-MM-DD)
+
+    Args:
+        stringDate (str): the string describing the date (YYYY-MM-DD)
+
+    Returns:
+        datetime.date: returns a datetime.date Object containing the submitted date.
+    """
+    array = stringDate.split("-")
+    return datetime.date(int(array[0]), int(array[1]), int(array[2]))
+
+def getSubstractNMonthsDate_asString(referenceDateString: str, numberOfMonths: int):
+    """Substract n months from the submitted date
+
+    Args:
+        referenceDateString (str): the reference date in the string format (YYYY-MM-DD)
+        numberOfMonths (int): the number of months to substract from the submitted reference date.
+
+    Returns:
+        string: returns the date reduced by given number of months
+    """
+    array = referenceDateString.split("-")
+    
+    substractYears = int(numberOfMonths / 12)
+    
+    restMonths = numberOfMonths - (substractYears * 12)
+    
+    newMonth = int(array[1]) - restMonths
+    newYear = int(array[0]) - substractYears
+
+    if newMonth <= 0:
+        newMonth = newMonth + 12
+        newYear = newYear - 1
+    
+    return formatDateAsString(datetime.date(newYear, newMonth, int(array[2])))
+
+def getSubstractNYearsDate_asString(referenceDateString, numberOfYears):
+    """Substract n years from the submitted date
+
+    Args:
+        referenceDateString (str): the reference date in the string format (YYYY-MM-DD)
+        numberOfyears (int): the number of years to substract from the submitted reference date.
+
+    Returns:
+        string: returns the date reduced by given number of years
+    """
+    array = referenceDateString.split("-")
+    newYear = int(array[0]) - numberOfYears
+    return formatDateAsString(datetime.date(int(newYear), int(array[1]), int(array[2])))
+
+def getSubstractNDaysDate_asString(referenceDateString, numberOfDays):
+    """Substract n days from the submitted date
+
+    Args:
+        referenceDateString (str): the reference date in the string format (YYYY-MM-DD)
+        numberOfdays (int): the number of days to substract from the submitted reference date.
+
+    Returns:
+        string: returns the date reduced by given number of days
+    """
+    date = formatStringAsDate(referenceDateString)
+    return formatDateAsString(date - datetime.timedelta(numberOfDays))
+
+def getChange_absolute(featureCollection, targetDate, compareDate):
+    """computes the absolute difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula 'value[targetDate]  - value[compareDate]'
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        compareDate (string): the compare date in the string format 'YYYY-MM-DD', i.e. '2024-01-01' to who the indicator value difference/change shall be computed
+
+    Returns:
+        dict<string, float>: returns a dictionary of all input features that have both timestamps and whose cahngeValues were successfully converted to a number.  the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    # get a dict object with id-value pairs for the featureColection
+    indicator_idValueDict_targetDate = getIndicatorIDValueDict(featureCollection, targetDate)
+
+    # dict for compareDate can be null  
+    indicator_idValueDict_compareDate = getIndicatorIDValueDict(featureCollection, compareDate)
+
+    # return empty map if no value exists for the compare date
+    if indicator_idValueDict_compareDate is None or len(indicator_idValueDict_compareDate) == 0:
+        throwError("Change computation cannot be performed as compare date does not exist within data")
+
+    resultDict = {}
+
+    for key, value in indicator_idValueDict_targetDate.items():
+        compareValue = indicator_idValueDict_compareDate[key]
+
+        if not isNoDataValue(compareValue) and not isNoDataValue(value):
+            resultValue = float(value) - float(compareValue)
+            resultDict[key] = resultValue
+    
+    return resultDict
+
+def getChange_relative_percent(featureCollection, targetDate, compareDate):
+    """computes the relative difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula '100 * ((value[targetDate] - value[compareDate]) / value[compareDate])'
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        compareDate (string): the compare date in the string format 'YYYY-MM-DD', i.e. '2024-01-01' to who the indicator value difference/change shall be computed
+
+    Returns:
+        dict<string, float>: returns a dictionary of all input features that have both timestamps and whose cahngeValues were successfully converted to a number.  the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    # get a dict object with id-value pairs for the featureCollection
+    indicator_idValueDict_targetDate = getIndicatorIDValueDict(featureCollection, targetDate)
+
+    # dict for compareDate can be null  
+    indicator_idValueDict_compareDate = getIndicatorIDValueDict(featureCollection, compareDate)
+
+    # return empty map if no value exists for the compare date
+    if indicator_idValueDict_compareDate is None or len(indicator_idValueDict_compareDate) == 0:
+        throwError("Change computation cannot be performed as compare date does not exist within data")
+
+    resultDict = {}
+
+    for key, value in indicator_idValueDict_targetDate.items():
+        compareValue = indicator_idValueDict_compareDate[key]
+        if not isNoDataValue(compareValue) or not isNoDataValue(value):
+            if float(compareValue) == 0:
+                resultDict[key] = None
+            
+            resultValue = 100 * ((float(value) - float(compareValue)) / float(compareValue))
+            resultDict[key] = resultValue
+
+    return resultDict
+
+def changeAbsolute_n_years(featureCollectin, targetDate, numberOfYears):
+    """computes the new indicator for an absolute change compared to number of previous years
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfYears (int): the number of years to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose absolute changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNYearsDate_asString(targetDate, numberOfYears)
+
+    return getChange_absolute(featureCollectin, targetDate, compareDate)
+
+def changeAbsolute_n_months(featureCollection, targetDate, numberOfMonths):
+    """computes the new indicator for an absolute change compared to number of previous months
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfmonths (int): the number of months to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose absolute changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNMonthsDate_asString(targetDate, numberOfMonths)
+    return getChange_absolute(featureCollection, targetDate, compareDate)
+
+def changeAbsolute_n_days(featureCollection, targetDate, numberOfDays):
+    """computes the new indicator for an absolute change compared to number of previous days
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfdays (int): the number of days to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose absolute changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNDaysDate_asString(targetDate, numberOfDays)
+    return getChange_absolute(featureCollection, targetDate, compareDate)
+
+def changeRelative_n_years_percent(featureCollection, targetDate, numberOfYears):
+    """computes the new indicator for an relative change compared to number of previous years
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfYears (int): the number of years to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNYearsDate_asString(targetDate, numberOfYears)
+    return getChange_relative_percent(featureCollection, targetDate, compareDate)
+
+def changeRelative_n_months_percent(featureCollection, targetDate, numberOfMonths):
+    """computes the new indicator for an relative change compared to number of previous months
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfmonths (int): the number of months to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNMonthsDate_asString(targetDate, numberOfMonths)
+    return getChange_relative_percent(featureCollection, targetDate, compareDate)
+
+def changeRelative_n_days_percent(featureCollection, targetDate, numberOfDays):
+    """computes the new indicator for an relative change compared to number of previous days
+    internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        numberOfdays (int): the number of days to substract from the submitted reference Date
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    compareDate = getSubstractNDaysDate_asString(targetDate, numberOfDays)
+    return getChange_relative_percent(featureCollection, targetDate, compareDate)
+
+def changeAbsolute_referenceDate(featureCollection, targetDate, referenceDate):
+    """computes the new indicator for an absolute change compared to a previous reference date (e.g. prior year or month or day). internally tests are rin, e.g. if a previous reference date is available or not.
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        referenceDate (string): the reference date in the past in the string format'YYYY-MM-DD', e.g. '2016-01-01' for two years past or '2017-12-01' for one month past
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    targetDate_dateformat = formatStringAsDate(targetDate)
+    referenceDate_dateformat = formatStringAsDate(referenceDate)
+
+    if targetDate_dateformat <= referenceDate_dateformat:
+        throwError("Change computation for fixed reference date does not allow targetDate being <= referenceDate. Values were: targetDate '" + str(targetDate) +"' and referenceDate '" + str(referenceDate) + "'")
+    
+    return getChange_absolute(featureCollection, targetDate, referenceDate)
+
+def changeRelative_referenceDate_percent(featureCollection, targetDate, referenceDate):
+    """computes the new indicator for an relative change compared to a previous reference date (e.g. prior year or month or day). internally tests are rin, e.g. if a previous reference date is available or not.
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        referenceDate (string): the reference date in the past in the string format'YYYY-MM-DD', e.g. '2016-01-01' for two years past or '2017-12-01' for one month past
+
+    Returns:
+        Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
+    """
+    targetDate_dateformat = formatStringAsDate(targetDate)
+    referenceDate_dateformat = formatStringAsDate(referenceDate)
+
+    if targetDate_dateformat <= referenceDate_dateformat:
+        throwError("Change computation for fixed reference date does not allow targetDate being <= referenceDate. Values were: targetDate '" + str(targetDate) +"' and referenceDate '" + str(referenceDate) + "'")
+    
+    return getChange_relative_percent(featureCollection, targetDate, referenceDate)
+
+def trend_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+    dates = []
+
+    for i in range(numberOfYears, 0, -1):
+        dates.append(getSubstractNYearsDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeTrend(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
+
+def trend_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
+    dates = []
+
+    for i in range(numberOfMonths, 0, -1):
+        dates.append(getSubstractNMonthsDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeTrend(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
+
+def trend_consecutive_n_days(featureCollection, targetDate, numberOfDays):
+    dates = []
+
+    for i in range(numberOfDays, 0, -1):
+        dates.append(getSubstractNDaysDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeTrend(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
 
 
+def computeTrend(feature, dates):
+    indicatorValueArray = []
+
+    # build array of indicator values corresponding to dates array
+    for date in dates:
+        indicatorValue = getIndicatorValue(feature, date)
+        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
+            indicatorValueArray.append(indicatorValue)
+
+    # make sure that feature has relevant date properties
+    if not len(dates) == len(indicatorValueArray):
+        return None
+    
+    timeAxisArray = []
+
+    for i in range(len(dates)):
+        timeAxisArray.append(i + 1)
+      
+    try:
+        # compute linear regression slope
+        linearRegressionSlope, _ = stats.pearsonr(indicatorValueArray, timeAxisArray)
+        firstYearValue = float(getIndicatorValue(feature, dates[0]))
+        
+        if firstYearValue == 0:
+            return None
+        
+        trend_percent = 100 * (linearRegressionSlope / firstYearValue)
+        return trend_percent
+    except:
+        log("Error during trend computation for feature with ID: " + str(getSpatialUnitFeatureIdValue(feature)) + " and NAME: " + str(getSpatialUnitFeatureNameValue(feature)))
+        log("Returning None")
+        return None
+    
+
+def computeLinearRegressionSlope(indicatorValueArray, yearsArray):
+    if not len(indicatorValueArray) == len(yearsArray):
+        log("Error during Pearson Correlation. Lengths of input arrays are not equal.")
+        return None
+    
+    indicatorValueArray = convertPropertyArrayToNumberArray(indicatorValueArray)
+    yearsArray = convertPropertyArrayToNumberArray(yearsArray)
+
+    if not len(indicatorValueArray) == len(yearsArray):
+        log("Error during Pearson Correlation. Input array(s) contain non numeric values.")
+        return None
+    
+    A_mean = mean(yearsArray)
+    B_mean = mean(indicatorValueArray)
+    sumAB = 0
+    sumA2 = 0
+
+    for i in range(len(indicatorValueArray)):
+        if bool(indicatorValueArray[i]) and bool(yearsArray[i]):
+            a_NextValue = yearsArray[i] - A_mean
+            b_NextValue = indicatorValueArray[i]  - B_mean
+
+            sumAB = sumAB + float(a_NextValue * b_NextValue)
+            sumA2 = sumA2 + float(a_NextValue * a_NextValue)
+
+    if sumA2 == 0:
+        return None
+
+    return float(sumAB / sumA2)     
+
+def computeContinuity(feature, dates):
+    """Computes the pearson correlation for the feature considering the submitted array of consecutive dates.
+
+    Args:
+        feature (Feature): a valid GeoJSON Feature, that must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        dates (Array<string>): array of dates for which the continuity value shall be computed as string of format 'YYYY-MM-DD' in increasing order, i.e. ["2015-12-31", "2016-12-31", "2017-12-31"]
+
+    Returns:
+        float: returns the continuity value for the feature, at this moment the continuity value is the pearson correlation value calculated with the following formula 'sum((Xi - Xmean) * (Yi - Ymean)) / sqrt(sum(Xi - Xmean)^2 * sum(Yi - Ymean)^2)'
+    """
+    indicatorValueArray = []
+
+    for date in dates: 
+        indicatorValue = getIndicatorValue(feature, date)
+        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
+            indicatorValueArray.append(indicatorValue)
+
+    if not len(dates) == len(indicatorValueArray):
+        log("Error during Pearson Correlation. Length of input arrays are not equal.")
+        return None
+    
+    return stats.pearsonr(indicatorValueArray, dates)
+
+def continuity_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+    dates = []
+
+    for i in range(numberOfYears, 0, -1):
+        dates.append(getSubstractNYearsDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeContinuity(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
+
+def continuity_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
+    dates = []
+
+    for i in range(numberOfMonths, 0, -1):
+        dates.append(getSubstractNMonthsDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeContinuity(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
+
+def continuity_consecutive_n_days(featureCollection, targetDate, numberOfDays):
+    dates = []
+
+    for i in range(numberOfDays, 0, -1):
+        dates.append(getSubstractNDaysDate_asString(targetDate, i))
+    
+    dates.append(targetDate)
+
+    resultDict = {}
+
+    for feature in featureCollection["features"]:
+        trend = computeContinuity(feature, dates)
+        if bool(trend) and not isNoDataValue(trend):
+            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+
+    if len(resultDict) == 0:
+        throwError("Trend computation resulted in NoData for each feature")
+
+    return resultDict
 
 
 #TODO
-
-# arbeitet Kommonitor nur mit features und featurecollections oder auch rohen geojson geometrien
 
 # Process Parameter (Objekt oder Dictionary)
 
