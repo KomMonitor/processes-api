@@ -108,11 +108,11 @@ def getGeoresourceByID(georesourceID, georesourcesDict):
         throwError("Tried to acquire a georesource with name '" + str(georesourceID) + "', but the georesourceDict does not contain such an  entry")
 
 def getProcessParameterByName_asString(parameterName, processParameters):
-    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Dictionary 
+    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Array. 
 
     Args:
         parameterName (string): the name of the process parameter
-        processParameters (Dict<string, (string|number|boolean)>>): an dictionary containing keys and values whereas key='name' and value='paramter value' representing variable additional process parameters that are required to perform the indicator computation.
+        processParameters (Array<Dict<string, (string|number|boolean)>>>): an array containing dictionaries containing the keys 'name' and 'value' describing the name and value of a processParameter. Representing variable additional process parameters that are required to perform the indicator computation.
 
     Raises:
         Exception: if the dict does not contain a parameter with given name
@@ -120,54 +120,70 @@ def getProcessParameterByName_asString(parameterName, processParameters):
     Returns:
         String: returns the values of the requested process Parameter as String. Useres should know the real type i. e. boolean or number
     """
-    if parameterName in processParameters:
-        return str(processParameters[parameterName])
-    else:        
-        throwError(f"Tried to acquire a process parameter with name '{parameterName}', but the Dictionary of processParameters does not contain such an entry")
+    value = None
+
+    for parameter in processParameters:
+        if parameter["name"] == parameterName:
+            value = str(parameter["value"])
+                
+    if value is None:
+        throwError(f"Tried to acquire a process parameter with name '" + str(parameterName) + "', but the Array of processParameter Dictionarys does not contain such an entry")
+
+    return value
 
 def getProcessParameterByName_asNumber(parameterName, processParameters):
-    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Dictionary 
+    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Array. 
 
     Args:
         parameterName (string): the name of the process parameter
-        processParameters (Dict<string, (string|number|boolean)>>): an dictionary containing keys and values whereas key='name' and value='paramter value' representing variable additional process parameters that are required to perform the indicator computation.
+        processParameters (Array<Dict<string, (string|number|boolean)>>>): an array containing dictionaries containing the keys 'name' and 'value' describing the name and value of a processParameter. Representing variable additional process parameters that are required to perform the indicator computation.
 
     Raises:
         Exception: if the dict does not contain a parameter with given name
-        ValueError: if the parameter Value could not be resolved to type number
 
     Returns:
-        Float: returns the values of the requested process Parameter as Float.
+        float: returns the values of the requested process Parameter as float. Useres should know the real type i. e. boolean or string.
     """
-    if parameterName in processParameters:
-        try:
-            return float(processParameters[parameterName])
-        except ValueError:
-            raise ValueError("Error while parsing parameter value '" + str(processParameters[parameterName]) + "' from parameter with name '" + str(parameterName) + "' as Number.")
-    else:
-        throwError(f"Tried to acquire a process parameter with name '" + str(parameterName) + "', but the list of processParameters does not contain such an entry")
-    
+    value = None
+
+    for parameter in processParameters:
+        if parameter["name"] == parameterName:
+            try:
+                value = float(parameter["value"])
+            except ValueError:
+                throwError("Error while parsing parameter value '" + str(parameter["value"]) + "' from parameter with name '" + str(parameterName) + "' as float.")
+                
+    if value is None:
+        throwError(f"Tried to acquire a process parameter with name '" + str(parameterName) + "', but the Array of processParameter Dictionarys does not contain such an entry")
+
+    return value
+
 def getProcessParameterByName_asBoolean(parameterName, processParameters):
-    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Dictionary 
+    """Acuires the process parameter with the name 'parameterName' from the submitted processParameters Array. 
 
     Args:
         parameterName (string): the name of the process parameter
-        processParameters (Dict<string, (string|number|boolean)>>): an dictionary containing keys and values whereas key='name' and value='paramter value' representing variable additional process parameters that are required to perform the indicator computation.
+        processParameters (Array<Dict<string, (string|number|boolean)>>>): an array containing dictionaries containing the keys 'name' and 'value' describing the name and value of a processParameter. Representing variable additional process parameters that are required to perform the indicator computation.
 
     Raises:
         Exception: if the dict does not contain a parameter with given name
-        ValueError: if the parameter Value could not be resolved to type boolean
 
     Returns:
-        Boolean: returns the values of the requested process Parameter as bool.
+        bool: returns the values of the requested process Parameter as boolean. Useres should know the real type i. e. float or string.
     """
-    if parameterName in processParameters:
-        try:
-            return eval(processParameters[parameterName])
-        except NameError:
-            raise NameError("Error while parsing parameter value '" + str(processParameters[parameterName]) + "' from parameter with name '" + str(parameterName) + "' as Boolean.")
-    else:
-        throwError(f"Tried to acquire a process parameter with name '" + str(parameterName) + "', but the list of processParameters does not contain such an entry")
+    value = None
+
+    for parameter in processParameters:
+        if parameter["name"] == parameterName:
+            try:
+                value = eval(parameter["value"])
+            except NameError:
+                throwError("Error while parsing parameter value '" + str(parameter["value"]) + "' from parameter with name '" + str(parameterName) + "' as float.")
+                
+    if value is None:
+        throwError(f"Tried to acquire a process parameter with name '" + str(parameterName) + "', but the Array of processParameter Dictionarys does not contain such an entry")
+
+    return value
     
 def getSpatialUnitFeatureIdValue(feature):
     """Acquire the unique feature id of the submitted GeoJSON feature representing a spatial unit. (i.e. city districts, building blocks, etc).
@@ -1932,12 +1948,12 @@ def getSubstractNMonthsDate_asString(referenceDateString: str, numberOfMonths: i
     """
     array = referenceDateString.split("-")
     
-    substractYears = int(numberOfMonths / 12)
+    substractdays = int(numberOfMonths / 12)
     
-    restMonths = numberOfMonths - (substractYears * 12)
+    restMonths = numberOfMonths - (substractdays * 12)
     
     newMonth = int(array[1]) - restMonths
-    newYear = int(array[0]) - substractYears
+    newYear = int(array[0]) - substractdays
 
     if newMonth <= 0:
         newMonth = newMonth + 12
@@ -1950,7 +1966,7 @@ def getSubstractNYearsDate_asString(referenceDateString, numberOfYears):
 
     Args:
         referenceDateString (str): the reference date in the string format (YYYY-MM-DD)
-        numberOfyears (int): the number of years to substract from the submitted reference date.
+        numberOfYears (int): the number of years to substract from the submitted reference date.
 
     Returns:
         string: returns the date reduced by given number of years
@@ -2038,14 +2054,14 @@ def getChange_relative_percent(featureCollection, targetDate, compareDate):
 
     return resultDict
 
-def changeAbsolute_n_years(featureCollectin, targetDate, numberOfYears):
-    """computes the new indicator for an absolute change compared to number of previous years
+def changeAbsolute_n_Years(featureCollectin, targetDate, numberOfYears):
+    """computes the new indicator for an absolute change compared to number of previous Years
     internally tests are run, e.g. if a previous year is available or not
 
     Args:
         featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
-        numberOfYears (int): the number of years to substract from the submitted reference Date
+        numberOfYears (int): the number of Years to substract from the submitted reference Date
 
     Returns:
         Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose absolute changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
@@ -2085,13 +2101,13 @@ def changeAbsolute_n_days(featureCollection, targetDate, numberOfDays):
     return getChange_absolute(featureCollection, targetDate, compareDate)
 
 def changeRelative_n_years_percent(featureCollection, targetDate, numberOfYears):
-    """computes the new indicator for an relative change compared to number of previous years
+    """computes the new indicator for an relative change compared to number of previous Years
     internally tests are run, e.g. if a previous year is available or not
 
     Args:
         featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
-        numberOfYears (int): the number of years to substract from the submitted reference Date
+        numberOfYears (int): the number of Years to substract from the submitted reference Date
 
     Returns:
         Dict<string, float>: returns the dictionary of all input features that have both timestamps and whose relative changeValues were successfully converted to a float value. the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
@@ -2134,7 +2150,7 @@ def changeAbsolute_referenceDate(featureCollection, targetDate, referenceDate):
 
     Args:
         featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
-        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2018-01-01'
         referenceDate (string): the reference date in the past in the string format'YYYY-MM-DD', e.g. '2016-01-01' for two years past or '2017-12-01' for one month past
 
     Returns:
@@ -2153,7 +2169,7 @@ def changeRelative_referenceDate_percent(featureCollection, targetDate, referenc
 
     Args:
         featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
-        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2018-01-01'
         referenceDate (string): the reference date in the past in the string format'YYYY-MM-DD', e.g. '2016-01-01' for two years past or '2017-12-01' for one month past
 
     Returns:
@@ -2168,6 +2184,16 @@ def changeRelative_referenceDate_percent(featureCollection, targetDate, referenc
     return getChange_relative_percent(featureCollection, targetDate, referenceDate)
 
 def trend_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+    """Computes the new indicator as trend for prior consecutive Years, internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollection (FeatureCollection): a valid FeatureCollection, whose features must contain a properties attribute storing the indicator time series according to kommonitors data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2024-01-01'
+        numberOfYears (int): the number of prior consecutive Years for which the trend shall be computed.
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose trend value were successfully computed. ResponseDict may bei smaller than the submitted feature collection. If the feature collection contains values which cannot be converted in a float value the result is 'None'.
+    """
     dates = []
 
     for i in range(numberOfYears, 0, -1):
@@ -2188,6 +2214,16 @@ def trend_consecutive_n_years(featureCollection, targetDate, numberOfYears):
     return resultDict
 
 def trend_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
+    """Computes the new indicator as trend for prior consecutive months, internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollection (FeatureCollection): a valid FeatureCollection, whose features must contain a properties attribute storing the indicator time series according to kommonitors data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2024-01-01'
+        numberOfMonths (int): the number of prior consecutive months for which the trend shall be computed.
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose trend value were successfully computed. ResponseDict may bei smaller than the submitted feature collection. If the feature collection contains values which cannot be converted in a float value the result is 'None'.
+    """
     dates = []
 
     for i in range(numberOfMonths, 0, -1):
@@ -2208,6 +2244,16 @@ def trend_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
     return resultDict
 
 def trend_consecutive_n_days(featureCollection, targetDate, numberOfDays):
+    """Computes the new indicator as trend for prior consecutive days, internally tests are run, e.g. if a previous year is available or not
+
+    Args:
+        featureCollection (FeatureCollection): a valid FeatureCollection, whose features must contain a properties attribute storing the indicator time series according to kommonitors data model
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2024-01-01'
+        numberOfDays (int): the number of prior consecutive days for which the trend shall be computed.
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose trend value were successfully computed. ResponseDict may bei smaller than the submitted feature collection. If the feature collection contains values which cannot be converted in a float value the result is 'None'.
+    """
     dates = []
 
     for i in range(numberOfDays, 0, -1):
@@ -2229,6 +2275,15 @@ def trend_consecutive_n_days(featureCollection, targetDate, numberOfDays):
 
 
 def computeTrend(feature, dates):
+    """Computes the trend value for the feature considering the submitted array of consecutive dates. Using the formula: 'T  =100 * b / I', where b is the linear regression slope and I is the first indicator value of the time series.
+
+    Args:
+        feature (Feature): a valid GeoJSON Feature, that must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        dates (Array<string>): array of dates for which the trend value shall be computed as string of format 'YYYY-MM-DD' in increasing order, i.e. ["2015-12-31", "2016-12-31", "2017-12-31"]
+
+    Returns:
+        float: returns the trend value of the feature considering the concrete consecutive years of dates array. or 'null' if any date of dates array is not included within feature
+    """
     indicatorValueArray = []
 
     # build array of indicator values corresponding to dates array
@@ -2248,7 +2303,7 @@ def computeTrend(feature, dates):
       
     try:
         # compute linear regression slope
-        linearRegressionSlope, _ = stats.pearsonr(indicatorValueArray, timeAxisArray)
+        linearRegressionSlope = computeLinearRegressionSlope(indicatorValueArray, timeAxisArray)
         firstYearValue = float(getIndicatorValue(feature, dates[0]))
         
         if firstYearValue == 0:
@@ -2262,26 +2317,35 @@ def computeTrend(feature, dates):
         return None
     
 
-def computeLinearRegressionSlope(indicatorValueArray, yearsArray):
-    if not len(indicatorValueArray) == len(yearsArray):
+def computeLinearRegressionSlope(indicatorValueArray, daysArray):
+    """Computes the slope of a linear regression using the following formula: 'b = sum((A - Amean) * (I - Imean)) / sum((A - Amean)^2)'. Where A are the consecutive years and I are the indicator Values.
+
+    Args:
+        indicatorValueArray (Array<float>): numeric indicator value array representing the time series in increasing order.
+        daysArray (Array<float>): numeric value array containing consecutive years in increasing order, i.e. [2015,2016,2017,2018,2019] 
+
+    Returns:
+        float: returns the linear regression slope of the submitted indicator time series. The input Arrays should have the same length otherwise the result is 'None'.
+    """
+    if not len(indicatorValueArray) == len(daysArray):
         log("Error during Pearson Correlation. Lengths of input arrays are not equal.")
         return None
     
     indicatorValueArray = convertPropertyArrayToNumberArray(indicatorValueArray)
-    yearsArray = convertPropertyArrayToNumberArray(yearsArray)
+    daysArray = convertPropertyArrayToNumberArray(daysArray)
 
-    if not len(indicatorValueArray) == len(yearsArray):
+    if not len(indicatorValueArray) == len(daysArray):
         log("Error during Pearson Correlation. Input array(s) contain non numeric values.")
         return None
     
-    A_mean = mean(yearsArray)
+    A_mean = mean(daysArray)
     B_mean = mean(indicatorValueArray)
     sumAB = 0
     sumA2 = 0
 
     for i in range(len(indicatorValueArray)):
-        if bool(indicatorValueArray[i]) and bool(yearsArray[i]):
-            a_NextValue = yearsArray[i] - A_mean
+        if bool(indicatorValueArray[i]) and bool(daysArray[i]):
+            a_NextValue = daysArray[i] - A_mean
             b_NextValue = indicatorValueArray[i]  - B_mean
 
             sumAB = sumAB + float(a_NextValue * b_NextValue)
@@ -2316,6 +2380,16 @@ def computeContinuity(feature, dates):
     return stats.pearsonr(indicatorValueArray, dates)
 
 def continuity_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+    """computes the new Indicator as continuity for prior consecutive years. The formula used is the pearson correlation.
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
+        numberOfYears (int): the number of prior consecutive years for which the continuity shall computed
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose continuity value were successfully computed. responseMap.size may be smaller than featureCollection.features.size, if featureCollection contains boolean value items or items whose Number-conversion result in Number.NaN
+    """
     dates = []
 
     for i in range(numberOfYears, 0, -1):
@@ -2336,6 +2410,16 @@ def continuity_consecutive_n_years(featureCollection, targetDate, numberOfYears)
     return resultDict
 
 def continuity_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
+    """computes the new Indicator as continuity for prior consecutive months. The formula used is the pearson correlation.
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
+        numberOfMonths (int): the number of prior consecutive Months for which the continuity shall computed
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose continuity value were successfully computed. responseMap.size may be smaller than featureCollection.features.size, if featureCollection contains boolean value items or items whose Number-conversion result in Number.NaN
+    """
     dates = []
 
     for i in range(numberOfMonths, 0, -1):
@@ -2356,6 +2440,16 @@ def continuity_consecutive_n_months(featureCollection, targetDate, numberOfMonth
     return resultDict
 
 def continuity_consecutive_n_days(featureCollection, targetDate, numberOfDays):
+    """computes the new Indicator as continuity for prior consecutive days. The formula used is the pearson correlation.
+
+    Args:
+        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
+        numberOfDays (int): the number of prior consecutive days for which the continuity shall computed
+
+    Returns:
+        Dict<string, float>: returns the dict of all input features whose continuity value were successfully computed. responseMap.size may be smaller than featureCollection.features.size, if featureCollection contains boolean value items or items whose Number-conversion result in Number.NaN
+    """
     dates = []
 
     for i in range(numberOfDays, 0, -1):
