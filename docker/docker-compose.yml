@@ -7,7 +7,7 @@ networks:
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:20.0.5
+    image: quay.io/keycloak/keycloak:24.0.4
     #container_name: keycloak
     restart: unless-stopped
     volumes:
@@ -42,7 +42,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   kommonitor-data-management:
-    image: kommonitor/data-management:2.1.8
+    image: kommonitor/data-management:4.0.1
     #container_name: kommonitor-data-management
     restart: unless-stopped
     depends_on:
