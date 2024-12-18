@@ -1,0 +1,132 @@
+import abc
+import datetime as dt
+import logging
+import os
+from dataclasses import dataclass
+from logging import Logger
+from typing import Dict, Union, Optional
+
+import openapi_client
+import prefect
+import requests
+from flask import g
+from openapi_client import ApiClient
+from prefect import task, flow, get_run_logger
+from pygeoapi.util import JobStatus
+
+from processor.auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.schemas import JobStatusInfoInternal, OutputExecutionResultInternal
+
+
+@dataclass
+class KommonitorProcessConfig:
+    job_id: str
+    inputs: dict[str, any]
+    output_path: str
+
+
+KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "https://demo.kommonitor.de.52north.org/data-management/management/")
+
+
+@task
+def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
+    if private:
+
+        # payload = {
+        #    "client_id": KC_CLIENT_ID,
+        #    "client_secret": KC_CLIENT_SECRET,
+        #    "grant_type": "password",
+        #    "Content-Type": "application/x-www-form-urlencoded",
+        #    "requested_roles": execute_request.properties.get("roles", "")
+        # }
+
+        # logger.info(f"Requesting token with roles: {execute_request.properties.get('roles', '')}")
+
+        # http = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+        # a = requests.post(http, data=payload)
+        # a = a.json()
+        # token = a['access_token']
+
+        token = g.token
+
+        configuration = openapi_client.Configuration(
+            host=KOMMONITOR_DATA_MANAGEMENT_URL,
+            access_token=token
+        )
+        return openapi_client.ApiClient(configuration)
+    else:
+        logger.debug(f"Using Public API without token")
+        configuration = openapi_client.Configuration(
+            host=KOMMONITOR_DATA_MANAGEMENT_URL
+        )
+        return openapi_client.ApiClient(configuration)
+
+
+class KommonitorProcess(BasePrefectProcessor):
+    result_storage_block = None
+    process_flow = flow
+
+    @staticmethod
+    @task
+    def format_inputs(execution_request: schemas.ExecuteRequest):
+        inputs = {}
+
+        for k, v in execution_request.inputs:
+            inputs[k] = v.root
+        return inputs
+
+    @staticmethod
+    @task
+    def setup_logging(job_id: str) -> Logger:
+        os.mkdir(f"results/{job_id}/")
+        log_path = f"results/{job_id}/log.txt"
+        filelogger = logging.FileHandler(log_path)
+        filelogger.setLevel(logging.DEBUG)
+        logger = get_run_logger()
+        logger.logger.addHandler(filelogger)
+        logger.debug("Setup logging ...")
+        return logger
+
+    @staticmethod
+    @flow(persist_result=True)
+    def process_flow(
+            processor,
+            job_id: str,
+            result_storage_block: str | None,
+            process_description: schemas.ProcessDescription,
+            execution_request: schemas.ExecuteRequest
+    ) -> Union[schemas.JobStatusInfoInternal, prefect.states.State]:
+        print(processor)
+
+        ## Setup
+        logger = KommonitorProcess.setup_logging(job_id)
+        inputs = KommonitorProcess.format_inputs(execution_request)
+
+        config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
+        dmc = data_management_client(logger, execution_request, True)
+
+        ## Run process
+        status, outputs = processor.run(config, logger, dmc)
+
+        ## Reformat output
+        return JobStatusInfoInternal(
+            jobID=job_id,
+            processID=process_description.id,
+            status=status,
+            updated=dt.datetime.now(),
+            generated_outputs=outputs
+        )
+
+    @staticmethod
+    @abc.abstractmethod
+    def run(config: KommonitorProcessConfig,
+            logger: logging.Logger,
+            dmc: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
+        ...
+
+    @property
+    @abc.abstractmethod
+    def process_description(self) -> schemas.ProcessDescription:
+        ...
