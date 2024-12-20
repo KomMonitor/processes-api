@@ -8,10 +8,10 @@ from flask import g
 from oauthlib.oauth2 import OAuth2Token
 
 KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
-KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "nichJZ3Sfqz094AGRYeYP1hlv3LWRvCc")
-KC_HOSTNAME = os.getenv('KC_HOSTNAME', "demo.kommonitor.de.52north.org")
+KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
+KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
-KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "/keycloak")
+KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 
 
 class MyIntrospectTokenValidator(IntrospectTokenValidator):
@@ -25,6 +25,7 @@ class MyIntrospectTokenValidator(IntrospectTokenValidator):
         # Store username and roles in context
         if token["active"]:
             g.user = token["username"]
+            g.user_id = token["sub"]
             g.roles = token["realm_access"]["roles"]
             g.token = resp.content
         else:

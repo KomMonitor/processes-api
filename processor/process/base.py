@@ -27,29 +27,34 @@ class KommonitorProcessConfig:
     output_path: str
 
 
-KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "https://demo.kommonitor.de.52north.org/data-management/management/")
+KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
+KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
+KC_TARGET_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-data-management")
+KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
+KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
+KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
+KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 
 
 @task
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
     if private:
 
-        # payload = {
-        #    "client_id": KC_CLIENT_ID,
-        #    "client_secret": KC_CLIENT_SECRET,
-        #    "grant_type": "password",
-        #    "Content-Type": "application/x-www-form-urlencoded",
-        #    "requested_roles": execute_request.properties.get("roles", "")
-        # }
+        payload = {
+            "client_id": KC_CLIENT_ID,
+            "client_secret": KC_CLIENT_SECRET,
+            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+            "audience": KC_TARGET_CLIENT_ID,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "requested_subject": execute_request.properties.get("user_id", "")
+        }
 
-        # logger.info(f"Requesting token with roles: {execute_request.properties.get('roles', '')}")
+        logger.info(f"Requesting token for user with ID: {execute_request.properties.get('user_id', '')}")
 
-        # http = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
-        # a = requests.post(http, data=payload)
-        # a = a.json()
-        # token = a['access_token']
-
-        token = g.token
+        http = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+        a = requests.post(http, data=payload)
+        a = a.json()
+        token = a['access_token']
 
         configuration = openapi_client.Configuration(
             host=KOMMONITOR_DATA_MANAGEMENT_URL,
