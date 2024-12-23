@@ -11,26 +11,26 @@ from processor.process.base import KommonitorProcess, KommonitorProcessConfig
 from processor.process.util.geojson import as_geojson
 
 
-class ShareUnemployed(KommonitorProcess):
+class PercentageShare(KommonitorProcess):
     process_description = ProcessDescription(
-        id="share-unemployed",
+        id="percentage-share",
         version="0.0.1",
-        title="Share of unemployed people in given spatial Unit",
+        title="Percentage share of an indicator to a reference indicator in a given spatial unit",
         example={
-            "population_georesource_id": "cccca04-cc57-48d3-a801-d6b4b00fcccc",
-            "unemployed_georesource_id": "aaaaa04-cc57-48d3-a801-d6b4b00faaaa",
-            "target_spatial_unit": "bbbba04-cc57-48d3-a801-d6b4b00fbbbb",
+            "indicator_id": "cccca04-cc57-48d3-a801-d6b4b00fcccc",
+            "reference_indicator_id": "aaaaa04-cc57-48d3-a801-d6b4b00faaaa",
+            "target_spatial_unit_id": "bbbba04-cc57-48d3-a801-d6b4b00fbbbb",
             "target_date": "2000-01-01"
         },
         additional_parameters=AdditionalProcessIOParameters(
             parameters=[
                 Parameter(
                     name="legend",
-                    value=["Share of unemployed people in given spatial Unit"]
+                    value=["Percentage share of an indicator to a reference indicator in a given spatial unit"]
                 ),
                 Parameter(
                     name="formula",
-                    value=["(unemployed_count / population_count) / 100"]
+                    value=["(indicator_count / reference_indicator_count) * 100"]
                 ),
             ]
         ),
@@ -39,15 +39,15 @@ class ShareUnemployed(KommonitorProcess):
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         inputs={
-            "population_georesource_id": ProcessInput(
-                title="population_georesource_id",
+            "indicator_id": ProcessInput(
+                title="indicator_id",
                 schema=ProcessIOSchema(type=ProcessIOType.STRING)
             ),
-            "unemployed_georesource_id": ProcessInput(
-                title="unemployed_georesource_id",
+            "reference_indicator_id": ProcessInput(
+                title="reference_indicator_id",
                 schema=ProcessIOSchema(type=ProcessIOType.STRING)
             ),
-            "target_spatial_unit": ProcessInput(
+            "target_spatial_unit_id": ProcessInput(
                 title="target_spatial_unit_id",
                 schema=ProcessIOSchema(type=ProcessIOType.STRING)
             ),
@@ -80,36 +80,38 @@ class ShareUnemployed(KommonitorProcess):
             indicator = {}
 
             response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                inputs["population_georesource_id"], inputs["target_spatial_unit"])
+                inputs["reference_indicator_id"], inputs["target_spatial_unit_id"])
             # Iterate population
             for feat in response:
                 feature_id = feat["fid"]
 
-                population = feat[f"DATE_{inputs['target_date']}"]
-                if population is None:
-                    population = 0
+                ref_value = feat[f"DATE_{inputs['target_date']}"]
+                if ref_value is None:
+                    # TODO: None must be None and not 0. Otherwise calculated indicator is misleading and
+                    #  calculation may cause an error
+                    ref_value = 0
                     logger.error(f"WARNING: the feature with featureID '{feature_id}' does not contain a "
                                  f"time series value for targetDate '{inputs['target_date']}")
 
                 indicator[feature_id] = {
                     "feature_id": feature_id,
                     "value": None,
-                    "population": float(population)
+                    "ref_value": float(ref_value)
                 }
 
             # Iterate unemployed
             response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                inputs["unemployed_georesource_id"], inputs["target_spatial_unit"])
+                inputs["indicator_id"], inputs["target_spatial_unit_id"])
             for feat in response:
                 feature_id = feat["fid"]
 
-                unemployed = feat[f"DATE_{inputs['target_date']}"]
-                if unemployed is None:
+                value = feat[f"DATE_{inputs['target_date']}"]
+                if value is None:
                     logger.error(f"WARNING: the feature with featureID '{feature_id}' does not contain a "
                                  f"time series value for targetDate '{inputs['target_date']}")
                 else:
                     # Calculate percentage
-                    indicator[feature_id]["value"] = (float(unemployed) / indicator[feature_id]["population"]) / 100
+                    indicator[feature_id]["value"] = (float(value) / indicator[feature_id]["ref_value"]) * 100
 
             return JobStatus.successful, {"result": indicator}
         except ApiException as e:
