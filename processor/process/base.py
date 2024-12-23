@@ -34,6 +34,7 @@ KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
+PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "http://localhost:8085/management/")
 
 
 @task
@@ -78,15 +79,15 @@ class KommonitorProcess(BasePrefectProcessor):
     def format_inputs(execution_request: schemas.ExecuteRequest):
         inputs = {}
 
-        for k, v in execution_request.inputs:
+        for k, v in execution_request.inputs.items():
             inputs[k] = v.root
         return inputs
 
     @staticmethod
     @task
     def setup_logging(job_id: str) -> Logger:
-        os.mkdir(f"results/{job_id}/")
-        log_path = f"results/{job_id}/log.txt"
+        os.mkdir(f"{PROCESS_RESULTS_DIR}/{job_id}/")
+        log_path = f"{PROCESS_RESULTS_DIR}/{job_id}/log.txt"
         filelogger = logging.FileHandler(log_path)
         filelogger.setLevel(logging.DEBUG)
         logger = get_run_logger()
