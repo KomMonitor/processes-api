@@ -123,10 +123,11 @@ def parse_processes(package: str) -> None:
             root = ast.parse(fh.read())
             for node in ast.iter_child_nodes(root):
                 if isinstance(node, ast.ClassDef) and node.bases[0].id == "KommonitorProcess":
+                    process_path = os.path.normpath(fh.name)
                     processes[node.name] = {
                         "type": "process",
                         "processor": {
-                            "name": f"process.{package}.{fh.name.split('/')[-1][:-3]}.{node.name}"
+                            "name": f"process.{package}.{process_path.split(os.path.sep)[-1][:-3]}.{node.name}"
                         }
                     }
     flask_app.api_.manager.processes = processes

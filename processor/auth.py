@@ -17,7 +17,9 @@ KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 class MyIntrospectTokenValidator(IntrospectTokenValidator):
     def introspect_token(self, token_string):
         url = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token/introspect"
-        data = {'token': token_string[7:], 'token_type_hint': 'access_token'}
+        data = {'token': token_string[7:], 'token_type_hint': 'access_token'}\
+            if token_string.startswith('Bearer')\
+            else {'token': token_string, 'token_type_hint': 'access_token'}
         auth = (KC_CLIENT_ID, KC_CLIENT_SECRET)
         resp = requests.post(url, data=data, auth=auth)
         resp.raise_for_status()
