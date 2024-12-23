@@ -8,6 +8,8 @@ from typing import Dict, Union, Optional
 
 import openapi_client
 import prefect
+from prefect.filesystems import LocalFileSystem
+from prefect.serializers import JSONSerializer
 import requests
 from flask import g
 from openapi_client import ApiClient
@@ -96,6 +98,16 @@ class KommonitorProcess(BasePrefectProcessor):
         return logger
 
     @staticmethod
+    @task
+    def store_output(job_id: str, output: dict) -> str:
+        storage = LocalFileSystem()
+        serializer = JSONSerializer()
+        result_path = f"{PROCESS_RESULTS_DIR}/{job_id}/result.json"
+        result = serializer.dumps(output)
+        storage.write_path(result_path, result)
+        return result_path
+
+    @staticmethod
     @flow(persist_result=True)
     def process_flow(
             processor,
@@ -116,13 +128,22 @@ class KommonitorProcess(BasePrefectProcessor):
         ## Run process
         status, outputs = processor.run(config, logger, dmc)
 
+        res_path = KommonitorProcess.store_output(job_id, outputs)
+
         ## Reformat output
         return JobStatusInfoInternal(
             jobID=job_id,
             processID=process_description.id,
             status=status,
             updated=dt.datetime.now(),
-            generated_outputs=outputs
+            generated_outputs={
+                "result": schemas.OutputExecutionResultInternal(
+                    location=res_path,
+                    media_type=(
+                        process_description.outputs["result"].schema_.content_media_type
+                    ),
+                )
+            },
         )
 
     @staticmethod

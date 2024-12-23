@@ -66,7 +66,8 @@ class ShareUnemployed(KommonitorProcess):
         },
     )
 
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
 
@@ -75,12 +76,14 @@ class ShareUnemployed(KommonitorProcess):
         logger.debug("Starting execution...")
 
         try:
-            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
+            georesources_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             indicator = {}
 
+            response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                inputs["population_georesource_id"], inputs["target_spatial_unit"])
             # Iterate population
-            for feat in as_geojson(georesources_controller.get_all_georesource_features_by_id(inputs["population_georesource_id"])):
-                feature_id = feat["properties"]["ID"]
+            for feat in response:
+                feature_id = feat["fid"]
 
                 population = feat[f"DATE_{inputs['target_date']}"]
                 if population is None:
@@ -91,12 +94,14 @@ class ShareUnemployed(KommonitorProcess):
                 indicator[feature_id] = {
                     "feature_id": feature_id,
                     "value": None,
-                    "population": population
+                    "population": float(population)
                 }
 
             # Iterate unemployed
-            for feat in as_geojson(georesources_controller.get_all_georesource_features_by_id(inputs["unemployed_georesource_id"])):
-                feature_id = feat["properties"]["ID"]
+            response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                inputs["unemployed_georesource_id"], inputs["target_spatial_unit"])
+            for feat in response:
+                feature_id = feat["fid"]
 
                 unemployed = feat[f"DATE_{inputs['target_date']}"]
                 if unemployed is None:
@@ -104,7 +109,7 @@ class ShareUnemployed(KommonitorProcess):
                                  f"time series value for targetDate '{inputs['target_date']}")
                 else:
                     # Calculate percentage
-                    indicator[feature_id]["value"] = (unemployed / indicator[feature_id]["population"]) / 100
+                    indicator[feature_id]["value"] = (float(unemployed) / indicator[feature_id]["population"]) / 100
 
             return JobStatus.successful, {"result": indicator}
         except ApiException as e:
