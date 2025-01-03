@@ -1576,7 +1576,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -1659,7 +1659,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -1742,7 +1742,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -1908,7 +1908,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -2003,7 +2003,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -2098,7 +2098,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "bytearray",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -2605,7 +2605,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "Dict[str, str]",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -2684,7 +2684,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "Dict[str, str]",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,
@@ -2763,7 +2763,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "Dict[str, str]",
+            '200': "List[Dict[str, str]]",
             '400': None,
             '401': None,
             '403': None,

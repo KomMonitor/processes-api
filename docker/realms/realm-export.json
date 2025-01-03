@@ -733,7 +733,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "data-management-secret",
       "redirectUris": [
         "http://localhost/kommonitor/api/datamanagement/*",
         "http://localhost:8085/*"
@@ -837,7 +837,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "processor-secret",
       "redirectUris": [
         "http://localhost/kommonitor/api/processor/*",
         "http://localhost:8095/*"

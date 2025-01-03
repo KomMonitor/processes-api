@@ -1,35 +1,22 @@
+import ast
 import asyncio
-import collections
+import glob
 import os
-import requests
-from authlib.oauth2.rfc7662 import IntrospectTokenValidator
-from flask import session, Blueprint, Flask, request, g, send_from_directory
-from pygeoapi import flask_app
-from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_
+import secrets
 
 from authlib.integrations.flask_oauth2 import ResourceProtector
+from flask import Flask, send_from_directory, request
+from werkzeug.utils import secure_filename
 
-KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
-KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "secret")
-KC_HOSTNAME = os.getenv('KC_HOSTNAME', "http://keycloak:8080")
-KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor")
-KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
+from auth import MyIntrospectTokenValidator
 
+if not os.getenv("PYGEOAPI_CONFIG"):
+    os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
+if not os.getenv("PYGEOAPI_OPENAPI"):
+    os.environ["PYGEOAPI_OPENAPI"] = os.path.join(os.path.dirname(__file__), "default-openapi.yml")
 
-class MyIntrospectTokenValidator(IntrospectTokenValidator):
-    def introspect_token(self, token_string):
-        url = f"{KC_HOSTNAME}/{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token/introspect"
-        data = {'token': token_string, 'token_type_hint': 'access_token'}
-        auth = (KC_CLIENT_ID, KC_CLIENT_SECRET)
-        resp = requests.post(url, data=data, auth=auth)
-        resp.raise_for_status()
-        token = resp.json()
-        # Store username and roles in context
-        if token["active"]:
-            g.user = token["username"]
-            g.roles = token["realm_access"]["roles"]
-        return token
-
+from pygeoapi import flask_app
+from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, get_response
 
 require_oauth = ResourceProtector()
 require_oauth.register_token_validator(MyIntrospectTokenValidator())
@@ -39,31 +26,68 @@ APP.url_map.strict_slashes = API_RULES.strict_slashes
 APP.config['JSONIFY_PRETTYPRINT_REGULAR'] = CONFIG['server'].get('pretty_print', True)
 
 
-@APP.route('/')
+@APP.get('/')
 def landing_page():
     return flask_app.landing_page()
 
 
-@APP.route('/processes')
-@APP.route('/processes/<process_id>')
-# @require_oauth()
+@APP.get('/processes')
+@APP.get('/processes/<process_id>')
+@require_oauth()
 def get_processes(process_id=None):
-    return flask_app.get_processes(process_id)
+    return get_response(api_.describe_processes(request, process_id))
 
 
 @APP.post('/processes')
 @require_oauth()
-def create_processes():
-    raise Exception("Not impelemented yet!")
+def create_process():
+    FILE = "source"
+    HASH = secrets.token_hex(nbytes=8)
+    UPLOAD_FOLDER = f"process/custom/"
+
+    # check if the post request has the file part
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() == "py"
+
+    if FILE not in request.files:
+        raise Exception("Error: file not found!")
+
+    file = request.files[FILE]
+    # If the user does not select a file, the browser submits an
+    # empty file without a filename.
+    if file.filename == '':
+        raise Exception("Error: filename not present!")
+    if file and allowed_file(file.filename):
+
+        filename = f"{secure_filename(file.filename)[:-3]}_{HASH}.py"
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+
+        print("TODO: check if process already exists and possibly reject POST")
+        parse_processes("custom")
+    else:
+        raise Exception("Error: file not allowed!")
+
+    return ""
 
 
-@APP.route('/processes/<process_id>/execution', methods=['POST'])
+@APP.put('/processes')
+@require_oauth()
+def update_process():
+    # check if update or new creation
+
+    # store as file
+    # register as process
+    # increment version number
+    raise Exception("Not implemented yet!")
+
+
+@APP.post('/processes/<process_id>/execution')
 @require_oauth()
 def execute_process_jobs(process_id):
     return flask_app.execute_process_jobs(process_id)
 
 
-@APP.route('/jobs')
+@APP.get('/jobs')
 @APP.route('/jobs/<job_id>',
            methods=['GET', 'DELETE'])
 @require_oauth()
@@ -71,50 +95,64 @@ def get_jobs(job_id=None):
     return flask_app.get_jobs(job_id)
 
 
-@APP.route('/jobs/<job_id>/results',
-           methods=['GET'])
+@APP.get('/jobs/<job_id>/results')
 @require_oauth()
 def get_job_result(job_id=None):
     return flask_app.get_job_result(job_id)
 
 
-@APP.route('/jobs/<job_id>/results/<resource>',
-           methods=['GET'])
+@APP.get('/jobs/<job_id>/results/<resource>')
 @require_oauth()
 def get_job_result_resource(job_id, resource):
     return flask_app.get_job_result_resource(job_id, resource)
 
 
 @APP.route('/results/<path:path>')
+@require_oauth()
 def send_report(path):
     return send_from_directory('results', path)
 
 
-async def init():
-    # deployment = await Deployment.build_from_flow(
-    #    flow=aggregate_sum_flow,
-    #    name="example",
-    #    version="1",
-    #    tags=["demo"],
-    # )
-    #
-    # deployment.schedule = CronSchedule(
-    #    cron="*/5 * * * *"
-    # )
-    # await deployment.apply()
-
-    processes = collections.OrderedDict()
-    processes["aggregate_sum"] = {
-        "type": "process",
-        "processor": {
-            "name": "process.aggregate_sum.AggregateSumFlowProcessor"
-        }
-    }
-
+def parse_processes(package: str) -> None:
+    """
+    Dynamically parses processes and adds them to the global processing list
+    """
+    processes = flask_app.api_.manager.processes
+    for process in glob.glob(f"process/{package}/*.py"):
+        with open(process) as fh:
+            root = ast.parse(fh.read())
+            for node in ast.iter_child_nodes(root):
+                if isinstance(node, ast.ClassDef) and node.bases[0].id == "KommonitorProcess":
+                    process_path = os.path.normpath(fh.name)
+                    processes[node.name] = {
+                        "type": "process",
+                        "processor": {
+                            "name": f"process.{package}.{process_path.split(os.path.sep)[-1][:-3]}.{node.name}"
+                        }
+                    }
     flask_app.api_.manager.processes = processes
 
 
-def run(a, b):
+async def init():
+    # Scan for available processes
+    parse_processes("kommonitor")
+    parse_processes("custom")
+
+    # deployment = await Deployment.build_from_flow(
+    #  flow=aggregate_sum_flow,
+    #  name="example",
+    #  version="1",
+    #  tags=["demo"],
+    # )
+
+    # deployment.schedule = CronSchedule(
+    #  cron="*/5 * * * *"
+    # )
+    # await deployment.apply()
+    pass
+
+
+def run():
     asyncio.run(init())
 
     APP.run(debug=False,
@@ -123,4 +161,4 @@ def run(a, b):
 
 
 if __name__ == "__main__":
-    run(None, None)
+    run()
