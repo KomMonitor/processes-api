@@ -76,10 +76,10 @@ class PercentageShare(KommonitorProcess):
         logger.debug("Starting execution...")
 
         try:
-            georesources_controller = openapi_client.IndicatorsControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             indicator = {}
 
-            response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+            response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                 inputs["reference_indicator_id"], inputs["target_spatial_unit_id"])
             # Iterate population
             for feat in response:
@@ -100,7 +100,7 @@ class PercentageShare(KommonitorProcess):
                 }
 
             # Iterate unemployed
-            response = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+            response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                 inputs["indicator_id"], inputs["target_spatial_unit_id"])
             for feat in response:
                 feature_id = feat["fid"]
