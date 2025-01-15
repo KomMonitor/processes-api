@@ -16,7 +16,7 @@ if not os.getenv("PYGEOAPI_OPENAPI"):
     os.environ["PYGEOAPI_OPENAPI"] = os.path.join(os.path.dirname(__file__), "default-openapi.yml")
 
 from pygeoapi import flask_app
-from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, get_response
+from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, processes_api, execute_from_flask
 
 require_oauth = ResourceProtector()
 require_oauth.register_token_validator(MyIntrospectTokenValidator())
@@ -35,8 +35,7 @@ def landing_page():
 @APP.get('/processes/<process_id>')
 @require_oauth()
 def get_processes(process_id=None):
-    return get_response(api_.describe_processes(request, process_id))
-
+    return flask_app.get_processes(process_id)
 
 @APP.post('/processes')
 @require_oauth()
@@ -131,6 +130,7 @@ def parse_processes(package: str) -> None:
                         }
                     }
     flask_app.api_.manager.processes = processes
+    api_.config['resources'] = processes
 
 
 async def init():

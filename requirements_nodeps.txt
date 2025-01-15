@@ -1,2 +1,2 @@
 pygeoapi-prefect @ git+https://github.com/kommonitor/pygeoapi-prefect.git@feature/kommonitor
-pygeoapi @ git+https://github.com/geopython/pygeoapi.git@e7264e8
+pygeoapi @ git+https://github.com/52North/pygeoapi.git@pydantic_v2
