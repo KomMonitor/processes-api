@@ -43,7 +43,8 @@ class Reproject(KommonitorProcess):
         outputs={}
     )
 
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
 

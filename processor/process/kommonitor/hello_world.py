@@ -49,8 +49,8 @@ class HelloWorld(KommonitorProcess):
         },
     )
 
-    @staticmethod
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
 
@@ -66,6 +66,7 @@ class HelloWorld(KommonitorProcess):
 
             # 4.1 Return success and result
             return JobStatus.successful, None
+
         except ApiException as e:
 
             # 4.2 Catch possible errors cleanly

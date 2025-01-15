@@ -1,5 +1,4 @@
 import abc
-import datetime as dt
 import logging
 import os
 from dataclasses import dataclass
@@ -11,7 +10,6 @@ import prefect
 from prefect.filesystems import LocalFileSystem
 from prefect.serializers import JSONSerializer
 import requests
-from flask import g
 from openapi_client import ApiClient
 from prefect import task, flow, get_run_logger
 from pygeoapi.util import JobStatus
@@ -19,7 +17,6 @@ from pygeoapi.util import JobStatus
 from processor.auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
-from pygeoapi_prefect.schemas import JobStatusInfoInternal, OutputExecutionResultInternal
 
 
 @dataclass
@@ -72,85 +69,75 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
         return openapi_client.ApiClient(configuration)
 
 
+@task
+def format_inputs(execution_request: schemas.ExecuteRequest):
+    inputs = {}
+
+    for k, v in execution_request.inputs.items():
+        inputs[k] = v.root
+    return inputs
+
+
+@task
+def setup_logging(job_id: str) -> Logger:
+    os.mkdir(f"results/{job_id}/")
+    log_path = f"results/{job_id}/log.txt"
+
+    filelogger = logging.FileHandler(log_path)
+    filelogger.setLevel(logging.DEBUG)
+    logger = get_run_logger()
+    logger.logger.addHandler(filelogger)
+    logger.debug("Setup logging ...")
+    return logger
+
+
+@task
+def store_output(job_id: str, output: dict) -> str:
+    storage = LocalFileSystem()
+    serializer = JSONSerializer()
+    result_path = f"{PROCESS_RESULTS_DIR}/{job_id}/result.json"
+    result = serializer.dumps(output)
+    storage.write_path(result_path, result)
+    return result_path
+
+
 class KommonitorProcess(BasePrefectProcessor):
     result_storage_block = None
-    process_flow = flow
 
-    @staticmethod
-    @task
-    def format_inputs(execution_request: schemas.ExecuteRequest):
-        inputs = {}
-
-        for k, v in execution_request.inputs.items():
-            inputs[k] = v.root
-        return inputs
-
-    @staticmethod
-    @task
-    def setup_logging(job_id: str) -> Logger:
-        os.mkdir(f"{PROCESS_RESULTS_DIR}/{job_id}/")
-        log_path = f"{PROCESS_RESULTS_DIR}/{job_id}/log.txt"
-        filelogger = logging.FileHandler(log_path)
-        filelogger.setLevel(logging.DEBUG)
-        logger = get_run_logger()
-        logger.logger.addHandler(filelogger)
-        logger.debug("Setup logging ...")
-        return logger
-
-    @staticmethod
-    @task
-    def store_output(job_id: str, output: dict) -> str:
-        storage = LocalFileSystem()
-        serializer = JSONSerializer()
-        result_path = f"{PROCESS_RESULTS_DIR}/{job_id}/result.json"
-        result = serializer.dumps(output)
-        storage.write_path(result_path, result)
-        return result_path
+    def __init__(self, processor_def: dict):
+        super().__init__(processor_def)
+        self.process_flow.__setattr__("processor", self)
 
     @staticmethod
     @flow(persist_result=True)
     def process_flow(
-            processor,
             job_id: str,
-            result_storage_block: str | None,
-            process_description: schemas.ProcessDescription,
             execution_request: schemas.ExecuteRequest
-    ) -> Union[schemas.JobStatusInfoInternal, prefect.states.State]:
-        print(processor)
-
+    ) -> dict:
         ## Setup
-        logger = KommonitorProcess.setup_logging(job_id)
-        inputs = KommonitorProcess.format_inputs(execution_request)
+
+        p = prefect.context.get_run_context().flow.__getattribute__("processor")
+        logger = setup_logging(job_id)
+        inputs = format_inputs(execution_request)
 
         config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, outputs = processor.run(config, logger, dmc)
-
-        res_path = KommonitorProcess.store_output(job_id, outputs)
+        status, outputs = p.run(config, logger, dmc)
+        res_path = store_output(job_id, outputs)
 
         ## Reformat output
-        return JobStatusInfoInternal(
-            jobID=job_id,
-            processID=process_description.id,
-            status=status,
-            updated=dt.datetime.now(),
-            generated_outputs={
-                "result": schemas.OutputExecutionResultInternal(
-                    location=res_path,
-                    media_type=(
-                        process_description.outputs["result"].schema_.content_media_type
-                    ),
-                )
-            },
-        )
+        # TODO: actually return results here
+        return {
+            'results': []
+        }
 
-    @staticmethod
     @abc.abstractmethod
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
-            dmc: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
+            dmc: ApiClient) -> (JobStatus, Dict):
         ...
 
     @property
