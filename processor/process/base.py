@@ -1,14 +1,15 @@
 import abc
+import json
 import logging
 import os
 from dataclasses import dataclass
 from logging import Logger
 from typing import Dict, Union, Optional
+import json
 
 import openapi_client
 import prefect
-from prefect.filesystems import LocalFileSystem
-from prefect.serializers import JSONSerializer
+
 import requests
 from openapi_client import ApiClient
 from prefect import task, flow, get_run_logger
@@ -17,6 +18,7 @@ from pygeoapi.util import JobStatus
 from processor.auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.utils import get_storage
 
 
 @dataclass
@@ -92,14 +94,28 @@ def setup_logging(job_id: str) -> Logger:
 
 
 @task
-def store_output(job_id: str, output: dict) -> str:
-    storage = LocalFileSystem()
-    serializer = JSONSerializer()
-    result_path = f"{PROCESS_RESULTS_DIR}/{job_id}/result.json"
-    result = serializer.dumps(output)
-    storage.write_path(result_path, result)
-    return result_path
-
+def store_output_as_file(job_id: str, output: dict) -> dict:
+    storage_type = "LocalFileSystem"
+    basepath = f"{PROCESS_RESULTS_DIR}"
+    output_dir = get_storage(storage_type, basepath=basepath)
+    filename = f"percentage-share-result-{job_id}.json"
+    output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
+    return {
+        'providers': {
+            'file_storage_provider': {
+                'type': storage_type,
+                'basepath': basepath
+            }
+        },
+        'results': [
+            {
+                'provider': 'file_storage_provider',
+                'mime_type': 'text/plain',
+                'location': f'{output_dir.basepath}/{filename}',
+                'filename': filename
+            }
+        ]
+    }
 
 class KommonitorProcess(BasePrefectProcessor):
     result_storage_block = None
@@ -115,23 +131,17 @@ class KommonitorProcess(BasePrefectProcessor):
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
-
         p = prefect.context.get_run_context().flow.__getattribute__("processor")
         logger = setup_logging(job_id)
         inputs = format_inputs(execution_request)
-
         config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
         status, outputs = p.run(config, logger, dmc)
-        res_path = store_output(job_id, outputs)
 
-        ## Reformat output
-        # TODO: actually return results here
-        return {
-            'results': []
-        }
+        ## Store output and return result
+        return store_output_as_file(job_id, outputs["result"])
 
     @abc.abstractmethod
     def run(self,

@@ -69,7 +69,7 @@ class PercentageShare(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
+            data_management_client: ApiClient) -> (JobStatus, Dict):
 
         # 1. Load inputs
         inputs = config.inputs
