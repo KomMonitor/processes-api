@@ -15,9 +15,10 @@ from openapi_client import ApiClient
 from prefect import task, flow, get_run_logger
 from pygeoapi.util import JobStatus
 
-from processor.auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
+from auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat
 from pygeoapi_prefect.utils import get_storage
 
 
@@ -119,6 +120,53 @@ def store_output_as_file(job_id: str, output: dict) -> dict:
 
 class KommonitorProcess(BasePrefectProcessor):
     result_storage_block = None
+    common_inputs = {
+        "target_indicator_id": ProcessInput(
+            title="target_indicator_id",
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.STRING
+            )
+        ),
+        "target_spatial_units": ProcessInput(
+            title="target_spatial_units",
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.ARRAY,
+                items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.DATE),
+                min_items=1
+            )
+        ),
+        "target_time ": ProcessInput(
+            title="target_time",
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.OBJECT,
+                required={'mode'},
+                properties={
+                    "mode": ProcessIOSchema(type_=ProcessIOType.STRING),
+                    "includeDates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING)),
+                    "excludeDates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
+                },
+                default={
+                    "mode": "MISSING",
+                    "includeDates": [],
+                    "excludeDates": []
+                }
+            )
+        ),
+        "execution_interval ": ProcessInput(
+            title="execution_interval",
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.OBJECT,
+                required={"cron"},
+                properties={
+                    "cron": ProcessIOSchema(type_=ProcessIOType.STRING)
+                },
+                default={
+                    "cron": "0 0 1 * *"
+                }
+            ),
+
+        )
+    }
 
     def __init__(self, processor_def: dict):
         super().__init__(processor_def)
@@ -151,6 +199,12 @@ class KommonitorProcess(BasePrefectProcessor):
         ...
 
     @property
-    @abc.abstractmethod
     def process_description(self) -> schemas.ProcessDescription:
+        description = self.detailed_process_description
+        description.inputs = description.inputs | KommonitorProcess.common_inputs
+        return description
+
+    @property
+    @abc.abstractmethod
+    def detailed_process_description(self) -> schemas.ProcessDescription:
         ...

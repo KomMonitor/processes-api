@@ -7,12 +7,11 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
-from processor.process.base import KommonitorProcess, KommonitorProcessConfig
-from processor.process.util.geojson import as_geojson
+from ..base import KommonitorProcess, KommonitorProcessConfig
 
 
 class PercentageShare(KommonitorProcess):
-    process_description = ProcessDescription(
+    detailed_process_description = ProcessDescription(
         id="percentage-share",
         version="0.0.1",
         title="Percentage share of an indicator to a reference indicator in a given spatial unit",
