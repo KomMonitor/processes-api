@@ -118,6 +118,7 @@ def parse_processes(package: str) -> None:
     """
     processes = flask_app.api_.manager.processes
     for process in glob.glob(f"process/{package}/*.py"):
+        print(process)
         with open(process) as fh:
             root = ast.parse(fh.read())
             for node in ast.iter_child_nodes(root):
@@ -151,9 +152,9 @@ async def init():
     # await deployment.apply()
     pass
 
+asyncio.run(init())
 
 def run():
-    asyncio.run(init())
 
     APP.run(debug=False,
             host=api_.config['server']['bind']['host'],
