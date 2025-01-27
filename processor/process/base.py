@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from enum import Enum
 from logging import Logger
 from typing import Dict, Union, Optional
 import json
@@ -18,7 +19,8 @@ from pygeoapi.util import JobStatus
 from auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
-from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
+    ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
 
 
@@ -77,7 +79,12 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
     inputs = {}
 
     for k, v in execution_request.inputs.items():
-        inputs[k] = v.root
+        if type(v) is ExecutionInputValueNoObject or type(v) is ExecutionInputValueNoObjectArray:
+            inputs[k] = v.model_dump()
+        elif type(v) is ExecutionQualifiedInputValue:
+            inputs[k] = v.model_dump()["value"]
+        else:
+            raise Exception("Unsupported input value!")
     return inputs
 
 
@@ -118,8 +125,30 @@ def store_output_as_file(job_id: str, output: dict) -> dict:
         ]
     }
 
+
+class ExecutionErrorType(str, Enum):
+    MISSING_TIMESTAMP = "MISSING_TIMESTAMP"
+    MISSING_DATASET = "MISSING_DATASET"
+    MISSING_SPATIAL_UNIT = "MISSING_SPATIAL_UNIT"
+    MISSING_SPATIAL_UNIT_FEATURE = "MISSING_SPATIAL_UNIT_FEATURE"
+    DATAMANAGEMENT_API_ERROR = "DATAMANAGEMENT_API_ERROR"
+    PROCESSING_ERROR = "PROCESSING_ERROR"
+
+
+class ExecutionMode(str, Enum):
+    MISSING = "MISSING"
+    ALL = "ALL"
+    DATES = "DATES"
+
+
+class ExecutionResourceType(str, Enum):
+    GEORESOURCE = "GEORESOURCE"
+    INDICATOR = "INDICATOR"
+
+
 class KommonitorProcess(BasePrefectProcessor):
     result_storage_block = None
+
     common_inputs = {
         "target_indicator_id": ProcessInput(
             title="target_indicator_id",
@@ -131,7 +160,7 @@ class KommonitorProcess(BasePrefectProcessor):
             title="target_spatial_units",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
-                items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.DATE),
+                items=ProcessIOSchema(type_=ProcessIOType.STRING),
                 min_items=1
             )
         ),
@@ -139,14 +168,14 @@ class KommonitorProcess(BasePrefectProcessor):
             title="target_time",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
-                required={'mode'},
+                required=["mode"],
                 properties={
-                    "mode": ProcessIOSchema(type_=ProcessIOType.STRING),
+                    "mode": ProcessIOSchema(type_=ProcessIOType.STRING, enum=[ExecutionMode.MISSING, ExecutionMode.ALL, ExecutionMode.DATES]),
                     "includeDates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING)),
                     "excludeDates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
                 },
                 default={
-                    "mode": "MISSING",
+                    "mode": ExecutionMode.MISSING,
                     "includeDates": [],
                     "excludeDates": []
                 }
@@ -156,7 +185,7 @@ class KommonitorProcess(BasePrefectProcessor):
             title="execution_interval",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
-                required={"cron"},
+                required=["cron"],
                 properties={
                     "cron": ProcessIOSchema(type_=ProcessIOType.STRING)
                 },
@@ -164,9 +193,84 @@ class KommonitorProcess(BasePrefectProcessor):
                     "cron": "0 0 1 * *"
                 }
             ),
-
         )
     }
+
+    error_type =  ProcessIOSchema(
+        type_=ProcessIOType.ARRAY,
+        items=ProcessIOSchema(
+            type_=ProcessIOType.OBJECT,
+            required=["type", "affectedResourceType", "affectedDatasetId", "affectedTimestamps", "affectedSpatialUnitFeatures", "errorMessage"],
+            properties={
+                "type": ProcessIOSchema(type_=ProcessIOType.STRING, enum=[ExecutionErrorType.MISSING_TIMESTAMP, ExecutionErrorType.MISSING_DATASET, ExecutionErrorType.MISSING_SPATIAL_UNIT, ExecutionErrorType.MISSING_SPATIAL_UNIT_FEATURE, ExecutionErrorType.DATAMANAGEMENT_API_ERROR, ExecutionErrorType.PROCESSING_ERROR]),
+                "affectedResourceType": ProcessIOSchema(type_=ProcessIOType.STRING, enum=[ExecutionResourceType.INDICATOR, ExecutionResourceType.GEORESOURCE]),
+                "affectedDatasetId": ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.UUID),
+                "affectedTimestamps": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.DATE)),
+                "affectedSpatialUnitFeatures": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING)),
+                "errorMessage": ProcessIOSchema(type_=ProcessIOType.STRING)
+            }
+        )
+    )
+
+    indicator_value_type = ProcessIOSchema(
+        type_=ProcessIOType.OBJECT,
+        required=["spatialReferenceKey", "valueMapping"],
+        properties={
+            "spatialReferenceKey": ProcessIOSchema(type_=ProcessIOType.STRING),
+            "valueMapping": ProcessIOSchema(
+                type_=ProcessIOType.ARRAY,
+                items=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    required=["indicatorValue", "timestamp"],
+                    properties={
+                        "indicatorValue": ProcessIOSchema(type_=ProcessIOType.NUMBER),
+                        "timestamp": ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.DATE)
+                    }
+                )
+            )
+        }
+    )
+
+    common_output = {
+        "jobSummary": ProcessOutput(
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.ARRAY,
+                items=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    properties={
+                        "spatialUnitId": ProcessIOSchema(type_=ProcessIOType.STRING),
+                        "modifiedResource": ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.URI),
+                        "numberOfIntegratedIndicatorFeatures": ProcessIOSchema(type_=ProcessIOType.INTEGER),
+                        "integratedTargetDates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.DATE)),
+                        "errorsOccurred": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=error_type)
+                    }
+                ),
+                content_media_type= "application/json"
+            )
+        ),
+        "results": ProcessOutput(
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.ARRAY,
+                items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.URI),
+                content_media_type="application/json"
+            )
+        ),
+        "resultData": ProcessOutput(
+            schema_=ProcessIOSchema(
+                type_=ProcessIOType.ARRAY,
+                items=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    required=["applicableSpatialUnit", "indicatorValues"],
+                    properties={
+                        "applicableSpatialUnit": ProcessIOSchema(type_=ProcessIOType.STRING),
+                        "indicatorValues": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=indicator_value_type),
+                    }
+                ),
+                content_media_type="application/json"
+            )
+        )
+    }
+
 
     def __init__(self, processor_def: dict):
         super().__init__(processor_def)
@@ -189,7 +293,7 @@ class KommonitorProcess(BasePrefectProcessor):
         status, outputs = p.run(config, logger, dmc)
 
         ## Store output and return result
-        return store_output_as_file(job_id, outputs["result"])
+        return store_output_as_file(job_id, outputs["results"])
 
     @abc.abstractmethod
     def run(self,
@@ -201,7 +305,6 @@ class KommonitorProcess(BasePrefectProcessor):
     @property
     def process_description(self) -> schemas.ProcessDescription:
         description = self.detailed_process_description
-        description.inputs = description.inputs | KommonitorProcess.common_inputs
         return description
 
     @property
