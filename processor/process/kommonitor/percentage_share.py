@@ -16,10 +16,17 @@ class PercentageShare(KommonitorProcess):
         version="0.0.1",
         title="Percentage share of an indicator to a reference indicator in a given spatial unit",
         example={
-            "indicator_id": "cccca04-cc57-48d3-a801-d6b4b00fcccc",
-            "reference_indicator_id": "aaaaa04-cc57-48d3-a801-d6b4b00faaaa",
-            "target_spatial_unit_id": "bbbba04-cc57-48d3-a801-d6b4b00fbbbb",
-            "target_date": "2000-01-01"
+            "target_indicator_id": "cccca04-cc57-48d3-a801-d6b4b00fcccc",
+            "target_spatial_units": ["bbbba04-cc57-48d3-a801-d6b4b00fbbbb"],
+            "target_time": {
+              "mode": "MISSING",
+              "includeDates": [],
+              "excludeDates": []
+            },
+            "execution_interval": {
+                "cron": "0 0 1 * *"
+            },
+            "reference_indicator_id": "aaaaa04-cc57-48d3-a801-d6b4b00faaaa"
         },
         additional_parameters=AdditionalProcessIOParameters(
             parameters=[
@@ -33,36 +40,17 @@ class PercentageShare(KommonitorProcess):
                 ),
             ]
         ),
-        jobControlOptions=[
+        job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
-        inputs={
-            "indicator_id": ProcessInput(
-                title="indicator_id",
-                schema=ProcessIOSchema(type=ProcessIOType.STRING)
-            ),
+        inputs=KommonitorProcess.common_inputs | {
             "reference_indicator_id": ProcessInput(
                 title="reference_indicator_id",
-                schema=ProcessIOSchema(type=ProcessIOType.STRING)
-            ),
-            "target_spatial_unit_id": ProcessInput(
-                title="target_spatial_unit_id",
-                schema=ProcessIOSchema(type=ProcessIOType.STRING)
-            ),
-            "target_date": ProcessInput(
-                title="target_date",
-                schema=ProcessIOSchema(type=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             )
         },
-        outputs={
-            "result": ProcessOutput(
-                schema=ProcessIOSchema(
-                    type=ProcessIOType.OBJECT,
-                    contentMediaType="application/json",
-                )
-            )
-        },
+        outputs = KommonitorProcess.common_output
     )
 
     def run(self,
@@ -77,14 +65,22 @@ class PercentageShare(KommonitorProcess):
         try:
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             indicator = {}
+            target_indicator_id = inputs["target_indicator_id"]
+            reference_indicator_id = inputs["reference_indicator_id"]
+            target_spatial_units = inputs["target_spatial_units"]
+            target_time = inputs["target_time"]["includeDates"][0]
+            execution_interval = inputs["execution_interval"]
+
+            target_unit_id = target_spatial_units[0]
+
 
             response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                inputs["reference_indicator_id"], inputs["target_spatial_unit_id"])
+                reference_indicator_id, target_unit_id)
             # Iterate population
             for feat in response:
                 feature_id = feat["fid"]
 
-                ref_value = feat[f"DATE_{inputs['target_date']}"]
+                ref_value = feat[f"DATE_{target_time}"]
                 if ref_value is None:
                     # TODO: None must be None and not 0. Otherwise calculated indicator is misleading and
                     #  calculation may cause an error
@@ -100,11 +96,11 @@ class PercentageShare(KommonitorProcess):
 
             # Iterate unemployed
             response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                inputs["indicator_id"], inputs["target_spatial_unit_id"])
+                target_indicator_id, target_unit_id)
             for feat in response:
                 feature_id = feat["fid"]
 
-                value = feat[f"DATE_{inputs['target_date']}"]
+                value = feat[f"DATE_{target_time}"]
                 if value is None:
                     logger.error(f"WARNING: the feature with featureID '{feature_id}' does not contain a "
                                  f"time series value for targetDate '{inputs['target_date']}")
@@ -112,7 +108,29 @@ class PercentageShare(KommonitorProcess):
                     # Calculate percentage
                     indicator[feature_id]["value"] = (float(value) / indicator[feature_id]["ref_value"]) * 100
 
-            return JobStatus.successful, {"result": indicator}
+            result = {
+                "jobSummary": [],
+                "results": [
+                    {
+                        "applicableSpatialUnit": target_unit_id,
+                        "indicatorValues": []
+                    }
+                ]
+            }
+            for feature in indicator.values():
+                result["results"][0]["indicatorValues"].append(
+                    {
+                        "spatialReferenceKey": feature["feature_id"],
+                        "valueMapping": [
+                            {
+                                "indicatorValue": feature["value"],
+                                "timestamp": target_time
+                            }
+                        ]
+                    }
+                )
+
+            return JobStatus.successful, result
         except ApiException as e:
             logger.error(f"Exception when calling DataManagementAPI: {e}")
             return JobStatus.failed, None
