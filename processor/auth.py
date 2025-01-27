@@ -14,7 +14,7 @@ KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 
 
-class MyIntrospectTokenValidator(IntrospectTokenValidator):
+class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
     def introspect_token(self, token_string):
         url = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token/introspect"
         data = {'token': token_string[7:], 'token_type_hint': 'access_token'}\
