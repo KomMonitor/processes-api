@@ -3,11 +3,15 @@ from typing import Dict, Optional
 import openapi_client
 from openapi_client import ApiClient
 from openapi_client.rest import ApiException
+# from pandas import isnull
+import pandas as pd
+
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
-
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
+
 from ..base import KommonitorProcess, KommonitorProcessConfig
+from ..util import dataio
 
 
 class PercentageShare(KommonitorProcess):
@@ -73,62 +77,29 @@ class PercentageShare(KommonitorProcess):
 
             target_unit_id = target_spatial_units[0]
 
+            data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(target_indicator_id, target_unit_id)
+            ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(reference_indicator_id, target_unit_id)
 
-            response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                reference_indicator_id, target_unit_id)
-            # Iterate population
-            for feat in response:
-                feature_id = feat["fid"]
+            indicator_df = dataio.indicator_timeseries_to_dataframe(data)
+            ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data)
 
-                ref_value = feat[f"DATE_{target_time}"]
-                if ref_value is None:
-                    # TODO: None must be None and not 0. Otherwise calculated indicator is misleading and
-                    #  calculation may cause an error
-                    ref_value = 0
-                    logger.error(f"WARNING: the feature with featureID '{feature_id}' does not contain a "
-                                 f"time series value for targetDate '{inputs['target_date']}")
+            merged_df = indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
+                                           suffixes=("_target", "_ref"))
+            merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
 
-                indicator[feature_id] = {
-                    "feature_id": feature_id,
-                    "value": None,
-                    "ref_value": float(ref_value)
-                }
+            merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
+            merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
 
-            # Iterate unemployed
-            response = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                target_indicator_id, target_unit_id)
-            for feat in response:
-                feature_id = feat["fid"]
+            merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
 
-                value = feat[f"DATE_{target_time}"]
-                if value is None:
-                    logger.error(f"WARNING: the feature with featureID '{feature_id}' does not contain a "
-                                 f"time series value for targetDate '{inputs['target_date']}")
-                else:
-                    # Calculate percentage
-                    indicator[feature_id]["value"] = (float(value) / indicator[feature_id]["ref_value"]) * 100
+            ts_result = dataio.dataframe_to_indicator_timeseries(merged_df)
 
             result = {
                 "jobSummary": [],
                 "results": [
-                    {
-                        "applicableSpatialUnit": target_unit_id,
-                        "indicatorValues": []
-                    }
+                    ts_result
                 ]
             }
-            for feature in indicator.values():
-                result["results"][0]["indicatorValues"].append(
-                    {
-                        "spatialReferenceKey": feature["feature_id"],
-                        "valueMapping": [
-                            {
-                                "indicatorValue": feature["value"],
-                                "timestamp": target_time
-                            }
-                        ]
-                    }
-                )
 
             return JobStatus.successful, result
         except ApiException as e:
