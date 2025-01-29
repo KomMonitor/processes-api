@@ -30,6 +30,7 @@ class PercentageShare(KommonitorProcess):
             "execution_interval": {
                 "cron": "0 0 1 * *"
             },
+            "base_indicator_id": "bbbbb04-dc45-58d3-a801-d6b4b00fbbbbb",
             "reference_indicator_id": "aaaaa04-cc57-48d3-a801-d6b4b00faaaa"
         },
         additional_parameters=AdditionalProcessIOParameters(
@@ -49,6 +50,10 @@ class PercentageShare(KommonitorProcess):
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         inputs=KommonitorProcess.common_inputs | {
+            "base_indicator_id": ProcessInput(
+                title="base_indicator_id",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            ),
             "reference_indicator_id": ProcessInput(
                 title="reference_indicator_id",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
@@ -70,36 +75,66 @@ class PercentageShare(KommonitorProcess):
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             indicator = {}
             target_indicator_id = inputs["target_indicator_id"]
-            reference_indicator_id = inputs["reference_indicator_id"]
+            base_indicator_id = inputs["base_indicator_id"]
+            ref_indicator_id = inputs["reference_indicator_id"]
             target_spatial_units = inputs["target_spatial_units"]
-            target_time = inputs["target_time"]["includeDates"][0]
-            execution_interval = inputs["execution_interval"]
-
-            target_unit_id = target_spatial_units[0]
-
-            data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(target_indicator_id, target_unit_id)
-            ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(reference_indicator_id, target_unit_id)
-
-            indicator_df = dataio.indicator_timeseries_to_dataframe(data)
-            ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data)
-
-            merged_df = indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
-                                           suffixes=("_target", "_ref"))
-            merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
-
-            merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
-            merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
-
-            merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
-
-            ts_result = dataio.dataframe_to_indicator_timeseries(merged_df)
+            exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
+            include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
 
             result = {
                 "jobSummary": [],
-                "results": [
-                    ts_result
-                ]
+                "results": []
             }
+
+            target_indicator_metadata = indicators_controller.get_indicator_by_id(target_indicator_id)
+            base_indicator_metadata = indicators_controller.get_indicator_by_id(base_indicator_id)
+            ref_indicator_metadata = indicators_controller.get_indicator_by_id(ref_indicator_id)
+
+            dates_df = dataio.get_applicable_dates_from_metadata_as_dataframe([target_indicator_metadata, base_indicator_metadata, ref_indicator_metadata])
+
+            # Candidate target dates are all dates, which potentially should be calculated depending on the execution mode
+            candidate_target_dates = dataio.get_missing_target_dates(dates_df, target_indicator_id, [base_indicator_id, ref_indicator_id],
+                                                                     drop_input_na=False,
+                                                                     mode=inputs["target_time"]["mode"],
+                                                                     exclude_dates=exclude_dates,
+                                                                     include_dates=include_dates)
+            # Computable target dates ar all dates, which potentially should be calculated depending on the execution mode and for which all inputs have an existing value
+            computable_target_dates = dataio.get_missing_target_dates(dates_df, target_indicator_id, [base_indicator_id, ref_indicator_id],
+                                                                     drop_input_na=True,
+                                                                     mode=inputs["target_time"]["mode"],
+                                                                     exclude_dates=exclude_dates,
+                                                                     include_dates=include_dates)
+
+            # determine missing timestamps for input datasets to add errors to jobSummary
+            missing_input_timestamps = dataio.get_missing_input_timestamps(candidate_target_dates, dates_df, [base_indicator_id, ref_indicator_id])
+            result["jobSummary"].append(dataio.get_missing_timestamps_error(missing_input_timestamps,resource_type="indicator"))
+
+            for target_unit_id in target_spatial_units:
+
+                base_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(base_indicator_id, target_unit_id)
+                ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(ref_indicator_id, target_unit_id)
+
+                indicator_df = dataio.indicator_timeseries_to_dataframe(base_data)
+                ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data)
+
+                merged_df = indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
+                                               suffixes=("_target", "_ref"))
+                merged_df = merged_df[merged_df["date"].isin(computable_target_dates)]
+                merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
+                # TODO create error for missing features
+                merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
+                merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
+
+                merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
+
+                ts_result = dataio.dataframe_to_indicator_timeseries(merged_df)
+
+                result["results"].append(
+                    {
+                        "applicableSpatialUnit": target_unit_id,
+                        "indicatorValues": ts_result
+                    }
+                )
 
             return JobStatus.successful, result
         except ApiException as e:
