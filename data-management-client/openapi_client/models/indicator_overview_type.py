@@ -37,11 +37,11 @@ class IndicatorOverviewType(BaseModel):
     """
     IndicatorOverviewType
     """ # noqa: E501
-    abbreviation: StrictStr = Field(description="abbreviated mark of the indicator")
+    abbreviation: Optional[StrictStr] = Field(description="abbreviated mark of the indicator")
     allowed_roles: Optional[List[StrictStr]] = Field(default=None, description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
     applicable_dates: List[StrictStr] = Field(description="array of applicable dates (year and month and day as YEAR-MONTH-DAY) according to ISO 8601 (e.g. 2018-01-30)", alias="applicableDates")
     applicable_spatial_units: List[IndicatorSpatialUnitJoinItem] = Field(description="array of spatial unit levels for which the dataset is applicable", alias="applicableSpatialUnits")
-    characteristic_value: StrictStr = Field(description="the distuingishing characteristic value of the indicator", alias="characteristicValue")
+    characteristic_value: Optional[StrictStr] = Field(description="the distuingishing characteristic value of the indicator", alias="characteristicValue")
     creation_type: StrictStr = Field(description="indicates if the data is simply inserted (INSERTION), computed by an automated script (COMPUTATION) or automatically aggregated by a script (AGGREGATION)", alias="creationType")
     default_classification_mapping: Optional[DefaultClassificationMappingType] = Field(default=None, alias="defaultClassificationMapping")
     indicator_id: StrictStr = Field(description="unique identifier of this resource", alias="indicatorId")
@@ -52,7 +52,7 @@ class IndicatorOverviewType(BaseModel):
     lowest_spatial_unit_for_computation: Optional[StrictStr] = Field(default=None, description="identifier/name of the lowest spatial unit for which the indicator can be computed and thus is available (only necessary for computable indicators)", alias="lowestSpatialUnitForComputation")
     metadata: CommonMetadataType
     ogc_services: List[OgcServicesType] = Field(description="list of available OGC services for that indicator for different spatial units", alias="ogcServices")
-    process_description: StrictStr = Field(description="description about how the indicator was computed", alias="processDescription")
+    process_description: Optional[StrictStr] = Field(description="description about how the indicator was computed", alias="processDescription")
     reference_date_note: Optional[StrictStr] = Field(default=None, description="an optional note on the reference date of the indicator", alias="referenceDateNote")
     display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")
     referenced_georesources: Optional[List[GeoresourceReferenceType]] = Field(default=None, description="list of references to georesources", alias="referencedGeoresources")
