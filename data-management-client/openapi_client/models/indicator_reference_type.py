@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import BaseModel, StrictStr
 from pydantic import Field
 try:
@@ -31,7 +31,7 @@ class IndicatorReferenceType(BaseModel):
     """
     a reference to another indicator, e.g. a sub-indicator that is used to compute the main indicator
     """ # noqa: E501
-    referenced_indicator_description: StrictStr = Field(description="a meaningful description of how the referenced indicator is related to the main indicator", alias="referencedIndicatorDescription")
+    referenced_indicator_description: Optional[StrictStr] = Field(description="a meaningful description of how the referenced indicator is related to the main indicator", alias="referencedIndicatorDescription")
     referenced_indicator_id: StrictStr = Field(description="unique identifier of the referenced indicator", alias="referencedIndicatorId")
     referenced_indicator_name: StrictStr = Field(description="the meaningful name of the referenced indicator", alias="referencedIndicatorName")
     __properties: ClassVar[List[str]] = ["referencedIndicatorDescription", "referencedIndicatorId", "referencedIndicatorName"]
