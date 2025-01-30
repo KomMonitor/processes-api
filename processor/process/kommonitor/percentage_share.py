@@ -11,7 +11,7 @@ from pygeoapi.util import JobStatus
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 
 from ..base import KommonitorProcess, KommonitorProcessConfig
-from ..util import dataio
+from ..util import dataio, job_summary
 
 
 class PercentageShare(KommonitorProcess):
@@ -71,9 +71,16 @@ class PercentageShare(KommonitorProcess):
         inputs = config.inputs
         logger.debug("Starting execution...")
 
+        result = {
+            "jobSummary": [],
+            "results": []
+        }
+        current_indicator = ""
+
         try:
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            indicator = {}
+
+            # Extract all relevant inputs
             target_indicator_id = inputs["target_indicator_id"]
             base_indicator_id = inputs["base_indicator_id"]
             ref_indicator_id = inputs["reference_indicator_id"]
@@ -81,15 +88,12 @@ class PercentageShare(KommonitorProcess):
             exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
             include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
 
-            result = {
-                "jobSummary": [],
-                "results": []
-            }
-
+            # Fetch indicator metadata
             target_indicator_metadata = indicators_controller.get_indicator_by_id(target_indicator_id)
             base_indicator_metadata = indicators_controller.get_indicator_by_id(base_indicator_id)
             ref_indicator_metadata = indicators_controller.get_indicator_by_id(ref_indicator_id)
 
+            # Get a DataFrame that contains dates for all indicators
             dates_df = dataio.get_applicable_dates_from_metadata_as_dataframe([target_indicator_metadata, base_indicator_metadata, ref_indicator_metadata])
 
             # Candidate target dates are all dates, which potentially should be calculated depending on the execution mode
@@ -107,26 +111,36 @@ class PercentageShare(KommonitorProcess):
 
             # determine missing timestamps for input datasets to add errors to jobSummary
             missing_input_timestamps = dataio.get_missing_input_timestamps(candidate_target_dates, dates_df, [base_indicator_id, ref_indicator_id])
-            result["jobSummary"].append(dataio.get_missing_timestamps_error(missing_input_timestamps,resource_type="indicator"))
+            if missing_input_timestamps:
+                result["jobSummary"].extend(job_summary.get_missing_timestamps_error(missing_input_timestamps,resource_type="indicator"))
 
             for target_unit_id in target_spatial_units:
 
+                # Fetch indicator timeseries data
                 base_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(base_indicator_id, target_unit_id)
                 ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(ref_indicator_id, target_unit_id)
 
+                # Create a DataFrame for each indicator timeseries data and merge it
                 indicator_df = dataio.indicator_timeseries_to_dataframe(base_data)
                 ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data)
 
                 merged_df = indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
                                                suffixes=("_target", "_ref"))
-                merged_df = merged_df[merged_df["date"].isin(computable_target_dates)]
-                merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
-                # TODO create error for missing features
+
+                # Cast indicator value columns to be numeric
                 merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
                 merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
 
+                # Use computable target dates to filter DataFrame for relevant rows
+                merged_df = merged_df[merged_df["date"].isin(computable_target_dates)]
+                # Drop rows where at least one input has an NA value
+                merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
+                # TODO create error for missing features
+
+                # Calculate percentage share
                 merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
 
+                # Convert DataFrame back again to required JSON format
                 ts_result = dataio.dataframe_to_indicator_timeseries(merged_df)
 
                 result["results"].append(
@@ -139,4 +153,5 @@ class PercentageShare(KommonitorProcess):
             return JobStatus.successful, result
         except ApiException as e:
             logger.error(f"Exception when calling DataManagementAPI: {e}")
-            return JobStatus.failed, None
+            result["jobSummary"].append(job_summary.get_api_client_error(e))
+            return JobStatus.failed, result

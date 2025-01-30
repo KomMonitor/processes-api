@@ -106,7 +106,7 @@ def store_output_as_file(job_id: str, output: dict) -> dict:
     storage_type = "LocalFileSystem"
     basepath = f"{PROCESS_RESULTS_DIR}"
     output_dir = get_storage(storage_type, basepath=basepath)
-    filename = f"percentage-share-result-{job_id}.json"
+    filename = f"result-{job_id}.json"
     output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
     return {
         'providers': {
@@ -292,8 +292,7 @@ class KommonitorProcess(BasePrefectProcessor):
         ## Run process
         status, outputs = p.run(config, logger, dmc)
 
-        ## Store output and return result
-        return store_output_as_file(job_id, outputs["results"])
+        return store_output_as_file(job_id, outputs)
 
     @abc.abstractmethod
     def run(self,
