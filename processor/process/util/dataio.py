@@ -129,19 +129,3 @@ def get_missing_input_timestamps(target_dates: list, df: pd.DataFrame, input_ids
         if(len(missing_timestamps) > 0):
             missing_timestamp_list.append({"id": id, "missingTimestamps": missing_timestamps})
     return missing_timestamp_list
-
-
-def get_missing_timestamps_error(missing_timestamps: list, resource_type: str):
-    error_list = []
-    for t in missing_timestamps:
-        error_list.append(
-            {
-                "type": "missingTimestamp",
-                "affectedResourceType": resource_type,
-                "affectedDatasetId": t["id"],
-                "affectedTimestamps": t["missingTimestamps"],
-                "affectedSpatialUnitFeatures": [],
-                "errorMessage": "Timestamps are missing for one or more input datasets"
-            }
-        )
-    return error_list
