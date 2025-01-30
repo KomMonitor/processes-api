@@ -5,7 +5,6 @@ pygeofilter
 Flask~=2.2.3
 oauthlib~=3.2.2
 prefect
-geopandas~=0.14.1
 griffe >= 0.20.0, <0.48.0
 gunicorn
 pydantic
@@ -14,3 +13,5 @@ python-dateutil~=2.8.2
 setuptools~=67.6.0
 rtree
 filelock
+geopandas~=1.0.1
+pandas~=2.2.3
