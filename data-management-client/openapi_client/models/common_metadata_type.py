@@ -38,7 +38,7 @@ class CommonMetadataType(BaseModel):
     last_update: Optional[date] = Field(default=None, description="a timestamp representing the lastUpdate according to ISO 8601 (e.g. 2018-01-30)", alias="lastUpdate")
     literature: Optional[StrictStr] = Field(default=None, description="an optional hint to literature about the dataset (e.g. URL or book/article name)")
     note: Optional[StrictStr] = Field(default=None, description="an optional note with background information about the dataset")
-    srid_epsg: Union[StrictFloat, StrictInt] = Field(description="the coordinate reference system of the dataset as EPSG code", alias="sridEPSG")
+    srid_epsg: Optional[Union[StrictFloat, StrictInt]] = Field(description="the coordinate reference system of the dataset as EPSG code", alias="sridEPSG")
     update_interval: StrictStr = Field(alias="updateInterval")
     __properties: ClassVar[List[str]] = ["contact", "databasis", "datasource", "description", "lastUpdate", "literature", "note", "sridEPSG", "updateInterval"]
 

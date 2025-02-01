@@ -5,12 +5,12 @@ from openapi_client.rest import ApiException
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
-from processor.process.base import KommonitorProcess, KommonitorProcessConfig
+from ..base import KommonitorProcess, KommonitorProcessConfig
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 
 
 class HelloWorld(KommonitorProcess):
-    process_description = ProcessDescription(
+    detailed_process_description = ProcessDescription(
         id="hello-world",
         version="1.0.0",
         title="Hello World! ",
@@ -49,8 +49,8 @@ class HelloWorld(KommonitorProcess):
         },
     )
 
-    @staticmethod
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
 
@@ -66,6 +66,7 @@ class HelloWorld(KommonitorProcess):
 
             # 4.1 Return success and result
             return JobStatus.successful, None
+
         except ApiException as e:
 
             # 4.2 Catch possible errors cleanly

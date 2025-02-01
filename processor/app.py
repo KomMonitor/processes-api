@@ -8,7 +8,7 @@ from authlib.integrations.flask_oauth2 import ResourceProtector
 from flask import Flask, send_from_directory, request
 from werkzeug.utils import secure_filename
 
-from auth import MyIntrospectTokenValidator
+from auth import KomMonitorIntrospectTokenValidator
 
 if not os.getenv("PYGEOAPI_CONFIG"):
     os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
@@ -16,10 +16,10 @@ if not os.getenv("PYGEOAPI_OPENAPI"):
     os.environ["PYGEOAPI_OPENAPI"] = os.path.join(os.path.dirname(__file__), "default-openapi.yml")
 
 from pygeoapi import flask_app
-from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, get_response
+from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, processes_api, execute_from_flask
 
 require_oauth = ResourceProtector()
-require_oauth.register_token_validator(MyIntrospectTokenValidator())
+require_oauth.register_token_validator(KomMonitorIntrospectTokenValidator())
 
 APP = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/static')
 APP.url_map.strict_slashes = API_RULES.strict_slashes
@@ -35,8 +35,7 @@ def landing_page():
 @APP.get('/processes/<process_id>')
 @require_oauth()
 def get_processes(process_id=None):
-    return get_response(api_.describe_processes(request, process_id))
-
+    return flask_app.get_processes(process_id)
 
 @APP.post('/processes')
 @require_oauth()
@@ -119,6 +118,7 @@ def parse_processes(package: str) -> None:
     """
     processes = flask_app.api_.manager.processes
     for process in glob.glob(f"process/{package}/*.py"):
+        print(process)
         with open(process) as fh:
             root = ast.parse(fh.read())
             for node in ast.iter_child_nodes(root):
@@ -131,6 +131,7 @@ def parse_processes(package: str) -> None:
                         }
                     }
     flask_app.api_.manager.processes = processes
+    api_.config['resources'] = processes
 
 
 async def init():
@@ -151,9 +152,9 @@ async def init():
     # await deployment.apply()
     pass
 
+asyncio.run(init())
 
 def run():
-    asyncio.run(init())
 
     APP.run(debug=False,
             host=api_.config['server']['bind']['host'],

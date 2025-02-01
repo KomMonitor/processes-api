@@ -5,14 +5,14 @@ from openapi_client import ApiClient, GeorecourcesControllerApi, GeoresourcePOST
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
-from processor.process.base import KommonitorProcess, KommonitorProcessConfig
+from ..base import KommonitorProcess, KommonitorProcessConfig
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, OutputExecutionResultInternal
 
 import geopandas as gpd
 
 
 class Reproject(KommonitorProcess):
-    process_description = ProcessDescription(
+    detailed_process_description = ProcessDescription(
         id="reproject",
         version="0.0.2",
         title="Reproject Georesource and persists result to local file.",
@@ -39,11 +39,40 @@ class Reproject(KommonitorProcess):
                 title="output_georesource_name",
                 schema=ProcessIOSchema(type=ProcessIOType.STRING)
             ),
+            "target_indicator_id": ProcessInput(
+                title="target_indicator_id",
+                schema=ProcessIOSchema(type=ProcessIOType.STRING)
+            ),
+            "target_spatial_units": ProcessInput(
+                title="target_spatial_units",
+                schema=ProcessIOSchema(type=ProcessIOType.ARRAY, items=[ProcessIOSchema(type=ProcessIOType.STRING)],
+                                       min_items=1)
+            ),
+            "target_time ": ProcessInput(
+                title="target_time",
+                schema=ProcessIOSchema(
+                    type=ProcessIOType.OBJECT,
+                    properties=ProcessIOSchema(allOf=[ProcessIOSchema(title="mode", type=ProcessIOType.STRING),
+                                                      ProcessIOSchema(title="includeDates", type=ProcessIOType.ARRAY,
+                                                                      items=[
+                                                                          ProcessIOSchema(type=ProcessIOType.STRING)]),
+                                                      ProcessIOSchema(title="excludeDates", type=ProcessIOType.ARRAY,
+                                                                      items=[
+                                                                          ProcessIOSchema(type=ProcessIOType.STRING)])
+                                                      ]
+                                               )
+                )
+            ),
+            "execution_interval ": ProcessInput(
+                title="execution_interval",
+                schema=ProcessIOSchema(type=ProcessIOType.STRING)
+            )
         },
         outputs={}
     )
 
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> (JobStatus, Optional[Dict[str, OutputExecutionResultInternal]]):
 

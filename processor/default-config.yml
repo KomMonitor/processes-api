@@ -38,7 +38,6 @@ server:
   languages:
     # First language is the default language
     - en-US
-    - fr-CA
   # cors: true
   pretty_print: true
   limit: 10
@@ -63,10 +62,8 @@ metadata:
   identification:
     title:
       en: pygeoapi default instance
-      fr: instance par défaut de pygeoapi
     description:
       en: pygeoapi provides an API to geospatial data
-      fr: pygeoapi fournit une API aux données géospatiales
     keywords:
       en:
         - geospatial

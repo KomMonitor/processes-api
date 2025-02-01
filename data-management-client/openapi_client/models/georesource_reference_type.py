@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import BaseModel, StrictStr
 from pydantic import Field
 try:
@@ -31,7 +31,7 @@ class GeoresourceReferenceType(BaseModel):
     """
     a reference to georesource, e.g. a resource that is used to compute the main indicator
     """ # noqa: E501
-    referenced_georesource_description: StrictStr = Field(description="a meaningful description of how the referenced georesource is related to the main indicator", alias="referencedGeoresourceDescription")
+    referenced_georesource_description: Optional[StrictStr] = Field(description="a meaningful description of how the referenced georesource is related to the main indicator", alias="referencedGeoresourceDescription")
     referenced_georesource_id: StrictStr = Field(description="unique identifier of the referenced georesource", alias="referencedGeoresourceId")
     referenced_georesource_name: StrictStr = Field(description="the meaningful name of the referenced georesource", alias="referencedGeoresourceName")
     __properties: ClassVar[List[str]] = ["referencedGeoresourceDescription", "referencedGeoresourceId", "referencedGeoresourceName"]
