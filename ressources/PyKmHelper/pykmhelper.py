@@ -10,6 +10,7 @@ import geojson
 import math
 import shapely
 import datetime
+from logging import Logger
 
 # Define custom CONSTANTS used within the script
 
@@ -208,23 +209,22 @@ def getSpatialUnitFeatureNameValue(feature):
     return str(feature["properties"][spatialUnitFeatureNamePropertyName])
 
 def log(logMessage):
-    print(logMessage)
-    # TODO: ProgressHelperService and Docstring
-
-def logError(logMessage):
-    raise Exception(logMessage)
-    # TODO: ProgressHelperService and Docstring
-
-def throwError(message):
-    """Throw an Error Object with a custom Messgae
+    """Implement function 'log' from module 'logging' to write an output Message to the console
 
     Args:
-        message (string): the custom message the error should contain
-
-    Raises:
-        Exception: throws the exception
+        logMessage (string): the message the shall be logged
     """
-    raise Exception(message)
+    Logger.log(logMessage)
+    # TODO: ProgressHelperService
+
+def throwError(logMessage):
+    """Implement function 'error' from module 'logging' to raise an error to the console
+
+    Args:
+        logMessage (string): the error message that shall be raised
+    """
+    Logger.error(logMessage)
+    # TODO: ProgressHelperService
 
 
 def isGeoJSONFeature(feature):
@@ -510,7 +510,7 @@ def setIndicatorValue(feature, targetDate, value):
         log("Affected has ID : " + str(getSpatialUnitFeatureIdValue(feature)) + " and NAME : " + str(getSpatialUnitFeatureNameValue(feature)))
         setIndicatorValue_asNoData(feature, targetDate)
 
-    targetDateWithPrefix = getTargetDateWithPropertyPrefix()
+    targetDateWithPrefix = getTargetDateWithPropertyPrefix(targetDate)
 
     feature["properties"][targetDateWithPrefix] = value
 
@@ -706,14 +706,157 @@ def transformMultiPolygonsToPolygons(featureCollection):
 #     # this function is not required (see LineStrings)
 #     return None
 
+#############################################################################################################################################
+# API_HELPER_METHODS_UTILITY   --   with the special purpose to reduce content in the computation scripts at 'KomMonitor-Script-Ressources' #  
+#############################################################################################################################################
 
+def applyComputationFilter(valueArray, computationFilterOperator, computationFilterPropertyValue):
+    """applys a computation filter to a submitted value array and returns the filtered Array. Several filter operators are valid.
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    Args:
+        valueArray (Array): the array for which the filter shall be applied
+        computationFilterOperator (string): the operator which shall be used to filter the array. Valid entrys are Equal, Greater_than, Greater_than_or_equal, Less_than, Less_than_or_equal, Unequal, Contains, Range
+        computationFilterPropertyValue (string): the filter value
 
-API_HELPER_METHODS_GEOMETRIC_OPERATIONS
+    Returns:
+        Array | None: returns the filtered Array or None if the wrong computation filter is used. None value has to be handeld separately in the script.
+    """
+    filteredArray = []    
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+    if computationFilterOperator == "Equal":
+        filteredArray = filter(lambda x: x == computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Greater_than":
+        filteredArray = filter(lambda x: x > computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Greater_than_or_equal":
+        filteredArray = filter(lambda x: x >= computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Less_than":
+        filteredArray = filter(lambda x: x < computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Less_than_or_equal":
+        filteredArray = filter(lambda x: x <= computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Unequal":
+        filteredArray = filter(lambda x: x != computationFilterPropertyValue, valueArray)
+    elif computationFilterOperator == "Contains":
+        computationFilterPropertyValueArray = computationFilterPropertyValue.split(",")
+        
+        for trimmed_element in (element.strip() for element in computationFilterPropertyValueArray):
+            tmp = [item for item in valueArray if item == trimmed_element]
+            filteredArray.extend(tmp)
+    elif computationFilterOperator == "Range":
+        computationFilterPropertyValueArray = computationFilterPropertyValue.split("-")
+        computationFilterPropertyValueArray = map(lambda x: int(x), computationFilterPropertyValueArray)
+
+        filteredArray = filter(lambda x: x >= computationFilterPropertyValueArray[0] and x < computationFilterPropertyValueArray[1])
+    else:
+        return None
+
+    return filteredArray    
+
+def applyComputationMethod(spatialUnitFeat, targetDate, valueArray, computationMethod):
+    """applys a computation method to a submitted value array and sets the features indicator value to the computed value.
+
+    Args:
+        spatialUnitFeat (Feature): the feature which indicator value shall be set.
+        targetDate (String): the date for which the indicator value shall be set.
+        valueArray (Array): the array which is used for computation of the value
+        computationMethod (string): the method used to compute the value (i.e. sum, min, mean ...) 
+    """
+    if computationMethod == "SUM":
+        setIndicatorValue(spatialUnitFeat, targetDate, sum(valueArray))
+    elif computationMethod == "MIN":
+        setIndicatorValue(spatialUnitFeat, targetDate, min(valueArray))
+    elif computationMethod == "MAX":
+        setIndicatorValue(spatialUnitFeat, targetDate, max(valueArray))
+    elif computationMethod == "MEAN":
+        setIndicatorValue(spatialUnitFeat, targetDate, mean(valueArray))
+    elif computationMethod == "MEDIAN":
+        setIndicatorValue(spatialUnitFeat, targetDate, median(valueArray))
+    elif computationMethod == "STANDARD_DEVIATION":
+        setIndicatorValue(spatialUnitFeat, targetDate, standardDeviation(valueArray))
+    else:
+        log("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
+        setIndicatorValue(spatialUnitFeat, targetDate, None)
+
+def getTargetDate_without_prefix(dateWithPrefix: str):
+    """Removes the date prefix from a submitted date string
+
+    Args:
+        dateWithPrefix (str): the target date with 'DATE_' prefix
+
+    Returns:
+        string: returns the date without 'DATE_'
+    """
+    if indicator_date_prefix in dateWithPrefix:
+        return dateWithPrefix[5:15]
+    elif len(dateWithPrefix) == 10:
+        return dateWithPrefix
+
+def getAll_target_time(targetTimeDict, computationIndicatorFeatureCollection, targetIndicatorFeatureCollection = None):
+    """Returns all target_times (or targetDates) that have to be computed in the skript. Therefore it checks the mode of the submitted Dict
+
+    Args:
+        targetTimeDict (dict): the target_time dict according to kommonitors process description schema
+        indicatorFeatureCollection (FeatureCollection): the base indicator for which all target dates shall be returned that fit the targetTime object.
+
+    Returns:
+        array<str>: returns an array containing all dates which fit the submitted schema. Without the prefix.
+    """
+    allDates = []
+    targetIndicatorDates = []
+    computeDates = []
+
+    if targetTimeDict["mode"] == "ALL":
+        for feature in computationIndicatorFeatureCollection["features"]:
+            for property in feature["properties"]:
+                if indicator_date_prefix in property:
+                    date = getTargetDate_without_prefix(property)
+                    if not date in allDates:
+                        if not date in targetTimeDict["excludeDates"]:
+                            allDates.append(date)
+        
+    elif targetTimeDict["mode"] == "DATES":
+        for feature in computationIndicatorFeatureCollection["features"]:
+            for property in feature["properties"]:
+                if indicator_date_prefix in property:
+                    date = getTargetDate_without_prefix(property)
+                    if not date in allDates:
+                        if date in targetTimeDict["includeDates"]:
+                            allDates.append(date)
     
+    elif targetTimeDict["mode"] == "MISSING":
+        for feature in computationIndicatorFeatureCollection["features"]:
+            for property in feature["properties"]:
+                if indicator_date_prefix in property:
+                    date = getTargetDate_without_prefix(property)
+                    if not date in computeDates:
+                        if not date in targetTimeDict["excludeDates"]:
+                            computeDates.append(date)
+
+        for feature in targetIndicatorFeatureCollection["features"]:
+            for property in feature["properties"]:
+                if indicator_date_prefix in property:
+                    date = getTargetDate_without_prefix(property)
+                    if not date in targetIndicatorDates:
+                        if not date in targetTimeDict["excludeDates"]:
+                            targetIndicatorDates.append(date)
+        
+        for date in computeDates:
+            if not date in targetIndicatorDates:
+                allDates.append(date)
+    
+    return allDates
+
+
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+""                                                                                                                 ""
+""                    API_HELPER_METHODS_GEOMETRIC_OPERATIONS                                                      ""
+""                                                                                                                 ""
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+
+
+
 def geoJSONtoGDF(geoJSON):
     """writes the submitted GeoJSON 'Feature' or 'FeatureCollection' to a GeoPandas GeoDataFrame.
 
@@ -1988,7 +2131,7 @@ def getSubstractNDaysDate_asString(referenceDateString, numberOfDays):
     date = formatStringAsDate(referenceDateString)
     return formatDateAsString(date - datetime.timedelta(numberOfDays))
 
-def getChange_absolute(featureCollection, targetDate, compareDate):
+def getChange_absolute(feature, targetDate, compareDate):
     """computes the absolute difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula 'value[targetDate]  - value[compareDate]'
 
     Args:
@@ -1999,26 +2142,15 @@ def getChange_absolute(featureCollection, targetDate, compareDate):
     Returns:
         dict<string, float>: returns a dictionary of all input features that have both timestamps and whose cahngeValues were successfully converted to a number.  the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
     """
-    # get a dict object with id-value pairs for the featureColection
-    indicator_idValueDict_targetDate = getIndicatorIDValueDict(featureCollection, targetDate)
+    targetDatePrefix = getTargetDateWithPropertyPrefix(targetDate)
+    compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
+    targetValue = feature["properties"][targetDatePrefix]
+    compareValue = feature["properties"][compareDatePrefix]
 
-    # dict for compareDate can be null  
-    indicator_idValueDict_compareDate = getIndicatorIDValueDict(featureCollection, compareDate)
-
-    # return empty map if no value exists for the compare date
-    if indicator_idValueDict_compareDate is None or len(indicator_idValueDict_compareDate) == 0:
-        throwError("Change computation cannot be performed as compare date does not exist within data")
-
-    resultDict = {}
-
-    for key, value in indicator_idValueDict_targetDate.items():
-        compareValue = indicator_idValueDict_compareDate[key]
-
-        if not isNoDataValue(compareValue) and not isNoDataValue(value):
-            resultValue = float(value) - float(compareValue)
-            resultDict[key] = resultValue
-    
-    return resultDict
+    if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
+        resultValue = float(targetValue) - float(compareValue)
+        
+    return resultValue
 
 def getChange_relative_percent(featureCollection, targetDate, compareDate):
     """computes the relative difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula '100 * ((value[targetDate] - value[compareDate]) / value[compareDate])'
@@ -2054,12 +2186,12 @@ def getChange_relative_percent(featureCollection, targetDate, compareDate):
 
     return resultDict
 
-def changeAbsolute_n_Years(featureCollectin, targetDate, numberOfYears):
+def changeAbsolute_n_years(feature, targetDate, numberOfYears):
     """computes the new indicator for an absolute change compared to number of previous Years
     internally tests are run, e.g. if a previous year is available or not
 
     Args:
-        featureCollectin (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        feature (Feature): a valid GeoJSON feature, whose must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
         numberOfYears (int): the number of Years to substract from the submitted reference Date
 
@@ -2068,7 +2200,7 @@ def changeAbsolute_n_Years(featureCollectin, targetDate, numberOfYears):
     """
     compareDate = getSubstractNYearsDate_asString(targetDate, numberOfYears)
 
-    return getChange_absolute(featureCollectin, targetDate, compareDate)
+    return getChange_absolute(feature, targetDate, compareDate)
 
 def changeAbsolute_n_months(featureCollection, targetDate, numberOfMonths):
     """computes the new indicator for an absolute change compared to number of previous months
