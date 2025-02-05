@@ -292,7 +292,16 @@ class KommonitorProcess(BasePrefectProcessor):
         ## Run process
         status, outputs = p.run(config, logger, dmc)
 
-        return store_output_as_file(job_id, outputs)
+        if status == JobStatus.failed:
+            return store_output_as_file(job_id, outputs)
+        else:
+            for result in outputs["results"]:
+                indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
+                resp = indicators_controller.update_indicator_as_body(
+                    indicator_id=inputs["target_indicator_id"],
+                    indicator_data=result
+                )
+
 
     @abc.abstractmethod
     def run(self,
@@ -310,6 +319,28 @@ class KommonitorProcess(BasePrefectProcessor):
     @abc.abstractmethod
     def detailed_process_description(self) -> schemas.ProcessDescription:
         ...
+
+class KommonitorResult:
+    def __init__(self):
+        self._report = []
+        self._su_result = None
+
+    @property
+    def report(self):
+        return self._report
+
+    def init_spatial_unit_result(self, spatial_unit_id: str):
+         self._su_result = {
+             "applicableSpatialUnit": spatial_unit_id
+         }
+
+    def complete_spatial_unit_summary(self):
+        if self._su_result:
+            self._report.append(self._su_result)
+        self._su_result = None
+
+    def add_indicator_values(self, values: list):
+        self._su_result["indicatorValues"] = values
 
 
 class KommonitorJobSummary:
