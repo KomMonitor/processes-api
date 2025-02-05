@@ -310,3 +310,98 @@ class KommonitorProcess(BasePrefectProcessor):
     @abc.abstractmethod
     def detailed_process_description(self) -> schemas.ProcessDescription:
         ...
+
+
+class KommonitorJobSummary:
+    def __init__(self):
+        self._report = []
+        self._su_summary = None
+
+    @property
+    def report(self):
+        return self._report
+
+    def init_spatial_unit_summary(self, spatial_unit_id: str):
+         self._su_summary = {
+             "spatialUnitId": spatial_unit_id
+         }
+
+    def complete_spatial_unit_summary(self):
+        if self._su_summary:
+            self._report.append(self._su_summary)
+        self._su_summary = None
+
+    def add_missing_timestamp_error(self, resource_type: str, dataset_id: str, timestamps: list):
+        self._su_summary.append(
+            {
+                "type": "missingTimestamp",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": timestamps,
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"Timestamps are missing for {resource_type} with ID {dataset_id}."
+            }
+        )
+
+    def add_missing_dataset_error(self, resource_type: str, dataset_id: str):
+        self._su_summary.append(
+            {
+                "type": "missingDataset",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"The {resource_type} with ID {dataset_id} is missing."
+            }
+        )
+
+    def add_missing_spatial_unit_error(self, dataset_id: str):
+        su_id = self._su_summary["spatialUnitId"]
+        self._su_summary.append(
+            {
+                "type": "missingSpatialUnit",
+                "affectedResourceType": "indicator",
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"The spatial unit {su_id} is missing for indicator {dataset_id}."
+            }
+        )
+
+    def add_missing_spatial_unit_feature_error(self, dataset_id: str, features: list):
+        self._su_summary.append(
+            {
+                "type": "missingSpatialUnitFeature",
+                "affectedResourceType": "indicator",
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": features,
+                "errorMessage": f"Spatial unit features are missing for indicator {dataset_id}."
+            }
+        )
+
+    def add_data_management_api_error(self, resource_type: str, dataset_id: str, error_code: int, error_message: str):
+        self._su_summary.append(
+            {
+                "type": "dataManagementApiError",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "dataManagementApiErrorCode": error_code,
+                "errorMessage": f"Error while calling API for {resource_type} with ID {dataset_id}: {error_message}."
+            }
+        )
+
+    def add_processing_error(self, resource_type: str, dataset_id: str, error_message: str):
+        self._su_summary.append(
+            {
+                "type": "processingError",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"Error while processing {resource_type} with ID {dataset_id}: {error_message}."
+            }
+        )
+
