@@ -10,6 +10,7 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 
+from ..base import KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries, fetch_spatial_unit_metadata
 from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorJobSummary, KommonitorResult
 from ..util import dataio
 
@@ -65,43 +66,40 @@ class PercentageShare(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, Dict):
+            data_management_client: ApiClient) -> (JobStatus, KommonitorResult):
 
-        # 1. Load inputs
-
-        inputs = config.inputs
         logger.debug("Starting execution...")
 
+        # Load inputs
+        inputs = config.inputs
+        # Extract all relevant inputs
+        target_indicator_id = inputs["target_indicator_id"]
+        base_indicator_id = inputs["base_indicator_id"]
+        ref_indicator_id = inputs["reference_indicator_id"]
+        target_spatial_units = inputs["target_spatial_units"]
+        exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
+        include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
 
-
-        result = {
-            "jobSummary": [],
-            "results": []
-        }
-        current_indicator = ""
-        result_list = []
-        job_summary = KommonitorJobSummary()
+        # Init object to store computation results
         result = KommonitorResult()
+        job_summary = KommonitorJobSummary()
 
         try:
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-
-            # Extract all relevant inputs
-            target_indicator_id = inputs["target_indicator_id"]
-            base_indicator_id = inputs["base_indicator_id"]
-            ref_indicator_id = inputs["reference_indicator_id"]
-            target_spatial_units = inputs["target_spatial_units"]
-            exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
-            include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
+            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
 
             for target_unit_id in target_spatial_units:
-                result.init_spatial_unit_result(target_unit_id)
-                job_summary.init_spatial_unit_summary(target_unit_id)
+                # Fetch spatial unit metadata since result data needs spatial unit name instead of its ID
+                su_metadata = fetch_spatial_unit_metadata(spatial_unit_controller, target_unit_id, job_summary, logger)
+
+                # Init results and job summary for current spatial unit
+                result.init_spatial_unit_result(su_metadata.spatial_unit_level)
+                job_summary.init_spatial_unit_summary(su_metadata.spatial_unit_level)
 
                 # Fetch indicator timeseries data
-                base_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(base_indicator_id, target_unit_id)
-                ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(ref_indicator_id, target_unit_id)
-                target_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(target_indicator_id, target_unit_id)
+                base_data = fetch_indicator_timeseries(indicators_controller, base_indicator_id, target_unit_id, job_summary, logger)
+                ref_data = fetch_indicator_timeseries(indicators_controller, ref_indicator_id, target_unit_id, job_summary, logger)
+                target_data = fetch_indicator_timeseries(indicators_controller, target_indicator_id, target_unit_id, job_summary, logger)
 
                 # Create a DataFrame for each indicator timeseries data and merge it
                 base_indicator_df = dataio.indicator_timeseries_to_dataframe(base_data, base_indicator_id, target_unit_id)
@@ -139,32 +137,30 @@ class PercentageShare(KommonitorProcess):
                                                suffixes=("_base", "_ref"))
 
                 # Cast indicator value columns to be numeric
-                merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
+                merged_df["value_base"] = pd.to_numeric(merged_df["value_base"])
                 merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
 
                 # Use computable target dates to filter DataFrame for relevant rows
                 merged_df = merged_df[merged_df["date"].isin(computable_target_dates)]
 
                 # Drop rows where at least one input has an NA value
-                merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
+                merged_df = merged_df.dropna(subset=["value_base", "value_ref"])
                 # TODO create error for missing features
 
                 # Calculate percentage share
-                merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
+                merged_df["result"] = merged_df["value_base"] / merged_df["value_ref"] * 100
 
                 # Convert DataFrame back again to required JSON format
                 indicator_values = dataio.dataframe_to_indicator_timeseries(merged_df)
 
+                job_summary.add_number_of_integrated_features(len(indicator_values))
+                job_summary.add_integrated_target_dates([d.strftime("%Y-%m-%d") for d in computable_target_dates])
+                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_indicator_id, target_unit_id)
+
                 result.add_indicator_values(indicator_values)
+                result.complete_spatial_unit_result()
 
-            outputs = {
-                "jobSummary": job_summary.report,
-                "results": result.report
-            }
-
-            return JobStatus.successful, outputs
+            return JobStatus.successful, result, job_summary
         except ApiException as e:
-            logger.error(f"Exception when calling DataManagementAPI: {e}")
-            job_summary.add_data_management_api_error()
-            result["jobSummary"].append(job_summary.get_api_client_error(e))
-            return JobStatus.failed, result
+            logger.error(f"Exception when instantiating DataManagementAPI client: {e}")
+            return JobStatus.failed, result, job_summary
