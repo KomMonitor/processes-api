@@ -1,3 +1,4 @@
+import datetime
 from typing import Dict, Optional
 
 import openapi_client
@@ -89,18 +90,24 @@ class PercentageShare(KommonitorProcess):
             spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
 
             for target_unit_id in target_spatial_units:
+                # Init results and job summary for current spatial unit
+                result.init_spatial_unit_result(target_unit_id)
+                job_summary.init_spatial_unit_summary(target_unit_id)
+
                 # Fetch spatial unit metadata since result data needs spatial unit name instead of its ID
                 su_metadata = fetch_spatial_unit_metadata(spatial_unit_controller, target_unit_id, job_summary, logger)
-
-                # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(su_metadata.spatial_unit_level)
-                job_summary.init_spatial_unit_summary(su_metadata.spatial_unit_level)
+                if su_metadata is None:
+                    job_summary.complete_spatial_unit_summary()
+                    continue
 
                 # Fetch indicator timeseries data
                 base_data = fetch_indicator_timeseries(indicators_controller, base_indicator_id, target_unit_id, job_summary, logger)
                 ref_data = fetch_indicator_timeseries(indicators_controller, ref_indicator_id, target_unit_id, job_summary, logger)
                 target_data = fetch_indicator_timeseries(indicators_controller, target_indicator_id, target_unit_id, job_summary, logger)
 
+                if base_data is None or ref_data is  None or target_data is  None:
+                    job_summary.complete_spatial_unit_summary()
+                    continue
                 # Create a DataFrame for each indicator timeseries data and merge it
                 base_indicator_df = dataio.indicator_timeseries_to_dataframe(base_data, base_indicator_id, target_unit_id)
                 ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data, ref_indicator_id, target_unit_id)
@@ -130,8 +137,8 @@ class PercentageShare(KommonitorProcess):
 
                 # determine missing timestamps for input datasets to add errors to jobSummary
                 missing_input_timestamps = dataio.get_missing_input_timestamps(candidate_target_dates, dates_df, [base_indicator_id, ref_indicator_id])
-                if missing_input_timestamps:
-                    job_summary.add_missing_timestamp_error(resource_type="indicator", dataset_id="", timestamps=missing_input_timestamps)
+                for missing in missing_input_timestamps:
+                    job_summary.add_missing_timestamp_error(resource_type="indicator", dataset_id=missing["id"], timestamps=[d.strftime("%Y-%m-%d") for d in missing["missingTimestamps"]])
 
                 merged_df = base_indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
                                                suffixes=("_base", "_ref"))
@@ -156,10 +163,10 @@ class PercentageShare(KommonitorProcess):
                 job_summary.add_number_of_integrated_features(len(indicator_values))
                 job_summary.add_integrated_target_dates([d.strftime("%Y-%m-%d") for d in computable_target_dates])
                 job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_indicator_id, target_unit_id)
+                job_summary.complete_spatial_unit_summary()
 
                 result.add_indicator_values(indicator_values)
                 result.complete_spatial_unit_result()
-
             return JobStatus.successful, result, job_summary
         except ApiException as e:
             logger.error(f"Exception when instantiating DataManagementAPI client: {e}")

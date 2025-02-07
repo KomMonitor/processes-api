@@ -148,12 +148,12 @@ class ExecutionResourceType(str, Enum):
 
 class KommonitorResult:
     def __init__(self):
-        self._report = []
+        self._values = []
         self._su_result = None
 
     @property
-    def report(self):
-        return self._report
+    def values(self):
+        return self._values
 
     def init_spatial_unit_result(self, spatial_unit_id: str):
          self._su_result = {
@@ -162,7 +162,7 @@ class KommonitorResult:
 
     def complete_spatial_unit_result(self):
         if self._su_result:
-            self._report.append(self._su_result)
+            self._values.append(self._su_result)
         self._su_result = None
 
     def add_indicator_values(self, values: list):
@@ -193,7 +193,7 @@ class KommonitorJobSummary:
         self._su_summary = None
 
     def add_modified_resource(self, base_url: str, indicator_id: str, spatial_unit_id: str):
-        self._su_summary["modifiedResource"] = urlparse.urljoin(base_url, f"{indicator_id}/{spatial_unit_id}")
+        self._su_summary["modifiedResource"] = urlparse.urljoin(base_url, f"indicators/{indicator_id}/{spatial_unit_id}")
 
     def add_number_of_integrated_features(self, number: int):
         self._su_summary["numberOfIntegratedIndicatorFeatures"] = number
@@ -305,7 +305,8 @@ def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerAp
         return su_metadata
     except ApiException as e:
         logger.error(f"Exception when fetching Indicator timeseries data from DataManagementAPI: {e}")
-        job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.data, spatial_unit_id)
+        job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.data)
+        return None
 
 
 def fetch_spatial_unit_metadata(controller: openapi_client.SpatialUnitsControllerApi, spatial_unit_id: str,
@@ -315,7 +316,8 @@ def fetch_spatial_unit_metadata(controller: openapi_client.SpatialUnitsControlle
         return su_metadata
     except ApiException as e:
         logger.error(f"Exception when fetching Spatial Unit metadata from DataManagementAPI: {e}")
-        job_summary.add_data_management_api_error("spatial unit", spatial_unit_id, e.status, e.data, spatial_unit_id)
+        job_summary.add_data_management_api_error("spatial unit", spatial_unit_id, e.status, e.data)
+        return None
 
 
 class KommonitorProcess(BasePrefectProcessor):
@@ -420,13 +422,6 @@ class KommonitorProcess(BasePrefectProcessor):
                 content_media_type= "application/json"
             )
         ),
-        "results": ProcessOutput(
-            schema_=ProcessIOSchema(
-                type_=ProcessIOType.ARRAY,
-                items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.URI),
-                content_media_type="application/json"
-            )
-        ),
         "resultData": ProcessOutput(
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
@@ -468,17 +463,15 @@ class KommonitorProcess(BasePrefectProcessor):
             output = {
                 "jobSummary": job_summary.summary,
                 "resultData": result.summary,
-                "results": []
             }
             return store_output_as_file(job_id, output)
         else:
             output = {
                 "jobSummary": None,
-                "resultData": [],
-                "results": []
+                "resultData": []
             }
             indicator_id = inputs["target_indicator_id"]
-            for res in result.summary:
+            for res in result.values:
                 indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
                 res["allowedRoles"] = []
                 try:
@@ -495,7 +488,7 @@ class KommonitorProcess(BasePrefectProcessor):
                     job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
-            return store_output_as_file(output)
+            return store_output_as_file(job_id, output)
 
     @abc.abstractmethod
     def run(self,
