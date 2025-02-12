@@ -3136,7 +3136,7 @@ class IndicatorsControllerApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ResponseEntity:
+    ) -> bytearray:
         """Modify/Update the contents of the selected indicator dataset
 
         Modify/Update the contents of the selected indicator dataset
@@ -3177,7 +3177,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "ResponseEntity",
+            '200': "bytearray",
             '201': None,
             '401': None,
             '403': None,
@@ -3212,7 +3212,7 @@ class IndicatorsControllerApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[ResponseEntity]:
+    ) -> ApiResponse[bytearray]:
         """Modify/Update the contents of the selected indicator dataset
 
         Modify/Update the contents of the selected indicator dataset
@@ -3253,7 +3253,7 @@ class IndicatorsControllerApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "ResponseEntity",
+            '200': "bytearray",
             '201': None,
             '401': None,
             '403': None,

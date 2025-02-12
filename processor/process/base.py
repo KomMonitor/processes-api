@@ -5,14 +5,14 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-from typing import Dict, Union, Optional
+import urllib.parse as urlparse
 import json
 
 import openapi_client
 import prefect
 
 import requests
-from openapi_client import ApiClient
+from openapi_client import ApiClient, ApiException
 from prefect import task, flow, get_run_logger
 from pygeoapi.util import JobStatus
 
@@ -146,6 +146,180 @@ class ExecutionResourceType(str, Enum):
     INDICATOR = "INDICATOR"
 
 
+class KommonitorResult:
+    def __init__(self):
+        self._values = []
+        self._su_result = None
+
+    @property
+    def values(self):
+        return self._values
+
+    def init_spatial_unit_result(self, spatial_unit_id: str):
+         self._su_result = {
+             "applicableSpatialUnit": spatial_unit_id
+         }
+
+    def complete_spatial_unit_result(self):
+        if self._su_result:
+            self._values.append(self._su_result)
+        self._su_result = None
+
+    def add_indicator_values(self, values: list):
+        self._su_result["indicatorValues"] = values
+
+
+class KommonitorJobSummary:
+    def __init__(self):
+        self._summary = []
+        self._su_summary = None
+
+    @property
+    def summary(self):
+        return self._summary
+
+    def init_spatial_unit_summary(self, spatial_unit_id: str):
+         self._su_summary = {
+             "spatialUnitId": spatial_unit_id,
+             "modifiedResource": None,
+             "numberOfIntegratedIndicatorFeatures": None,
+             "integratedTargetDates": [],
+             "errorsOccurred": []
+         }
+
+    def complete_spatial_unit_summary(self):
+        if self._su_summary:
+            self._summary.append(self._su_summary)
+        self._su_summary = None
+
+    def add_modified_resource(self, base_url: str, indicator_id: str, spatial_unit_id: str):
+        self._su_summary["modifiedResource"] = urlparse.urljoin(base_url, f"indicators/{indicator_id}/{spatial_unit_id}")
+
+    def add_number_of_integrated_features(self, number: int):
+        self._su_summary["numberOfIntegratedIndicatorFeatures"] = number
+
+    def add_integrated_target_dates(self, dates: list):
+        self._su_summary["integratedTargetDates"] = dates
+
+    def add_missing_timestamp_error(self, resource_type: str, dataset_id: str, timestamps: list):
+        self._su_summary["errorsOccurred"].append(
+            {
+                "type": "missingTimestamp",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": timestamps,
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"Timestamps are missing for {resource_type} with ID {dataset_id}."
+            }
+        )
+
+    def add_missing_dataset_error(self, resource_type: str, dataset_id: str):
+        self._su_summary["errorsOccurred"].append(
+            {
+                "type": "missingDataset",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"The {resource_type} with ID {dataset_id} is missing."
+            }
+        )
+
+    def add_missing_spatial_unit_error(self, dataset_id: str):
+        su_id = self._su_summary["spatialUnitId"]
+        self._su_summary["errorsOccurred"].append(
+            {
+                "type": "missingSpatialUnit",
+                "affectedResourceType": "indicator",
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"The spatial unit {su_id} is missing for indicator {dataset_id}."
+            }
+        )
+
+    def add_missing_spatial_unit_feature_error(self, dataset_id: str, features: list):
+        self._su_summary["errorsOccurred"].append(
+            {
+                "type": "missingSpatialUnitFeature",
+                "affectedResourceType": "indicator",
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": features,
+                "errorMessage": f"Spatial unit features are missing for indicator {dataset_id}."
+            }
+        )
+
+    def add_data_management_api_error(self, resource_type: str, dataset_id: str, error_code: int, error_message: str, spatial_unit_id: str = None):
+        if spatial_unit_id:
+            for su_summary in self._summary:
+                if su_summary["spatialUnitId"] == spatial_unit_id:
+                    su_summary["errorsOccurred"].append(
+                        {
+                            "type": "dataManagementApiError",
+                            "affectedResourceType": resource_type,
+                            "affectedDatasetId": dataset_id,
+                            "affectedTimestamps": [],
+                            "affectedSpatialUnitFeatures": [],
+                            "dataManagementApiErrorCode": error_code,
+                            "errorMessage": f"Error while calling API for {resource_type} with ID {dataset_id}: {error_message}."
+                        }
+                    )
+        else:
+            self._su_summary["errorsOccurred"].append(
+                {
+                    "type": "dataManagementApiError",
+                    "affectedResourceType": resource_type,
+                    "affectedDatasetId": dataset_id,
+                    "affectedTimestamps": [],
+                    "affectedSpatialUnitFeatures": [],
+                    "dataManagementApiErrorCode": error_code,
+                    "errorMessage": f"Error while calling API for {resource_type} with ID {dataset_id}: {error_message}."
+                }
+        )
+
+    def add_processing_error(self, resource_type: str, dataset_id: str, error_message: str):
+        self._su_summary["errorsOccurred"].append(
+            {
+                "type": "processingError",
+                "affectedResourceType": resource_type,
+                "affectedDatasetId": dataset_id,
+                "affectedTimestamps": [],
+                "affectedSpatialUnitFeatures": [],
+                "errorMessage": f"Error while processing {resource_type} with ID {dataset_id}: {error_message}."
+            }
+        )
+
+    def mark_failed_job(self, spatial_unit_id: str):
+        for su_summary in self._summary:
+            if su_summary["spatialUnitId"] == spatial_unit_id:
+                su_summary["modifiedResource"] = None,
+                su_summary["numberOfIntegratedIndicatorFeatures"] = None
+                su_summary["integratedTargetDates"] = []
+
+
+def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerApi, indicator_id: str,
+                               spatial_unit_id: str, job_summary: KommonitorJobSummary, logger: logging.Logger):
+    try:
+        su_metadata = controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(indicator_id, spatial_unit_id)
+        return su_metadata
+    except ApiException as e:
+        logger.error(f"Exception when fetching Indicator timeseries data from DataManagementAPI: {e}")
+        job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.data)
+        return None
+
+
+def fetch_spatial_unit_metadata(controller: openapi_client.SpatialUnitsControllerApi, spatial_unit_id: str,
+                                job_summary: KommonitorJobSummary, logger: logging.Logger):
+    try:
+        su_metadata = controller.get_spatial_units_by_id(spatial_unit_id)
+        return su_metadata
+    except ApiException as e:
+        logger.error(f"Exception when fetching Spatial Unit metadata from DataManagementAPI: {e}")
+        job_summary.add_data_management_api_error("spatial unit", spatial_unit_id, e.status, e.data)
+        return None
+
+
 class KommonitorProcess(BasePrefectProcessor):
     result_storage_block = None
 
@@ -248,13 +422,6 @@ class KommonitorProcess(BasePrefectProcessor):
                 content_media_type= "application/json"
             )
         ),
-        "results": ProcessOutput(
-            schema_=ProcessIOSchema(
-                type_=ProcessIOType.ARRAY,
-                items=ProcessIOSchema(type_=ProcessIOType.STRING, format_=ProcessIOFormat.URI),
-                content_media_type="application/json"
-            )
-        ),
         "resultData": ProcessOutput(
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
@@ -290,15 +457,44 @@ class KommonitorProcess(BasePrefectProcessor):
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, outputs = p.run(config, logger, dmc)
+        status, result, job_summary = p.run(config, logger, dmc)
 
-        return store_output_as_file(job_id, outputs)
+        if status == JobStatus.failed:
+            output = {
+                "jobSummary": job_summary.summary,
+                "resultData": result.summary,
+            }
+            return store_output_as_file(job_id, output)
+        else:
+            output = {
+                "jobSummary": None,
+                "resultData": []
+            }
+            indicator_id = inputs["target_indicator_id"]
+            for res in result.values:
+                indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
+                res["allowedRoles"] = []
+                try:
+                    resp = indicators_controller.update_indicator_as_body_with_http_info(
+                        indicator_id=indicator_id,
+                        indicator_data=res
+                    )
+                    if resp.status_code == 200:
+                        output["resultData"].append(res)
+                    else:
+                        job_summary.mark_failed_job(res["applicableSpatialUnit"])
+                except ApiException as e:
+                    logger.error(f"Exception when calling DataManagementAPI: {e}")
+                    job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
+                    job_summary.mark_failed_job(res["applicableSpatialUnit"])
+            output["jobSummary"] = job_summary.summary
+            return store_output_as_file(job_id, output)
 
     @abc.abstractmethod
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            dmc: ApiClient) -> (JobStatus, Dict):
+            dmc: ApiClient) -> (JobStatus, KommonitorResult, KommonitorJobSummary):
         ...
 
     @property
@@ -310,3 +506,4 @@ class KommonitorProcess(BasePrefectProcessor):
     @abc.abstractmethod
     def detailed_process_description(self) -> schemas.ProcessDescription:
         ...
+

@@ -1,3 +1,4 @@
+import datetime
 from typing import Dict, Optional
 
 import openapi_client
@@ -10,8 +11,9 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 
-from ..base import KommonitorProcess, KommonitorProcessConfig
-from ..util import dataio, job_summary
+from ..base import KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries, fetch_spatial_unit_metadata
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorJobSummary, KommonitorResult
+from ..util import dataio
 
 
 class PercentageShare(KommonitorProcess):
@@ -65,93 +67,107 @@ class PercentageShare(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, Dict):
+            data_management_client: ApiClient) -> (JobStatus, KommonitorResult):
 
-        # 1. Load inputs
-        inputs = config.inputs
         logger.debug("Starting execution...")
 
-        result = {
-            "jobSummary": [],
-            "results": []
-        }
-        current_indicator = ""
+        # Load inputs
+        inputs = config.inputs
+        # Extract all relevant inputs
+        target_indicator_id = inputs["target_indicator_id"]
+        base_indicator_id = inputs["base_indicator_id"]
+        ref_indicator_id = inputs["reference_indicator_id"]
+        target_spatial_units = inputs["target_spatial_units"]
+        exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
+        include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
+
+        # Init object to store computation results
+        result = KommonitorResult()
+        job_summary = KommonitorJobSummary()
 
         try:
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-
-            # Extract all relevant inputs
-            target_indicator_id = inputs["target_indicator_id"]
-            base_indicator_id = inputs["base_indicator_id"]
-            ref_indicator_id = inputs["reference_indicator_id"]
-            target_spatial_units = inputs["target_spatial_units"]
-            exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
-            include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
-
-            # Fetch indicator metadata
-            target_indicator_metadata = indicators_controller.get_indicator_by_id(target_indicator_id)
-            base_indicator_metadata = indicators_controller.get_indicator_by_id(base_indicator_id)
-            ref_indicator_metadata = indicators_controller.get_indicator_by_id(ref_indicator_id)
-
-            # Get a DataFrame that contains dates for all indicators
-            dates_df = dataio.get_applicable_dates_from_metadata_as_dataframe([target_indicator_metadata, base_indicator_metadata, ref_indicator_metadata])
-
-            # Candidate target dates are all dates, which potentially should be calculated depending on the execution mode
-            candidate_target_dates = dataio.get_missing_target_dates(dates_df, target_indicator_id, [base_indicator_id, ref_indicator_id],
-                                                                     drop_input_na=False,
-                                                                     mode=inputs["target_time"]["mode"],
-                                                                     exclude_dates=exclude_dates,
-                                                                     include_dates=include_dates)
-            # Computable target dates ar all dates, which potentially should be calculated depending on the execution mode and for which all inputs have an existing value
-            computable_target_dates = dataio.get_missing_target_dates(dates_df, target_indicator_id, [base_indicator_id, ref_indicator_id],
-                                                                     drop_input_na=True,
-                                                                     mode=inputs["target_time"]["mode"],
-                                                                     exclude_dates=exclude_dates,
-                                                                     include_dates=include_dates)
-
-            # determine missing timestamps for input datasets to add errors to jobSummary
-            missing_input_timestamps = dataio.get_missing_input_timestamps(candidate_target_dates, dates_df, [base_indicator_id, ref_indicator_id])
-            if missing_input_timestamps:
-                result["jobSummary"].extend(job_summary.get_missing_timestamps_error(missing_input_timestamps,resource_type="indicator"))
+            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
 
             for target_unit_id in target_spatial_units:
+                # Init results and job summary for current spatial unit
+                result.init_spatial_unit_result(target_unit_id)
+                job_summary.init_spatial_unit_summary(target_unit_id)
+
+                # Fetch spatial unit metadata since result data needs spatial unit name instead of its ID
+                su_metadata = fetch_spatial_unit_metadata(spatial_unit_controller, target_unit_id, job_summary, logger)
+                if su_metadata is None:
+                    job_summary.complete_spatial_unit_summary()
+                    continue
 
                 # Fetch indicator timeseries data
-                base_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(base_indicator_id, target_unit_id)
-                ref_data = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(ref_indicator_id, target_unit_id)
+                base_data = fetch_indicator_timeseries(indicators_controller, base_indicator_id, target_unit_id, job_summary, logger)
+                ref_data = fetch_indicator_timeseries(indicators_controller, ref_indicator_id, target_unit_id, job_summary, logger)
+                target_data = fetch_indicator_timeseries(indicators_controller, target_indicator_id, target_unit_id, job_summary, logger)
 
+                if base_data is None or ref_data is  None or target_data is  None:
+                    job_summary.complete_spatial_unit_summary()
+                    continue
                 # Create a DataFrame for each indicator timeseries data and merge it
-                indicator_df = dataio.indicator_timeseries_to_dataframe(base_data)
-                ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data)
+                base_indicator_df = dataio.indicator_timeseries_to_dataframe(base_data, base_indicator_id, target_unit_id)
+                ref_indicator_df = dataio.indicator_timeseries_to_dataframe(ref_data, ref_indicator_id, target_unit_id)
+                target_indicator_df = dataio.indicator_timeseries_to_dataframe(target_data, target_indicator_id, target_unit_id)
 
-                merged_df = indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
-                                               suffixes=("_target", "_ref"))
+                # Get a DataFrame that contains dates for all input indicators
+                df_list = [base_indicator_df, ref_indicator_df, target_indicator_df]
+                dates_df = dataio.get_applicable_dates(df_list)
+
+                # Candidate target dates are all dates, which potentially should be calculated depending on the execution mode
+                candidate_target_dates = dataio.get_missing_target_dates(dates_df,
+                                                                         target_id=target_indicator_id,
+                                                                         input_ids=[base_indicator_id, ref_indicator_id],
+                                                                         drop_input_na=False,
+                                                                         mode=inputs["target_time"]["mode"],
+                                                                         exclude_dates=exclude_dates,
+                                                                         include_dates=include_dates)
+
+                # Computable target dates ar all dates, which potentially should be calculated depending on the execution mode and for which all inputs have an existing value
+                computable_target_dates = dataio.get_missing_target_dates(dates_df,
+                                                                          target_id=target_indicator_id,
+                                                                          input_ids=[base_indicator_id, ref_indicator_id],
+                                                                          drop_input_na=True,
+                                                                          mode=inputs["target_time"]["mode"],
+                                                                          exclude_dates=exclude_dates,
+                                                                          include_dates=include_dates)
+
+                # determine missing timestamps for input datasets to add errors to jobSummary
+                missing_input_timestamps = dataio.get_missing_input_timestamps(candidate_target_dates, dates_df, [base_indicator_id, ref_indicator_id])
+                for missing in missing_input_timestamps:
+                    job_summary.add_missing_timestamp_error(resource_type="indicator", dataset_id=missing["id"], timestamps=[d.strftime("%Y-%m-%d") for d in missing["missingTimestamps"]])
+
+                merged_df = base_indicator_df.merge(ref_indicator_df, how="left", on=["ID", "date"],
+                                               suffixes=("_base", "_ref"))
 
                 # Cast indicator value columns to be numeric
-                merged_df["value_target"] = pd.to_numeric(merged_df["value_target"])
+                merged_df["value_base"] = pd.to_numeric(merged_df["value_base"])
                 merged_df["value_ref"] = pd.to_numeric(merged_df["value_ref"])
 
                 # Use computable target dates to filter DataFrame for relevant rows
                 merged_df = merged_df[merged_df["date"].isin(computable_target_dates)]
+
                 # Drop rows where at least one input has an NA value
-                merged_df = merged_df.dropna(subset=["value_target", "value_ref"])
+                merged_df = merged_df.dropna(subset=["value_base", "value_ref"])
                 # TODO create error for missing features
 
                 # Calculate percentage share
-                merged_df["result"] = merged_df["value_target"] / merged_df["value_ref"] * 100
+                merged_df["result"] = merged_df["value_base"] / merged_df["value_ref"] * 100
 
                 # Convert DataFrame back again to required JSON format
-                ts_result = dataio.dataframe_to_indicator_timeseries(merged_df)
+                indicator_values = dataio.dataframe_to_indicator_timeseries(merged_df)
 
-                result["results"].append(
-                    {
-                        "applicableSpatialUnit": target_unit_id,
-                        "indicatorValues": ts_result
-                    }
-                )
+                job_summary.add_number_of_integrated_features(len(indicator_values))
+                job_summary.add_integrated_target_dates([d.strftime("%Y-%m-%d") for d in computable_target_dates])
+                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_indicator_id, target_unit_id)
+                job_summary.complete_spatial_unit_summary()
 
-            return JobStatus.successful, result
+                result.add_indicator_values(indicator_values)
+                result.complete_spatial_unit_result()
+            return JobStatus.successful, result, job_summary
         except ApiException as e:
-            logger.error(f"Exception when calling DataManagementAPI: {e}")
-            result["jobSummary"].append(job_summary.get_api_client_error(e))
-            return JobStatus.failed, result
+            logger.error(f"Exception when instantiating DataManagementAPI client: {e}")
+            return JobStatus.failed, result, job_summary
