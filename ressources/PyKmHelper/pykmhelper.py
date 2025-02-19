@@ -790,7 +790,7 @@ def getTargetDate_without_prefix(dateWithPrefix: str):
     elif len(dateWithPrefix) == 10:
         return dateWithPrefix
 
-def getAll_target_time(targetTimeDict, computationIndicatorFeatureCollection, targetIndicatorFeatureCollection = None):
+def getAll_target_time(targetTimeDict, target_applicable_dates: set, all_input_applicable_dates: list):
     """Returns all target_times (or targetDates) that have to be computed in the skript. Therefore it checks the mode of the submitted Dict
 
     Args:
@@ -800,50 +800,42 @@ def getAll_target_time(targetTimeDict, computationIndicatorFeatureCollection, ta
     Returns:
         array<str>: returns an array containing all dates which fit the submitted schema. Without the prefix.
     """
-    allDates = []
-    targetIndicatorDates = []
     computeDates = []
 
     if targetTimeDict["mode"] == "ALL":
-        for feature in computationIndicatorFeatureCollection["features"]:
-            for property in feature["properties"]:
-                if indicator_date_prefix in property:
-                    date = getTargetDate_without_prefix(property)
-                    if not date in allDates:
-                        if not date in targetTimeDict["excludeDates"]:
-                            allDates.append(date)
-        
+        # get all dates that exist in every input indicator
+        allDates = all_input_applicable_dates[0].copy()
+        for input_applicable_dates in all_input_applicable_dates:
+            allDates.intersection_update(input_applicable_dates)
+
+        # remove excluded Dates 
+        for date in allDates:
+            if not date in targetTimeDict["excludeDates"]:
+                computeDates.append(date)
+ 
     elif targetTimeDict["mode"] == "DATES":
-        for feature in computationIndicatorFeatureCollection["features"]:
-            for property in feature["properties"]:
-                if indicator_date_prefix in property:
-                    date = getTargetDate_without_prefix(property)
-                    if not date in allDates:
-                        if date in targetTimeDict["includeDates"]:
-                            allDates.append(date)
+        # get all dates that exist in every input indicator
+        allDates = all_input_applicable_dates[0].copy()
+        for input_applicable_dates in all_input_applicable_dates:
+            allDates.intersection_update(input_applicable_dates)
+        
+        # add needed dates to list
+        for date in allDates:
+            if date in targetTimeDict["includeDates"]:
+                computeDates.append(date)
     
     elif targetTimeDict["mode"] == "MISSING":
-        for feature in computationIndicatorFeatureCollection["features"]:
-            for property in feature["properties"]:
-                if indicator_date_prefix in property:
-                    date = getTargetDate_without_prefix(property)
-                    if not date in computeDates:
-                        if not date in targetTimeDict["excludeDates"]:
-                            computeDates.append(date)
-
-        for feature in targetIndicatorFeatureCollection["features"]:
-            for property in feature["properties"]:
-                if indicator_date_prefix in property:
-                    date = getTargetDate_without_prefix(property)
-                    if not date in targetIndicatorDates:
-                        if not date in targetTimeDict["excludeDates"]:
-                            targetIndicatorDates.append(date)
+        # get all dates that exist in every input indicator
+        allDates = all_input_applicable_dates[0].copy()
+        for input_applicable_dates in all_input_applicable_dates:
+            allDates.intersection_update(input_applicable_dates)
         
-        for date in computeDates:
-            if not date in targetIndicatorDates:
-                allDates.append(date)
+        # compare existing target indicator dates with applicable dates of inputs
+        for date in allDates:
+            if not date in target_applicable_dates and not date in targetTimeDict["excludeDates"]:
+                computeDates.append(date)
     
-    return allDates
+    return computeDates
 
 
 
@@ -2135,7 +2127,7 @@ def getChange_absolute(feature, targetDate, compareDate):
     """computes the absolute difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula 'value[targetDate]  - value[compareDate]'
 
     Args:
-        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        feature (Feature): a valid GeoJSON Feature, which must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
         compareDate (string): the compare date in the string format 'YYYY-MM-DD', i.e. '2024-01-01' to who the indicator value difference/change shall be computed
 
@@ -2499,6 +2491,7 @@ def computeContinuity(feature, dates):
         float: returns the continuity value for the feature, at this moment the continuity value is the pearson correlation value calculated with the following formula 'sum((Xi - Xmean) * (Yi - Ymean)) / sqrt(sum(Xi - Xmean)^2 * sum(Yi - Ymean)^2)'
     """
     indicatorValueArray = []
+    countArray = []
 
     for date in dates: 
         indicatorValue = getIndicatorValue(feature, date)
@@ -2508,14 +2501,19 @@ def computeContinuity(feature, dates):
     if not len(dates) == len(indicatorValueArray):
         log("Error during Pearson Correlation. Length of input arrays are not equal.")
         return None
-    
-    return stats.pearsonr(indicatorValueArray, dates)
 
-def continuity_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+    for i in range(len(dates), 0, -1):
+        countArray.append(i)
+
+    result = stats.pearsonr(indicatorValueArray, countArray)
+
+    return result[0]
+
+def continuity_consecutive_n_years(feature, targetDate, numberOfYears):
     """computes the new Indicator as continuity for prior consecutive years. The formula used is the pearson correlation.
 
     Args:
-        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        feature (Feature): a valid GeoJSON Feature,which must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
         numberOfYears (int): the number of prior consecutive years for which the continuity shall computed
 
@@ -2529,23 +2527,17 @@ def continuity_consecutive_n_years(featureCollection, targetDate, numberOfYears)
     
     dates.append(targetDate)
 
-    resultDict = {}
+    trend = computeContinuity(feature, dates)
+    if not bool(trend) or isNoDataValue(trend):
+        throwError(f"Trend computation resulted in NoData for feature {getSpatialUnitFeatureIdValue(feature)}")
+    
+    return trend
 
-    for feature in featureCollection["features"]:
-        trend = computeContinuity(feature, dates)
-        if bool(trend) and not isNoDataValue(trend):
-            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
-
-    if len(resultDict) == 0:
-        throwError("Trend computation resulted in NoData for each feature")
-
-    return resultDict
-
-def continuity_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
+def continuity_consecutive_n_months(feature, targetDate, numberOfMonths):
     """computes the new Indicator as continuity for prior consecutive months. The formula used is the pearson correlation.
 
     Args:
-        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        feature (Feature): a valid GeoJSON Feature,which must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
         numberOfMonths (int): the number of prior consecutive Months for which the continuity shall computed
 
@@ -2559,23 +2551,17 @@ def continuity_consecutive_n_months(featureCollection, targetDate, numberOfMonth
     
     dates.append(targetDate)
 
-    resultDict = {}
+    trend = computeContinuity(feature, dates)
+    if not bool(trend) or isNoDataValue(trend):
+        throwError(f"Trend computation resulted in NoData for feature {getSpatialUnitFeatureIdValue(feature)}")
+    
+    return trend
 
-    for feature in featureCollection["features"]:
-        trend = computeContinuity(feature, dates)
-        if bool(trend) and not isNoDataValue(trend):
-            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
-
-    if len(resultDict) == 0:
-        throwError("Trend computation resulted in NoData for each feature")
-
-    return resultDict
-
-def continuity_consecutive_n_days(featureCollection, targetDate, numberOfDays):
+def continuity_consecutive_n_days(feature, targetDate, numberOfDays):
     """computes the new Indicator as continuity for prior consecutive days. The formula used is the pearson correlation.
 
     Args:
-        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
+        feature (Feature): a valid GeoJSON Feature,which must contain a 'properties' attribute storing the indicator time series according to Kommonitors data model.
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', e.g. '2018-01-01'
         numberOfDays (int): the number of prior consecutive days for which the continuity shall computed
 
@@ -2589,17 +2575,11 @@ def continuity_consecutive_n_days(featureCollection, targetDate, numberOfDays):
     
     dates.append(targetDate)
 
-    resultDict = {}
-
-    for feature in featureCollection["features"]:
-        trend = computeContinuity(feature, dates)
-        if bool(trend) and not isNoDataValue(trend):
-            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
-
-    if len(resultDict) == 0:
-        throwError("Trend computation resulted in NoData for each feature")
-
-    return resultDict
+    trend = computeContinuity(feature, dates)
+    if not bool(trend) or isNoDataValue(trend):
+        throwError(f"Trend computation resulted in NoData for feature {getSpatialUnitFeatureIdValue(feature)}")
+    
+    return trend
 
 
 #TODO

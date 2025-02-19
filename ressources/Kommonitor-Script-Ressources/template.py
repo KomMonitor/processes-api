@@ -7,7 +7,7 @@ from pygeoapi.util import JobStatus
 
 from processor.process.base import KommonitorProcess, KommonitorProcessConfig
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
-
+from processor.process.base import KommonitorJobSummary, KommonitorResult
 from ressources.PyKmHelper import pykmhelper
 
 class __scriptName__(KommonitorProcess):
@@ -28,6 +28,20 @@ class __scriptName__(KommonitorProcess):
         # 1. Load inputs
         inputs = config.inputs
 
+        # Load inputs
+        inputs = config.inputs
+        # Extract all relevant inputs
+        target_indicator_id = inputs["target_indicator_id"]
+        base_indicator_id = inputs["base_indicator_id"]
+        ref_indicator_id = inputs["reference_indicator_id"]
+        target_spatial_units = inputs["target_spatial_units"]
+        exclude_dates = inputs["target_time"]["excludeDates"] if "excludeDates" in inputs["target_time"] else []
+        include_dates = inputs["target_time"]["includeDates"] if "includeDates" in inputs["target_time"] else []
+
+        # Init object to store computation results
+        result = KommonitorResult()
+        job_summary = KommonitorJobSummary()
+
         # 2. Log some useful stuff
         logger.debug("Starting execution...")
 
@@ -36,7 +50,7 @@ class __scriptName__(KommonitorProcess):
             jobSummary = []
 
             # 3. Generate result || Main Script    
-            for spatialUnit in inputs["target_spatial_unit"]:
+            for spatialUnit in target_spatial_units:
 
                 georesources_controller = openapi_client.IndicatorsControllerApi(data_management_client)
                 
