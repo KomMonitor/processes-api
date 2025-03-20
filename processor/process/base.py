@@ -458,11 +458,11 @@ class KommonitorProcess(BasePrefectProcessor):
 
         ## Run process
         status, result, job_summary = p.run(config, logger, dmc)
-
+        print(status)
         if status == JobStatus.failed:
             output = {
                 "jobSummary": job_summary.summary,
-                "resultData": result.summary,
+                "resultData": [],
             }
             return store_output_as_file(job_id, output)
         else:

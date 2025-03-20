@@ -11,6 +11,10 @@ import math
 import shapely
 import datetime
 from logging import Logger
+from enum import Enum
+from openapi_client import IndicatorOverviewType
+from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from typing import Optional, Tuple
 
 # Define custom CONSTANTS used within the script
 
@@ -214,7 +218,7 @@ def log(logMessage):
     Args:
         logMessage (string): the message the shall be logged
     """
-    Logger.log(logMessage)
+    print(logMessage)
     # TODO: ProgressHelperService
 
 def throwError(logMessage):
@@ -223,7 +227,7 @@ def throwError(logMessage):
     Args:
         logMessage (string): the error message that shall be raised
     """
-    Logger.error(logMessage)
+    raise RuntimeError(logMessage)
     # TODO: ProgressHelperService
 
 
@@ -385,12 +389,12 @@ def getIndicatorValue(feature, targetDate):
     else:
         targetDateWithPrefix = getTargetDateWithPropertyPrefix(targetDate)
     
-    indicatorValue = feature["properties"][targetDateWithPrefix]
+    indicatorValue = feature[targetDateWithPrefix]
 
     if indicatorValue is None:
         return None
     else:
-        return indicatorValue
+        return float(indicatorValue)
     
 def getIndicatorValueArray(featureCollection, targetDate):
     """Aquire the array of indicator values for the specified 'targetDate'
@@ -582,7 +586,7 @@ def isNoDataValue(value):
     Returns:
         bool: returns 'True' if the value is a NoData Value (i. e. 'None', 'NaN')
     """
-    if math.isnan(value) or value == None:
+    if math.isnan(float(value)) or value == None:
         return True
     else:
         return False
@@ -776,6 +780,82 @@ def applyComputationMethod(spatialUnitFeat, targetDate, valueArray, computationM
         log("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
         setIndicatorValue(spatialUnitFeat, targetDate, None)
 
+# Classes designed for use in km-script-resources
+
+class IndicatorCalculationType(str, Enum):
+    TARGET_INDICATOR = "TARGET_INDICATOR"
+    COMPUTATION_INDICATOR = "COMPUTATION_INDICATOR"
+    BASE_INDICATOR = "BASE_INDICATOR"
+    REFERENCE_INDICATOR = "REFERENCE_INDICATOR"
+    NUMERATOR_INDICATOR = "NUMERATOR_INDICATOR"
+    DENOMINATOR_INDICATOR = "DENOMINATOR_INDICATOR"
+
+class FeatureTimeSeries:
+    id: str
+    properties: dict
+
+
+class IndicatorType:
+    id: str
+    type: IndicatorCalculationType
+    meta: Optional[IndicatorOverviewType]
+    values: Optional[list]
+    bool_missing_timestamp: bool
+    missing_timestamps: Optional[list]
+    applicable_su: Optional[list]
+    time_series: dict[dict]
+
+    def __init__(self, id : str, type : IndicatorCalculationType):
+        self.id = id
+        self.type = type
+        self.bool_missing_timestamp = False
+        self.time_series = {{}}
+
+class IndicatorCollection:
+    def __init__(self):
+        self.indicators = {}
+    
+    def add_indicator(self, indicator: IndicatorType):
+        self.indicators[indicator.id] = indicator
+
+    def find_intersection_target_dates_from_meta(self) -> set:
+        listApplicableDates = [] 
+
+        for item in self.indicators:
+            listApplicableDates.append(set(self.indicators[item].meta.applicable_dates))
+        
+        intersection = listApplicableDates[0].copy()
+        for dates in listApplicableDates[1:]:
+            intersection.intersection_update(dates)
+        
+        return intersection
+    
+    def find_intersection_target_dates_from_values(self) -> None:
+        # TODO
+        return None
+    
+    def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
+        self.indicators[indicator].applicable_su = []        
+
+        for indicator in self.indicators:
+            for unit in self.indicators[indicator].meta.applicable_spatial_units:
+                self.indicators[indicator].applicable_su.append(unit.spatial_unit_id)
+
+            if not spatial_unit in self.indicators[indicator].applicable_su:
+                job_summary.add_missing_spatial_unit_error(indicator)
+
+    def check_applicable_target_dates(self, job_summary: KommonitorJobSummary):
+        # catch missing timestamp error
+            for indicator in self.indicators:
+                if self.indicators[indicator].bool_missing_timestamp:
+                    job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
+
+    def fetch_indicator_feature_time_series(self):
+        for indicator in self.indicators:
+            for feature in self.indicators[indicator].value:
+                self.indicators[indicator].time_series[feature["fid"]] = feature
+
+        
 def getTargetDate_without_prefix(dateWithPrefix: str):
     """Removes the date prefix from a submitted date string
 
@@ -791,15 +871,16 @@ def getTargetDate_without_prefix(dateWithPrefix: str):
         return dateWithPrefix
 
 def getAll_target_time(targetTimeDict, target_applicable_dates: set, all_input_applicable_dates: list):
-    """Returns all target_times (or targetDates) that have to be computed in the skript. Therefore it checks the mode of the submitted Dict
+    """returns all applicable target dates for the target indicator and all computation indicators, based on the the applicable target dates from indicator metadata
 
     Args:
-        targetTimeDict (dict): the target_time dict according to kommonitors process description schema
-        indicatorFeatureCollection (FeatureCollection): the base indicator for which all target dates shall be returned that fit the targetTime object.
+        targetTimeDict (dict): the dictionary containing the target times according to kommonitors schema
+        target_applicable_dates (set): applicable dates of target indicator, typically from metadata
+        all_input_applicable_dates (list): a list containing sets of applicable dates for all computation indicators
 
     Returns:
-        array<str>: returns an array containing all dates which fit the submitted schema. Without the prefix.
-    """
+        list: returns a list containing all applicable dates for all indicators
+    """      
     computeDates = []
 
     if targetTimeDict["mode"] == "ALL":
@@ -837,9 +918,41 @@ def getAll_target_time(targetTimeDict, target_applicable_dates: set, all_input_a
     
     return computeDates
 
+def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType, 
+                                                collection: IndicatorCollection, 
+                                                target_time_dict: dict) -> Tuple[bool, list]:
+    
+    allDates = collection.find_intersection_target_dates_from_meta()
+    computeDates = []
+    missing_timestamps = False
 
+    if target_time_dict["mode"] == "ALL":
+        # remove excluded Dates 
+        for date in allDates:
+            if not date in target_time_dict["excludeDates"]:
+                computeDates.append(date)
+        
+    elif target_time_dict["mode"] == "DATES":
+        # add needed dates to list
+        for date in allDates:
+            if date in target_time_dict["includeDates"]:
+                computeDates.append(date)
 
+    elif target_time_dict["mode"] == "MISSING":
+        # compare existing target indicator dates with applicable dates of inputs
+        for date in allDates:
+            if not date in target_indicator.meta.applicable_dates and not date in target_time_dict["excludeDates"]:
+                computeDates.append(date)
 
+    # add missing timestamp informations to indicator collection
+    for indicator in collection.indicators:
+        for date in collection.indicators[indicator].meta.applicable_dates:
+            if not date in computeDates:
+                missing_timestamps = True
+                collection.indicators[indicator].bool_missing_timestamp = True
+                collection.indicators[indicator].missing_timestamps.append(date)
+
+    return missing_timestamps, computeDates
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 ""                                                                                                                 ""
 ""                    API_HELPER_METHODS_GEOMETRIC_OPERATIONS                                                      ""
@@ -2136,8 +2249,8 @@ def getChange_absolute(feature, targetDate, compareDate):
     """
     targetDatePrefix = getTargetDateWithPropertyPrefix(targetDate)
     compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
-    targetValue = feature["properties"][targetDatePrefix]
-    compareValue = feature["properties"][compareDatePrefix]
+    targetValue = feature[targetDatePrefix]
+    compareValue = feature[compareDatePrefix]
 
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         resultValue = float(targetValue) - float(compareValue)
@@ -2307,7 +2420,7 @@ def changeRelative_referenceDate_percent(featureCollection, targetDate, referenc
     
     return getChange_relative_percent(featureCollection, targetDate, referenceDate)
 
-def trend_consecutive_n_years(featureCollection, targetDate, numberOfYears):
+def trend_consecutive_n_years(feature, targetDate, numberOfYears):
     """Computes the new indicator as trend for prior consecutive Years, internally tests are run, e.g. if a previous year is available or not
 
     Args:
@@ -2327,15 +2440,9 @@ def trend_consecutive_n_years(featureCollection, targetDate, numberOfYears):
 
     resultDict = {}
 
-    for feature in featureCollection["features"]:
-        trend = computeTrend(feature, dates)
-        if bool(trend) and not isNoDataValue(trend):
-            resultDict[getSpatialUnitFeatureIdValue(feature)] = trend
+    trend = computeTrend(feature, dates)
 
-    if len(resultDict) == 0:
-        throwError("Trend computation resulted in NoData for each feature")
-
-    return resultDict
+    return trend
 
 def trend_consecutive_n_months(featureCollection, targetDate, numberOfMonths):
     """Computes the new indicator as trend for prior consecutive months, internally tests are run, e.g. if a previous year is available or not
@@ -2495,7 +2602,7 @@ def computeContinuity(feature, dates):
 
     for date in dates: 
         indicatorValue = getIndicatorValue(feature, date)
-        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
+        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(float(indicatorValue)):
             indicatorValueArray.append(indicatorValue)
 
     if not len(dates) == len(indicatorValueArray):
@@ -2507,7 +2614,7 @@ def computeContinuity(feature, dates):
 
     result = stats.pearsonr(indicatorValueArray, countArray)
 
-    return result[0]
+    return float(result[0])
 
 def continuity_consecutive_n_years(feature, targetDate, numberOfYears):
     """computes the new Indicator as continuity for prior consecutive years. The formula used is the pearson correlation.

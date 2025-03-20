@@ -102,6 +102,7 @@ class PercentageShare(KommonitorProcess):
 
                 # Fetch indicator timeseries data
                 base_data = fetch_indicator_timeseries(indicators_controller, base_indicator_id, target_unit_id, job_summary, logger)
+                print(base_data)
                 ref_data = fetch_indicator_timeseries(indicators_controller, ref_indicator_id, target_unit_id, job_summary, logger)
                 target_data = fetch_indicator_timeseries(indicators_controller, target_indicator_id, target_unit_id, job_summary, logger)
 
