@@ -8,12 +8,12 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi.process.base import *
-from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from ressources.PyKmHelper import pykmhelper
+from ..pykmhelper import *
 from ..util import dataio
 
 class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):

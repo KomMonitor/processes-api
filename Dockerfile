@@ -20,6 +20,7 @@ RUN chmod +x run.sh
 
 # copy application files
 COPY processor processor
+COPY ressources ressources
 
 ENV PYTHONUNBUFFERED=1
 CMD ["./run.sh"]
