@@ -20,20 +20,84 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_absChange_nTemporalItems",
         version="0.0.1",
-        title="Absolute change of an indicator in the submitted range.",
+        title="Absolute Veränderung bezogen auf Zeitspanne",
+        description= "Berechnet die absolute Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
+        additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Veränderung absolut",
+                        "apiName": "indicator_change_absolute",
+                        "formula": "$ I_{N} - I_{M} $",
+                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
+                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
+                        "inputBoxes": [
+                            {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "temporal_options",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "number_of_temporal_items",
+                                "temporal_type"
+                            ]
+                            }
+                        ]
+                    }]
+                )
+            ]
+        ),
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
-        inputs=KommonitorProcess.common_inputs | {
+        inputs=KommonitorProcess.common_inputs | {        
+            "computation_id": ProcessInput(
+                id= "COMPUTATION_ID",
+                title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
+                description="Indikatoren-ID des Basisindikators.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            ),
             "number_of_temporal_items": ProcessInput(
-                title="number_of_temporal_items",
-                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER)
+                id= "number_of_temporal_items",
+                title="Anzahl",
+                description= "Anzahl der Zeiteinheiten. Standard ist '1'.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER, minimum=1, maximum=100000)
             ),
             "temporal_type": ProcessInput(
-                title="temporal_type",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                id="temporal_type",
+                title="Art des zeitlichen Bezugs",
+                description="Angabe des Zeitbezug-Typs. Standard ist 'Jahre'.",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    enum=[
+                        {
+                        "apiName": "YEARS",
+                        "displayName": "Jahr(e)"
+                        },
+                        {
+                            "apiName": "MONTHS",
+                            "displayName": "Monat(e)"
+                        },
+                        {
+                            "apiName": "DAYS",
+                            "displayName": "Tag(e)"
+                        }
+                    ],                    
+                    default={
+                        "apiName": "YEARS",
+                        "displayName": "Jahr(e)"
+                    }
+                )
             )
         },
         outputs = KommonitorProcess.common_output
