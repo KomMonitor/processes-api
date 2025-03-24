@@ -20,7 +20,8 @@ class PercentageShare(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="percentage-share",
         version="0.0.1",
-        title="Percentage share of an indicator to a reference indicator in a given spatial unit",
+        title="Prozentualer Anteil mehrerer Basisindikatoren von einem Referenzindikator",
+        description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren durch den Wert des Referenzindikators dividiert",
         example={
             "target_indicator_id": "cccca04-cc57-48d3-a801-d6b4b00fcccc",
             "target_spatial_units": ["bbbba04-cc57-48d3-a801-d6b4b00fbbbb"],
@@ -38,13 +39,33 @@ class PercentageShare(KommonitorProcess):
         additional_parameters=AdditionalProcessIOParameters(
             parameters=[
                 Parameter(
-                    name="legend",
-                    value=["Percentage share of an indicator to a reference indicator in a given spatial unit"]
-                ),
-                Parameter(
-                    name="formula",
-                    value=["(indicator_count / reference_indicator_count) * 100"]
-                ),
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Prozentualer Anteil (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
+                        "apiName": "indicator_share_percentage",
+                        "formula": "$$ \frac{\sum_{n=1}^{m} I_{n}}{I_{ref}} \times 100 $$",
+                        "legend": "<br/>$I_{n}$ = Basis-Indikatoren <br/>$I_{ref}$ = Referenzindikator ",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${indicatorName} [ ${unit} ]<br/>",
+                        "inputBoxes": [
+                           {
+                            "id": "reference_id",
+                            "title": "Notwendiger Referenzindikator (Divisor)",
+                            "description": "",
+                            "contents": [
+                                "reference_id"
+                            ]
+                            },
+                            {
+                            "id": "computation_ids",
+                            "title": "Notwendige (Basis-)Indikatoren (Dividend)",
+                            "description": "",
+                            "contents": [
+                                "computation_ids"
+                            ]
+                            }
+                        ]
+                    }]
+                )
             ]
         ),
         job_control_options=[
@@ -52,12 +73,18 @@ class PercentageShare(KommonitorProcess):
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         inputs=KommonitorProcess.common_inputs | {
-            "base_indicator_id": ProcessInput(
-                title="base_indicator_id",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            "computation_ids": ProcessInput(
+                title="Notwendige (Basis-)Indikatoren (Dividend)",
+                description="Auswahl der für die Berechnung erforderlichen (Basis-)Indikatoren",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.ARRAY,
+                    items=ProcessIOSchema(type_=ProcessIOType.STRING),
+                    min_items=1
+                )
             ),
-            "reference_indicator_id": ProcessInput(
-                title="reference_indicator_id",
+            "reference_id": ProcessInput(
+                title="Notwendiger Referenzindikator (Divisor)",
+                description="Auswahl des für die Berechnung erforderlichen Referenzindikators",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             )
         },
