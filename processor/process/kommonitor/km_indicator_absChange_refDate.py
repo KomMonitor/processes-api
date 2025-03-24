@@ -19,17 +19,58 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_absChange_refDate",
         version="0.0.1",
-        title="Absolute change of an indicator compared to the reference date.",
+        title="Absolute Veränderung bezogen auf festen Referenz-Zeitpunkt",
+        description= "Berechnet die absolute Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
+        additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Veränderung absolut bezogen auf Referenzdatum",
+                        "apiName": "indicator_change_absolute_refDate",
+                        "formula": "$ I_{N} - I_{M} $",
+                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt",
+                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt ${reference_date}",
+                        "inputBoxes": [
+                            {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "reference_date",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "reference_date"
+                            ]
+                            }
+                        ]
+                    }]
+                )
+            ]
+        ),
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
-        inputs=KommonitorProcess.common_inputs | {
-            "reference_date": ProcessInput(
-                title="reference_date",
+        inputs=KommonitorProcess.common_inputs | {        
+            "computation_id": ProcessInput(
+                id= "COMPUTATION_ID",
+                title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
+                description="Indikatoren-ID des Basisindikators.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
-            )
+            ),
+            "reference_date": ProcessInput(
+                id= "reference_date",
+                title="fester Referenz-Zeitpunkt",
+                description= "fester Referenz-Zeitpunkt.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            )           
         },
         outputs = KommonitorProcess.common_output
     )

@@ -20,22 +20,59 @@ class KmIndicatorDivide(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_divide",
         version="0.0.1",
-        title="Division of two different Indicators.",
+        title="Division zweier Indikatoren",
+        description= "Berechnet den Grad der Kontinuität über eine vergangene Zeitspanne eines Indikators als Pearson Korrelation bei einer linearen Regression über die betrachtete Zeitspanne.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
+        additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Division (Quotient zweier Indikatoren)",
+                        "apiName": "indicator_division",
+                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
+                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
+                        "dynamicLegend": "<br/> $A$: ${computation_id_numerator_name} [ ${computation_id_numerator_unit} ] <br/> $B$: ${computation_id_denominator_name} [ ${computation_id_denominator_unit} ]",
+                        "inputBoxes": [
+                           {
+                            "id": "computation_id_numerator",
+                            "title": "Notwendiger Dividend-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "computation_id_denominator",
+                            "title": "Notwendiger Divisor-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                        ]
+                    }]
+                )
+            ]
+        ),
         inputs=KommonitorProcess.common_inputs | {
             "computation_id_numerator": ProcessInput(
-                title="computation_id_numerator",
+                id= "COMPUTATION_ID_NUMERATOR",
+                title="Auswahl des für die Berechnung erforderlichen Dividenden",
+                description="Indikatoren-ID des Basisindikators.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             ),
             "computation_id_denominator": ProcessInput(
-                title="computation_id_denominator",
-                schema_= ProcessIOSchema(type_=ProcessIOType.STRING)
+                id= "COMPUTATION_ID_DENOMINATOR",
+                title="Auswahl des für die Berechnung erforderlichen Divisors",
+                description="Indikatoren-ID des Basisindikators.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             )
-        },
+        }, 
         outputs = KommonitorProcess.common_output
     )
 

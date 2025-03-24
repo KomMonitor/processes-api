@@ -19,22 +19,86 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_Trend_nTemporalItems",
         version="0.0.1",
-        title="Trend of an indicator in the submitted range.",
+        title="Trendberechnung bezogen auf Zeitspanne",
+        description= "Berechnet den Trend über eine vergangene Zeitspanne eines Indikators als Steigung b der Geraden bei einer linearen Regression im Verhältnis zum Indikatorwert des ersten Jahres.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
+        additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Trendberechnung (mittels linearer Regression)",
+                        "apiName": "indicator_trend",
+                        "formula": "$$ T = 100 \times \frac{b}{I_{1}} $$ wobei $$ b = \frac{\sum_{n=1}^{m}((A_{n} - \bar{A}) \times (I_{n} - \bar{I}))}{\sum_{n=1}^{m} (A_{n} - \bar{A})^2} $$",
+                        "legend": "<br/>$T$ = Trend<br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",
+                        "dynamicLegend": "<br/>$T$ = Trend<br/>$m$ = ${number_of_temporal_items} konsekutiver vergangener ${temporal_type} <br/>$A_{n}$ = aufeinander folgende ${temporal_type}<br/>$\bar{A}$ = arithmetisches Mittel der aufeinander folgenden ${temporal_type}<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden ${temporal_type}<br/>$\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden ${temporal_type} <br/> $I$ = Indikator '${computation_id_name} ${computation_id_unit}'",
+                        "inputBoxes": [
+                           {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "temporal_options",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "number_of_temporal_items",
+                                "temporal_type"
+                            ]
+                            }
+                        ]
+                    }]
+                )
+            ]
+        ),
         inputs=KommonitorProcess.common_inputs | {
+            "computation_id": ProcessInput(
+                id= "COMPUTATION_ID",
+                title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
+                description="Indikatoren-ID des Basisindikators.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            ),
             "number_of_temporal_items": ProcessInput(
-                title="number_of_temporal_items",
-                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER)
+                id= "number_of_temporal_items",
+                title="Anzahl",
+                description= "Anzahl der Zeiteinheiten. Standard ist '1'.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER, minimum=1, maximum=100000)
             ),
             "temporal_type": ProcessInput(
-                title="temporal_type",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                id="temporal_type",
+                title="Art des zeitlichen Bezugs",
+                description="Angabe des Zeitbezug-Typs. Standard ist 'Jahre'.",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    enum=[
+                        {
+                        "apiName": "YEARS",
+                        "displayName": "Jahr(e)"
+                        },
+                        {
+                            "apiName": "MONTHS",
+                            "displayName": "Monat(e)"
+                        },
+                        {
+                            "apiName": "DAYS",
+                            "displayName": "Tag(e)"
+                        }
+                    ],                    
+                    default={
+                        "apiName": "YEARS",
+                        "displayName": "Jahr(e)"
+                    }
+                )
             )
-        },
+        }, 
         outputs = KommonitorProcess.common_output
     )
 
