@@ -31,7 +31,7 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
                         "apiName": "indicator_change_absolute_refDate",
                         "formula": "$ I_{N} - I_{M} $",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt",
-                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt ${reference_date}",
+                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt ${reference_date}",
                         "inputBoxes": [
                             {
                             "id": "computation_id",

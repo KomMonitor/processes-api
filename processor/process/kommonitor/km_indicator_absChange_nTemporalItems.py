@@ -32,7 +32,7 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
                         "apiName": "indicator_change_absolute",
                         "formula": "$ I_{N} - I_{M} $",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
-                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
+                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
                         "inputBoxes": [
                             {
                             "id": "computation_id",

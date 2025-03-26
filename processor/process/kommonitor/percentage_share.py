@@ -45,7 +45,7 @@ class PercentageShare(KommonitorProcess):
                         "apiName": "indicator_share_percentage",
                         "formula": "$$ \frac{\sum_{n=1}^{m} I_{n}}{I_{ref}} \times 100 $$",
                         "legend": "<br/>$I_{n}$ = Basis-Indikatoren <br/>$I_{ref}$ = Referenzindikator ",
-                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${indicatorName} [ ${unit} ]<br/>",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]<br/>",
                         "inputBoxes": [
                            {
                             "id": "reference_id",
