@@ -8,12 +8,16 @@ from authlib.integrations.flask_oauth2 import ResourceProtector
 from flask import Flask, send_from_directory, request
 from werkzeug.utils import secure_filename
 
+from flask_cors import CORS
+
 from auth import KomMonitorIntrospectTokenValidator
 
 if not os.getenv("PYGEOAPI_CONFIG"):
     os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
 if not os.getenv("PYGEOAPI_OPENAPI"):
     os.environ["PYGEOAPI_OPENAPI"] = os.path.join(os.path.dirname(__file__), "default-openapi.yml")
+
+KOMMONITOR_CORS_ORIGIN = os.getenv('KOMMONITOR_PROCESSES_API_ALLOWED_CORS_ORIGINS', "http://localhost:8000")
 
 from pygeoapi import flask_app
 from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, processes_api, execute_from_flask
@@ -24,6 +28,13 @@ require_oauth.register_token_validator(KomMonitorIntrospectTokenValidator())
 APP = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/static')
 APP.url_map.strict_slashes = API_RULES.strict_slashes
 APP.config['JSONIFY_PRETTYPRINT_REGULAR'] = CONFIG['server'].get('pretty_print', True)
+
+CORS(APP)
+cors = CORS(APP, resource={
+    r"/*":{
+        "origins":KOMMONITOR_CORS_ORIGIN
+    }
+})
 
 
 @APP.get('/')

@@ -69,8 +69,14 @@ services:
   #kommonitor-processes-api:
   #  image: kommonitor/processes-api:latest
   #  environment:
-  #  - KC_CLIENT_ID=kommonitor-importer
-  #  - KC_CLIENT_SECRET=ZcrTia5Xzlq5KirsU2zGoi6vtk0Teksj
+  #  - KC_HOSTNAME=keycloak.url
+  #  - KC_HOSTNAME_PATH=
+  #  - KC_REALM_NAME=kommonitor
+  #  - KC_CLIENT_ID=kommonitor-processes-api
+  #  - KC_CLIENT_SECRET=secret
+  #  - KOMMONITOR_DATA_MANAGEMENT_URL=http://localhost:8085/management/
+  #  - PROCESS_RESULTS_DIR=http://localhost:8085/management/
+  #  - KOMMONITOR_PROCESSES_API_ALLOWED_CORS_ORIGINS=http://localhost:8000
   #  ports:
   #    - 9999:9999
   #  networks:
