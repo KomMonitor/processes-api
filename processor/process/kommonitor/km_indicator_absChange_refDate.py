@@ -13,7 +13,7 @@ from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult,
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from ..pykmhelper import *
+from .. import pykmhelper
 
 class KmIndicatorAbsChangeRefDate(KommonitorProcess):
     detailed_process_description = ProcessDescription(
@@ -142,7 +142,6 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
                     computation_indicator_id, 
                     spatial_unit)
 
-                print(computation_indicator)
                 logger.debug("Retrieved required computation indicator successfully...")
                 
                 # iterate over all features an append the indicator

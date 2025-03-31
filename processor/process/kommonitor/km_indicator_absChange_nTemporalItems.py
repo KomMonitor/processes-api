@@ -13,7 +13,7 @@ from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult,
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from ..pykmhelper import *
+from .. import  pykmhelper
 from ..util import dataio
 
 class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
@@ -107,7 +107,7 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, KommonitorResult):
+            data_management_client: ApiClient) -> (JobStatus, KommonitorResult, KommonitorJobSummary):
 
         logger.debug("Starting execution...")
 
@@ -206,6 +206,7 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
                 result.complete_spatial_unit_result()
                 
                 print(result.values)
+                print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
 

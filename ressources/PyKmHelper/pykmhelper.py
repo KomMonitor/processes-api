@@ -13,7 +13,7 @@ import datetime
 from logging import Logger
 from enum import Enum
 from openapi_client import IndicatorOverviewType
-from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
 from typing import Optional, Tuple
 
 # Define custom CONSTANTS used within the script

@@ -13,7 +13,7 @@ from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult,
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from ..pykmhelper import *
+from .. import pykmhelper
 
 class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
@@ -206,7 +206,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 result.complete_spatial_unit_result()
 
                 print(result.values)
-                 
+                print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except ApiException as e:

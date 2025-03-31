@@ -801,15 +801,17 @@ class IndicatorType:
     meta: Optional[IndicatorOverviewType]
     values: Optional[list]
     bool_missing_timestamp: bool
-    missing_timestamps: Optional[list]
-    applicable_su: Optional[list]
+    missing_timestamps: list
+    applicable_su: list
     time_series: dict[dict]
 
     def __init__(self, id : str, type : IndicatorCalculationType):
         self.id = id
         self.type = type
         self.bool_missing_timestamp = False
-        self.time_series = {{}}
+        self.time_series = {}
+        self.missing_timestamps = []
+        self.applicable_su = []
 
 class IndicatorCollection:
     def __init__(self):
@@ -835,7 +837,6 @@ class IndicatorCollection:
         return None
     
     def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
-        self.indicators[indicator].applicable_su = []        
 
         for indicator in self.indicators:
             for unit in self.indicators[indicator].meta.applicable_spatial_units:
@@ -852,7 +853,7 @@ class IndicatorCollection:
 
     def fetch_indicator_feature_time_series(self):
         for indicator in self.indicators:
-            for feature in self.indicators[indicator].value:
+            for feature in self.indicators[indicator].values:
                 self.indicators[indicator].time_series[feature["fid"]] = feature
 
         
@@ -921,7 +922,7 @@ def getAll_target_time(targetTimeDict, target_applicable_dates: set, all_input_a
 def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType, 
                                                 collection: IndicatorCollection, 
                                                 target_time_dict: dict) -> Tuple[bool, list]:
-    
+
     allDates = collection.find_intersection_target_dates_from_meta()
     computeDates = []
     missing_timestamps = False
@@ -931,7 +932,7 @@ def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType
         for date in allDates:
             if not date in target_time_dict["excludeDates"]:
                 computeDates.append(date)
-        
+
     elif target_time_dict["mode"] == "DATES":
         # add needed dates to list
         for date in allDates:
@@ -946,8 +947,8 @@ def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType
 
     # add missing timestamp informations to indicator collection
     for indicator in collection.indicators:
-        for date in collection.indicators[indicator].meta.applicable_dates:
-            if not date in computeDates:
+        for date in computeDates :
+            if not date in collection.indicators[indicator].meta.applicable_dates:
                 missing_timestamps = True
                 collection.indicators[indicator].bool_missing_timestamp = True
                 collection.indicators[indicator].missing_timestamps.append(date)

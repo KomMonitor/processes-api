@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 import logging
+import math
 
 import openapi_client
 from IPython.core.events import pre_run_cell
@@ -18,12 +19,12 @@ from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 # from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
-class KmIndicatorDivide(KommonitorProcess):
+class KmIndicatorSubtract(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_indicator_divide",
+        id="km_indicator_subtract",
         version="0.0.1",
-        title="Division zweier Indikatoren",
-        description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
+        title="Subtraktion mehrerer Basisindikatoren von einem Referenzindikator",
+        description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren vom Wert des Referenzindikators abgezogen.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -34,7 +35,7 @@ class KmIndicatorDivide(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
+                        "titleShort": "Multiplikation (Quotient zweier Indikatoren)",
                         "apiName": "indicator_division",
                         "formula": "$ \\frac{I_{1}}{I_{2}}  $",
                         "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
@@ -62,16 +63,16 @@ class KmIndicatorDivide(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "computation_id_numerator": ProcessInput(
-                id= "COMPUTATION_ID_NUMERATOR",
-                title="Auswahl des für die Berechnung erforderlichen Dividenden",
-                description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            "computation_ids": ProcessInput(
+                id= "COMPUTATION_IDS",
+                title="für die Berechnung erforderliche Basisindikatoren",
+                description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY)
             ),
-            "computation_id_denominator": ProcessInput(
-                id= "COMPUTATION_ID_DENOMINATOR",
-                title="Auswahl des für die Berechnung erforderlichen Divisors",
-                description="Indikatoren-ID des Basisindikators.",
+            "reference_id": ProcessInput(
+                id= "REFERENCE_ID",
+                title="für die Berechnung erforderlicher Referenzindikator",
+                description="Divisor",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             )
         }, 
@@ -90,8 +91,8 @@ class KmIndicatorDivide(KommonitorProcess):
         inputs = config.inputs
         # Extract all relevant inputs
         target_id = inputs["target_indicator_id"]
-        numerator_id = inputs["computation_id_numerator"]
-        denominator_id = inputs["computation_id_denominator"]
+        computation_ids = inputs["computation_ids"]
+        reference_id = inputs["reference_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         
@@ -107,13 +108,13 @@ class KmIndicatorDivide(KommonitorProcess):
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
-            ni = IndicatorType(numerator_id, IndicatorCalculationType.NUMERATOR_INDICATOR)
-            di = IndicatorType(denominator_id, IndicatorCalculationType.DENOMINATOR_INDICATOR)
-
+            ri = IndicatorType(reference_id, IndicatorCalculationType.REFERENCE_INDICATOR)
+            
             collection = IndicatorCollection()
-            collection.add_indicator(ni)
-            collection.add_indicator(di)
-
+            collection.add_indicator(ri)
+            for indicator in computation_ids:
+                collection.add_indicator(IndicatorType(indicator, IndicatorCalculationType.COMPUTATION_INDICATOR))
+            
             # query indicator metadate to check for errors occured
             ti.meta = indicators_controller.get_indicator_by_id(
                 target_id)
@@ -146,32 +147,35 @@ class KmIndicatorDivide(KommonitorProcess):
                     collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                         indicator, 
                         spatial_unit)
-                    print(indicator)
-                    print(collection.indicators[indicator].values)
-
+                    
                 collection.fetch_indicator_feature_time_series()
 
                 logger.debug("Retrieved required indicators successfully")
 
-                # iterate over all features an append the indicator
+                # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
                 try:
-                    for feature in collection.indicators[numerator_id].time_series:
+                    for feature in collection.indicators[reference_id].time_series:
                         valueMapping = []
                         for targetTime in all_times:
                             time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
                             
-                            numeratorValue = collection.indicators[numerator_id].time_series[feature][time_with_prefix]
-                            denumeratorValue = collection.indicators[denominator_id].time_series[feature][time_with_prefix]
-                            
-                            value = float(numeratorValue) / float(denumeratorValue)
+                            compSum = 0
+                            for indicator in collection.indicators:
+                                if collection.indicators[indicator].type == IndicatorCalculationType.REFERENCE_INDICATOR:
+                                    continue
+                                compSum += float(collection.indicators[indicator].time_series[feature][time_with_prefix])
+
+                            refValue = float(collection.indicators[reference_id].time_series[feature][time_with_prefix])
+
+                            value = refValue - compSum
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         
                         indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 except RuntimeError as r:
                     logger.error(r)
                     logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", numerator_id, str(r))
+                    job_summary.add_processing_error("INDICATOR", reference_id, str(r))
 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
