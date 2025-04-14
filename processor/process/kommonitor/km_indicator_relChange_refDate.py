@@ -1,75 +1,49 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import logging
-import math
 
 import openapi_client
-from IPython.core.events import pre_run_cell
 from openapi_client import ApiClient
 from openapi_client.rest import ApiException
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from .. import pykmhelper
-from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
-# from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
+from .. import  pykmhelper
+from ..pykmhelper import IndicatorCalculationType, IndicatorCollection, IndicatorType
+from ..util import dataio
 
-class KmIndicatorMultiply(KommonitorProcess):
+class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_indicator_multiply",
+        id="km_indicator_relChange_refDate",
         version="0.0.1",
-        title="Multiplikation beliebig vieler Indikatoren",
-        description= "Berechnet den Wert welcher durch Multiplikation beliebig vieler Indikatoren entsteht.",
+        title="Relative Veränderung bezogen auf einen Referenzzeitpunkt",
+        description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
+        additional_parameters=AdditionalProcessIOParameters(
+        ),
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
-        additional_parameters=AdditionalProcessIOParameters(
-            parameters=[
-                Parameter(
-                    name="kommonitorUiParams",
-                    value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
-                        "inputBoxes": [
-                           {
-                            "id": "computation_id_numerator",
-                            "title": "Notwendiger Dividend-Indikator",
-                            "description": "",
-                            "contents": [
-                                "computation_id"
-                            ]
-                            },
-                            {
-                            "id": "computation_id_denominator",
-                            "title": "Notwendiger Divisor-Indikator",
-                            "description": "",
-                            "contents": [
-                                "computation_id"
-                            ]
-                            },
-                        ]
-                    }]
-                )
-            ]
-        ),
-        inputs=KommonitorProcess.common_inputs | {
-            "computation_ids": ProcessInput(
-                id= "COMPUTATION_IDS",
-                title="für die Berechnung erforderliche Basisindikatoren",
-                description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
-            )
-        }, 
+        inputs=KommonitorProcess.common_inputs | {        
+            "computation_id": ProcessInput(
+                id= "COMPUTATION_ID",
+                title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
+                description="Indikatoren-ID des Basisindikators.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            ),
+            "reference_date": ProcessInput(
+                id= "reference_date",
+                title="fester Referenz-Zeitpunkt",
+                description= "fester Referenz-Zeitpunkt.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            )   
+        },
         outputs = KommonitorProcess.common_output
     )
 
@@ -85,11 +59,11 @@ class KmIndicatorMultiply(KommonitorProcess):
         inputs = config.inputs
         # Extract all relevant inputs
         target_id = inputs["target_indicator_id"]
-        computation_ids = inputs["computation_ids"]
+        computation_id = inputs["computation_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        
-        
+        reference_date = inputs["reference_date"]
+
         # Init object to store computation results
         result = KommonitorResult()
         job_summary = KommonitorJobSummary()
@@ -103,8 +77,7 @@ class KmIndicatorMultiply(KommonitorProcess):
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
             
             collection = IndicatorCollection()
-            for indicator in computation_ids:
-                collection.add_indicator(IndicatorType(indicator, IndicatorCalculationType.COMPUTATION_INDICATOR))
+            collection.add_indicator(IndicatorType(computation_id, IndicatorCalculationType.COMPUTATION_INDICATOR))
             
 
             # query indicator metadate to check for errors occured
@@ -134,7 +107,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                 """
                 Endpoint of spatial unit controller api has to be implemented
                 """
-                # query the correct indicator for numerator and denominator
+                # query the correct indicator for all Indicators in Collection
                 for indicator in collection.indicators:
                     collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                         indicator, 
@@ -147,23 +120,19 @@ class KmIndicatorMultiply(KommonitorProcess):
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
                 try:
-                    for feature in collection.indicators[computation_ids[0]].time_series:
+                    for feature in collection.indicators[computation_id].time_series:
                         valueMapping = []
                         for targetTime in all_times:
                             time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
                             
-                            allIndicatorValues = []
-                            for indicator in collection.indicators:
-                                allIndicatorValues.append(float(collection.indicators[indicator].time_series[feature][time_with_prefix]))
-                            
-                            value = math.prod(allIndicatorValues)
+                            value = pykmhelper.changeRelative_referenceDate_percent(collection.indicators[computation_id].time_series[feature], time_with_prefix, reference_date)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         
                         indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 except RuntimeError as r:
                     logger.error(r)
                     logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", computation_ids[0], str(r))
+                    job_summary.add_processing_error("INDICATOR", computation_id, str(r))
 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))

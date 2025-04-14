@@ -19,48 +19,18 @@ from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 # from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
-class KmIndicatorMultiply(KommonitorProcess):
+class KmIndicatorSum(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_indicator_multiply",
+        id="km_indicator_sum",
         version="0.0.1",
-        title="Multiplikation beliebig vieler Indikatoren",
-        description= "Berechnet den Wert welcher durch Multiplikation beliebig vieler Indikatoren entsteht.",
+        title="Summe aus mehreren Indikatoren",
+        description= "Berechnet den Wert welcher durch Summenbildung beliebig vieler Indikatoren entsteht.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         additional_parameters=AdditionalProcessIOParameters(
-            parameters=[
-                Parameter(
-                    name="kommonitorUiParams",
-                    value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
-                        "inputBoxes": [
-                           {
-                            "id": "computation_id_numerator",
-                            "title": "Notwendiger Dividend-Indikator",
-                            "description": "",
-                            "contents": [
-                                "computation_id"
-                            ]
-                            },
-                            {
-                            "id": "computation_id_denominator",
-                            "title": "Notwendiger Divisor-Indikator",
-                            "description": "",
-                            "contents": [
-                                "computation_id"
-                            ]
-                            },
-                        ]
-                    }]
-                )
-            ]
         ),
         inputs=KommonitorProcess.common_inputs | {
             "computation_ids": ProcessInput(
@@ -156,7 +126,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                             for indicator in collection.indicators:
                                 allIndicatorValues.append(float(collection.indicators[indicator].time_series[feature][time_with_prefix]))
                             
-                            value = math.prod(allIndicatorValues)
+                            value = sum(allIndicatorValues)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         
                         indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})

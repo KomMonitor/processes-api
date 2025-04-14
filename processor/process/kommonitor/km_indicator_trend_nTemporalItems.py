@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import logging
 
 import openapi_client
@@ -8,36 +8,34 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
 
-from .. import pykmhelper
+from .. import  pykmhelper
+from ..pykmhelper import IndicatorCalculationType, IndicatorCollection, IndicatorType
+from ..util import dataio
 
 class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_indicator_Trend_nTemporalItems",
+        id="km_indicator_absChange_nTemporalItems",
         version="0.0.1",
-        title="Trendberechnung bezogen auf Zeitspanne",
-        description= "Berechnet den Trend über eine vergangene Zeitspanne eines Indikators als Steigung b der Geraden bei einer linearen Regression im Verhältnis zum Indikatorwert des ersten Jahres.",
+        title="Absolute Veränderung bezogen auf Zeitspanne",
+        description= "Berechnet die absolute Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
-        job_control_options=[
-            ProcessJobControlOption.SYNC_EXECUTE,
-            ProcessJobControlOption.ASYNC_EXECUTE,
-        ],
         additional_parameters=AdditionalProcessIOParameters(
             parameters=[
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Trendberechnung (mittels linearer Regression)",
-                        "apiName": "indicator_trend",
-                        "formula": "$$ T = 100 \times \frac{b}{I_{1}} $$ wobei $$ b = \frac{\sum_{n=1}^{m}((A_{n} - \bar{A}) \times (I_{n} - \bar{I}))}{\sum_{n=1}^{m} (A_{n} - \bar{A})^2} $$",
-                        "legend": "<br/>$T$ = Trend<br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",
-                        "dynamicLegend": "<br/>$T$ = Trend<br/>$m$ = ${number_of_temporal_items} konsekutiver vergangener ${temporal_type} <br/>$A_{n}$ = aufeinander folgende ${temporal_type}<br/>$\bar{A}$ = arithmetisches Mittel der aufeinander folgenden ${temporal_type}<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden ${temporal_type}<br/>$\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden ${temporal_type} <br/> $I$ = Indikator '${compIndicatorSelection.indicatorName} [${compIndicatorSelection.unit}]'",
+                        "titleShort": "Veränderung absolut",
+                        "apiName": "indicator_change_absolute",
+                        "formula": "$ I_{N} - I_{M} $",
+                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
+                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
                         "inputBoxes": [
-                           {
+                            {
                             "id": "computation_id",
                             "title": "Notwendiger Basis-Indikator",
                             "description": "",
@@ -59,7 +57,11 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 )
             ]
         ),
-        inputs=KommonitorProcess.common_inputs | {
+        job_control_options=[
+            ProcessJobControlOption.SYNC_EXECUTE,
+            ProcessJobControlOption.ASYNC_EXECUTE,
+        ],
+        inputs=KommonitorProcess.common_inputs | {        
             "computation_id": ProcessInput(
                 id= "COMPUTATION_ID",
                 title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
@@ -98,7 +100,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                     }
                 )
             )
-        }, 
+        },
         outputs = KommonitorProcess.common_output
     )
 
@@ -106,20 +108,20 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, Dict):
+            data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
         logger.debug("Starting execution...")
 
          # Load inputs
         inputs = config.inputs
         # Extract all relevant inputs
-        target_indicator_id = inputs["target_indicator_id"]
-        computation_indicator_id = inputs["computation_id"]
+        target_id = inputs["target_indicator_id"]
+        computation_id = inputs["computation_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         number_of_temporal_items = inputs["number_of_temporal_items"]
-        temporal_type = inputs["temporal_type"]
-
+        temporal_type = inputs["temporal_type"]        
+        
         # Init object to store computation results
         result = KommonitorResult()
         job_summary = KommonitorJobSummary()
@@ -129,22 +131,23 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
 
-            # query indicator metadate to check for errors occured
-            computation_indicator_metadata = indicators_controller.get_indicator_by_id(
-                computation_indicator_id)
-
-            target_indicator_metadata = indicators_controller.get_indicator_by_id(
-                target_indicator_id)
+            # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
+            ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
             
-            # get applicable dates and compute all dates which have to get calculated according to the target_time schema
-            computation_indicator_applicable_dates = computation_indicator_metadata.applicable_dates
-            target_indicator_applicable_dates = target_indicator_metadata.applicable_dates
+            collection = IndicatorCollection()
+            collection.add_indicator(IndicatorType(computation_id, IndicatorCalculationType.COMPUTATION_INDICATOR))
+            
 
-            computation_indicator_applicable_spatial_units = []
-            for unit in computation_indicator_metadata.applicable_spatial_units:
-                computation_indicator_applicable_spatial_units.append(unit.spatial_unit_id)
+            # query indicator metadate to check for errors occured
+            ti.meta = indicators_controller.get_indicator_by_id(
+                target_id)
+            
+            for indicator in collection.indicators:
+                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
+                indicator)
 
-            all_times = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(computation_indicator_applicable_dates)])
+            # calculate intersection dates and all dates that have to be computed according to target_time schema
+            bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
                 # Init results and job summary for current spatial unit
@@ -152,26 +155,26 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # catch missing timestamp error
-                missing_dates = [date for date in all_times if not date in computation_indicator_applicable_dates]
-                if len(missing_dates) >= 1:
-                    job_summary.add_missing_timestamp_error("INDICATOR", computation_indicator_id, missing_dates) 
-                
+                if bool_missing_timestamp:
+                     collection.check_applicable_target_dates(job_summary)
+
                 # catch missing spatial unit error
-                if not spatial_unit in computation_indicator_applicable_spatial_units:
-                    job_summary.add_missing_spatial_unit_error(computation_indicator_id)
+                collection.check_applicable_spatial_units(spatial_unit, job_summary)
 
                 # catch missing spatial unit feature error
                 """
                 Endpoint of spatial unit controller api has to be implemented
                 """
+                # query the correct indicator for all Indicators in Collection
+                for indicator in collection.indicators:
+                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                        indicator, 
+                        spatial_unit)
+                    
+                collection.fetch_indicator_feature_time_series()
 
-                # query the correct indicator 
-                computation_indicator = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                    computation_indicator_id, 
-                    spatial_unit)
-                
-                logger.debug("Retrieved required computation indicator successfully...")
-                
+                logger.debug("Retrieved required indicators successfully")
+
                 # find the function, that matches the requested pattern in inputs["temporal_type"]
                 if temporal_type == "YEARS":
                     func = pykmhelper.trend_consecutive_n_years
@@ -180,26 +183,25 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 elif temporal_type == "DAYS":
                     func = pykmhelper.trend_consecutive_n_days
 
-                # iterate over all features an append the indicator
+                # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
                 try:
-                    for feature in computation_indicator:
+                    for feature in collection.indicators[computation_id].time_series:
                         valueMapping = []
                         for targetTime in all_times:
-                            value = func(feature, targetTime, number_of_temporal_items)
+                            value = func(collection.indicators[computation_id].time_series[feature], time_with_prefix, number_of_temporal_items)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         
-                        spatialReferenceKey = feature["ID"]
-                        indicator_values.append({"spatialReferenceKey": spatialReferenceKey, "valueMapping": valueMapping})
+                        indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 except RuntimeError as r:
                     logger.error(r)
                     logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", computation_indicator_id, str(r))
+                    job_summary.add_processing_error("INDICATOR", computation_id, str(r))
 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
                 job_summary.add_integrated_target_dates(all_times)
-                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_indicator_id, spatial_unit)
+                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_id, spatial_unit)
                 job_summary.complete_spatial_unit_summary()
 
                 result.add_indicator_values(indicator_values)

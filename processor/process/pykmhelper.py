@@ -790,11 +790,6 @@ class IndicatorCalculationType(str, Enum):
     NUMERATOR_INDICATOR = "NUMERATOR_INDICATOR"
     DENOMINATOR_INDICATOR = "DENOMINATOR_INDICATOR"
 
-class FeatureTimeSeries:
-    id: str
-    properties: dict
-
-
 class IndicatorType:
     id: str
     type: IndicatorCalculationType
@@ -804,6 +799,7 @@ class IndicatorType:
     missing_timestamps: list
     applicable_su: list
     time_series: dict[dict]
+    applicable_su_features: list
 
     def __init__(self, id : str, type : IndicatorCalculationType):
         self.id = id
@@ -812,32 +808,58 @@ class IndicatorType:
         self.time_series = {}
         self.missing_timestamps = []
         self.applicable_su = []
-
+        self.applicable_su_features = []
+    
 class IndicatorCollection:
+    intersection_su_features: list
+    intersection_target_dates: set
+    all_target_dates: list
+    all_su_features: list
+
     def __init__(self):
         self.indicators = {}
+        self.intersection_su_features = []
+        self.all_target_dates = []
     
     def add_indicator(self, indicator: IndicatorType):
         self.indicators[indicator.id] = indicator
 
-    def find_intersection_target_dates_from_meta(self) -> set:
+    def find_intersection_target_dates_from_meta(self):
         listApplicableDates = [] 
 
         for item in self.indicators:
             listApplicableDates.append(set(self.indicators[item].meta.applicable_dates))
         
         intersection = listApplicableDates[0].copy()
+        union = listApplicableDates[0].copy()
         for dates in listApplicableDates[1:]:
             intersection.intersection_update(dates)
-        
-        return intersection
+            union = union | dates
+
+        self.intersection_target_dates = intersection
+        self.all_target_dates = list(union)
+
     
     def find_intersection_target_dates_from_values(self) -> None:
         # TODO
         return None
     
-    def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
+    def find_intersection_applicable_su_features(self) -> list:
+        listApplicableSuFeatures = [] 
 
+        for item in self.indicators:
+            listApplicableSuFeatures.append(set(self.indicators[item].applicable_su_features))
+        
+        intersection = listApplicableSuFeatures[0].copy()
+        union = listApplicableSuFeatures[0].copy()
+        for su_features in listApplicableSuFeatures[1:]:
+            intersection.intersection_update(su_features)
+            union = union | su_features
+
+        self.intersection_su_features = intersection
+        self.all_su_features = union
+
+    def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
         for indicator in self.indicators:
             for unit in self.indicators[indicator].meta.applicable_spatial_units:
                 self.indicators[indicator].applicable_su.append(unit.spatial_unit_id)
@@ -847,14 +869,32 @@ class IndicatorCollection:
 
     def check_applicable_target_dates(self, job_summary: KommonitorJobSummary):
         # catch missing timestamp error
-            for indicator in self.indicators:
-                if self.indicators[indicator].bool_missing_timestamp:
-                    job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
+        for indicator in self.indicators:
+            if self.indicators[indicator].bool_missing_timestamp:
+                job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
+
+    def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary):
+        for indicator in self.indicators:
+            for feature in self.all_su_features:
+                missing_su_features = []
+                if not feature in self.indicators[indicator].applicable_su_features:
+                    missing_su_features.append(feature)
+
+            if len(missing_su_features) > 0:
+                job_summary.add_missing_spatial_unit_feature_error(indicator, missing_su_features)
+
 
     def fetch_indicator_feature_time_series(self):
         for indicator in self.indicators:
+            su_features = []
             for feature in self.indicators[indicator].values:
-                self.indicators[indicator].time_series[feature["fid"]] = feature
+                id = feature["ID"]
+                self.indicators[indicator].time_series[id] = feature
+                su_features.append(id)
+
+            self.indicators[indicator].applicable_su_features = su_features
+
+        self.intersection_su_features = self.find_intersection_applicable_su_features()
 
         
 def getTargetDate_without_prefix(dateWithPrefix: str):
@@ -923,35 +963,53 @@ def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType
                                                 collection: IndicatorCollection, 
                                                 target_time_dict: dict) -> Tuple[bool, list]:
 
-    allDates = collection.find_intersection_target_dates_from_meta()
+    collection.find_intersection_target_dates_from_meta()
+    intersectionDates = collection.intersection_target_dates
     computeDates = []
     missing_timestamps = False
 
     if target_time_dict["mode"] == "ALL":
         # remove excluded Dates 
-        for date in allDates:
+        for date in intersectionDates:
             if not date in target_time_dict["excludeDates"]:
                 computeDates.append(date)
 
+        # add missing timestamp informations to indicator collection
+        for indicator in collection.indicators:
+            for date in collection.all_target_dates:
+                if not date in collection.indicators[indicator].meta.applicable_dates and not date in target_time_dict["excludeDates"]:
+                    missing_timestamps = True
+                    collection.indicators[indicator].bool_missing_timestamp = True
+                    collection.indicators[indicator].missing_timestamps.append(date)
+
     elif target_time_dict["mode"] == "DATES":
         # add needed dates to list
-        for date in allDates:
+        for date in intersectionDates:
             if date in target_time_dict["includeDates"]:
                 computeDates.append(date)
 
+        # add missing timestamp informations to indicator collection
+        for indicator in collection.indicators:
+            for date in target_time_dict["includeDates"] :
+                if not date in collection.indicators[indicator].meta.applicable_dates:
+                    missing_timestamps = True
+                    collection.indicators[indicator].bool_missing_timestamp = True
+                    collection.indicators[indicator].missing_timestamps.append(date)
+
+
     elif target_time_dict["mode"] == "MISSING":
         # compare existing target indicator dates with applicable dates of inputs
-        for date in allDates:
+        for date in intersectionDates:
             if not date in target_indicator.meta.applicable_dates and not date in target_time_dict["excludeDates"]:
                 computeDates.append(date)
 
-    # add missing timestamp informations to indicator collection
-    for indicator in collection.indicators:
-        for date in computeDates :
-            if not date in collection.indicators[indicator].meta.applicable_dates:
-                missing_timestamps = True
-                collection.indicators[indicator].bool_missing_timestamp = True
-                collection.indicators[indicator].missing_timestamps.append(date)
+        # add missing timestamp informations to indicator collection
+        for indicator in collection.indicators:
+            for date in collection.all_target_dates:
+                if not date in collection.indicators[indicator].meta.applicable_dates and not date in target_indicator.meta.applicable_dates and not date in target_time_dict["excludeDates"]:
+                    missing_timestamps = True
+                    collection.indicators[indicator].bool_missing_timestamp = True
+                    collection.indicators[indicator].missing_timestamps.append(date)
 
     return missing_timestamps, computeDates
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -2258,39 +2316,30 @@ def getChange_absolute(feature, targetDate, compareDate):
         
     return resultValue
 
-def getChange_relative_percent(featureCollection, targetDate, compareDate):
+def getChange_relative_percent(feature, targetDate, compareDate):
     """computes the relative difference/change of indicator values between the submitted dates (if both are present in the dataset) using the formula '100 * ((value[targetDate] - value[compareDate]) / value[compareDate])'
 
     Args:
-        featureCollection (FeatureCollection): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
+        feature (Feature): a valid GeoJSON FeatureCollection, whose features must contain a 'properties' attribute storing the indicator time series according to KomMonitor's data model
         targetDate (string): the reference/target date in the string format 'YYYY-MM-DD', i.e. '2024-01-01'
         compareDate (string): the compare date in the string format 'YYYY-MM-DD', i.e. '2024-01-01' to who the indicator value difference/change shall be computed
 
     Returns:
         dict<string, float>: returns a dictionary of all input features that have both timestamps and whose cahngeValues were successfully converted to a number.  the response Dict may be smaller than the featureCollection size, if featureCollection contains boolean value items or items whose float-conversion returns in nan the value will be set to 'None'
     """
-    # get a dict object with id-value pairs for the featureCollection
-    indicator_idValueDict_targetDate = getIndicatorIDValueDict(featureCollection, targetDate)
+    targetDatePrefix = getTargetDateWithPropertyPrefix(targetDate)
+    compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
+    
+    targetValue = feature[targetDatePrefix]
+    compareValue = feature[compareDatePrefix]
+    if not isNoDataValue(compareValue) or not isNoDataValue(targetValue):
+        if float(compareValue) == 0:
+            resultValue = None
+            throwError("The reference value is zero, a computation is not possible.")
+        
+        resultValue = 100 * ((float(targetValue) - float(compareValue)) / float(compareValue))
 
-    # dict for compareDate can be null  
-    indicator_idValueDict_compareDate = getIndicatorIDValueDict(featureCollection, compareDate)
-
-    # return empty map if no value exists for the compare date
-    if indicator_idValueDict_compareDate is None or len(indicator_idValueDict_compareDate) == 0:
-        throwError("Change computation cannot be performed as compare date does not exist within data")
-
-    resultDict = {}
-
-    for key, value in indicator_idValueDict_targetDate.items():
-        compareValue = indicator_idValueDict_compareDate[key]
-        if not isNoDataValue(compareValue) or not isNoDataValue(value):
-            if float(compareValue) == 0:
-                resultDict[key] = None
-            
-            resultValue = 100 * ((float(value) - float(compareValue)) / float(compareValue))
-            resultDict[key] = resultValue
-
-    return resultDict
+    return resultValue
 
 def changeAbsolute_n_years(feature, targetDate, numberOfYears):
     """computes the new indicator for an absolute change compared to number of previous Years
@@ -2438,8 +2487,6 @@ def trend_consecutive_n_years(feature, targetDate, numberOfYears):
         dates.append(getSubstractNYearsDate_asString(targetDate, i))
     
     dates.append(targetDate)
-
-    resultDict = {}
 
     trend = computeTrend(feature, dates)
 

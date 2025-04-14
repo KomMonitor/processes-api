@@ -14,7 +14,7 @@ from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIO
 from pygeoapi.util import JobStatus
 
 from .. import  pykmhelper
-from ..util import dataio
+from ..pykmhelper import IndicatorCalculationType, IndicatorCollection, IndicatorType
 
 class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
@@ -107,15 +107,15 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, KommonitorResult, KommonitorJobSummary):
+            data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
         logger.debug("Starting execution...")
 
          # Load inputs
         inputs = config.inputs
         # Extract all relevant inputs
-        target_indicator_id = inputs["target_indicator_id"]
-        computation_indicator_id = inputs["computation_id"]
+        target_id = inputs["target_indicator_id"]
+        computation_id = inputs["computation_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         number_of_temporal_items = inputs["number_of_temporal_items"]
@@ -130,46 +130,45 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
 
+            ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
+            collection = IndicatorCollection()
+            collection.add_indicator(IndicatorType(computation_id, IndicatorCalculationType.COMPUTATION_INDICATOR))
+
             # query indicator metadate to check for errors occured
-            computation_indicator_metadata = indicators_controller.get_indicator_by_id(
-                computation_indicator_id)
-
-            target_indicator_metadata = indicators_controller.get_indicator_by_id(
-                target_indicator_id)
+            ti.meta = indicators_controller.get_indicator_by_id(
+                target_id)
             
-            # get applicable dates and compute all dates which have to get calculated according to the target_time schema
-            computation_indicator_applicable_dates = computation_indicator_metadata.applicable_dates
-            target_indicator_applicable_dates = target_indicator_metadata.applicable_dates
+            for indicator in collection.indicators:
+                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
+                indicator)
 
-            computation_indicator_applicable_spatial_units = []
-            for unit in computation_indicator_metadata.applicable_spatial_units:
-                computation_indicator_applicable_spatial_units.append(unit.spatial_unit_id)
-
-            all_times = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(computation_indicator_applicable_dates)])
-
+            # calculate intersection dates and all dates that have to be computed according to target_time schema
+            bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
+            
             for spatial_unit in target_spatial_units:
                 # Init results and job summary for current spatial unit
                 result.init_spatial_unit_result(spatial_unit)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # catch missing timestamp error
-                missing_dates = [date for date in all_times if not date in computation_indicator_applicable_dates]
-                if len(missing_dates) >= 1:
-                    job_summary.add_missing_timestamp_error("INDICATOR", computation_indicator_id, missing_dates)  
-                
+                if bool_missing_timestamp:
+                     collection.check_applicable_target_dates(job_summary)
+
                 # catch missing spatial unit error
-                if not spatial_unit in computation_indicator_applicable_spatial_units:
-                    job_summary.add_missing_spatial_unit_error(computation_indicator_id)
+                collection.check_applicable_spatial_units(spatial_unit, job_summary)
 
-                # catch missing spatial unit feature error
-                """
-                Endpoint of spatial unit controller api has to be implemented
-                """
+                # query the correct indicator for all Indicators in Collection
+                for indicator in collection.indicators:
+                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                        indicator, 
+                        spatial_unit)
+                    
+                collection.fetch_indicator_feature_time_series()
 
-                # query the correct indicator
-                computation_indicator = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                    computation_indicator_id,
-                    spatial_unit)
+                # get the intersection of all applicable su_features and check for missing spatial unit feature error
+                collection.find_intersection_applicable_su_features()
+                collection.check_applicable_spatial_unit_features(job_summary)
+
                 logger.debug("Retrieved required computation indicator successfully...")
                 
                 # find the function, that matches the requested pattern in inputs["temporal_type"]
@@ -183,23 +182,22 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
                 # iterate over all features an append the indicator
                 indicator_values = []  
                 try:
-                    for feature in computation_indicator:
+                    for feature in collection.intersection_su_features:
                         valueMapping = []
                         for targetTime in all_times:
-                            value = func(feature, targetTime, number_of_temporal_items)
+                            value = func(collection.indicators[computation_id].time_series[feature], targetTime, number_of_temporal_items)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
 
-                        spatialReferenceKey = feature["ID"]
-                        indicator_values.append({"spatialReferenceKey": spatialReferenceKey, "valueMapping": valueMapping})
+                        indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 except RuntimeError as r:
                     logger.error(r)
                     logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", computation_indicator_id, str(r))
+                    job_summary.add_processing_error("INDICATOR", computation_id, str(r))
     
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
                 job_summary.add_integrated_target_dates(all_times)
-                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_indicator_id, spatial_unit)
+                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_id, spatial_unit)
                 job_summary.complete_spatial_unit_summary()
 
                 result.add_indicator_values(indicator_values)

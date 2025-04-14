@@ -17,7 +17,7 @@ from pygeoapi.util import JobStatus
 
 from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
-# from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
+# from ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
 class KmIndicatorPromille(KommonitorProcess):
     detailed_process_description = ProcessDescription(
