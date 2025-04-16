@@ -38,18 +38,18 @@ class KmIndicatorDivide(KommonitorProcess):
                         "apiName": "indicator_division",
                         "formula": "$ \\frac{I_{1}}{I_{2}}  $",
                         "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
+                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
                         "inputBoxes": [
                            {
-                            "id": "computation_id_numerator",
+                            "id": "reference_id",
                             "title": "Notwendiger Dividend-Indikator",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "reference_id"
                             ]
                             },
                             {
-                            "id": "computation_id_denominator",
+                            "id": "computation_id",
                             "title": "Notwendiger Divisor-Indikator",
                             "description": "",
                             "contents": [
