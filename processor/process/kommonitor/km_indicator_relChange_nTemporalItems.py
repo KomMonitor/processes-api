@@ -130,10 +130,6 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 # catch missing spatial unit error
                 collection.check_applicable_spatial_units(spatial_unit, job_summary)
 
-                # catch missing spatial unit feature error
-                """
-                Endpoint of spatial unit controller api has to be implemented
-                """
                 # query the correct indicator for all Indicators in Collection
                 for indicator in collection.indicators:
                     collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
@@ -141,6 +137,10 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                         spatial_unit)
                     
                 collection.fetch_indicator_feature_time_series()
+
+                # get the intersection of all applicable su_features and check for missing spatial unit feature error
+                collection.find_intersection_applicable_su_features()
+                collection.check_applicable_spatial_unit_features(job_summary)
 
                 logger.debug("Retrieved required indicators successfully")
 
@@ -155,7 +155,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
                 try:
-                    for feature in collection.indicators[computation_id].time_series:
+                    for feature in collection.intersection_su_features:
                         valueMapping = []
                         for targetTime in all_times:
                             time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
