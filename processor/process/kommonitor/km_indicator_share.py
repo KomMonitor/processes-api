@@ -35,26 +35,26 @@ class KmIndicatorShare(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (Quotient zweier Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
+                        "apiName": "indicator_share",
+                        "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator",
+                        "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} $$",
+                        "dynamicFormula": "$$ \\frac{ sum_baseIndicators }{ I_{ref}} $$",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${indicatorName} [ ${unit} ]<br/>",
                         "inputBoxes": [
                            {
-                            "id": "computation_id_numerator",
-                            "title": "Notwendiger Dividend-Indikator",
+                            "id": "reference_id",
+                            "title": "Notwendiger Referenzindikator (Divisor)",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "reference_id"
                             ]
                             },
                             {
-                            "id": "computation_id_denominator",
-                            "title": "Notwendiger Divisor-Indikator",
+                            "id": "computation_ids",
+                            "title": "Notwendige (Basis-)Indikatoren (Dividend)",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "computation_ids"
                             ]
                             },
                         ]
