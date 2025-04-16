@@ -121,7 +121,7 @@ class KmIndicatorDivide(KommonitorProcess):
             for indicator in collection.indicators:
                 collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
                 indicator)
-
+            
             # calculate intersection dates and all dates that have to be computed according to target_time schema
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
@@ -137,42 +137,45 @@ class KmIndicatorDivide(KommonitorProcess):
                 # catch missing spatial unit error
                 collection.check_applicable_spatial_units(spatial_unit, job_summary)
 
-                # catch missing spatial unit feature error
-                """
-                Endpoint of spatial unit controller api has to be implemented
-                """
                 # query the correct indicator for numerator and denominator
                 for indicator in collection.indicators:
                     collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                         indicator, 
                         spatial_unit)
-                    print(indicator)
-                    print(collection.indicators[indicator].values)
 
                 collection.fetch_indicator_feature_time_series()
+
+                # get the intersection of all applicable su_features and check for missing spatial unit feature error
+                collection.find_intersection_applicable_su_features()
+                collection.check_applicable_spatial_unit_features(job_summary)
 
                 logger.debug("Retrieved required indicators successfully")
 
                 # iterate over all features an append the indicator
                 indicator_values = []  
-                try:
-                    for feature in collection.indicators[numerator_id].time_series:
-                        valueMapping = []
-                        for targetTime in all_times:
-                            time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            
-                            numeratorValue = collection.indicators[numerator_id].time_series[feature][time_with_prefix]
-                            denumeratorValue = collection.indicators[denominator_id].time_series[feature][time_with_prefix]
-                            
-                            value = float(numeratorValue) / float(denumeratorValue)
-                            valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
-                        
-                        indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
-                except RuntimeError as r:
-                    logger.error(r)
-                    logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", numerator_id, str(r))
+                
+                for feature in collection.intersection_su_features:
+                    valueMapping = []
+                    for targetTime in all_times:
+                        try:
+                            try:
+                                time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
+                                
+                                numeratorValue = collection.indicators[numerator_id].time_series[feature][time_with_prefix]
+                                denumeratorValue = collection.indicators[denominator_id].time_series[feature][time_with_prefix]
 
+                                value = float(numeratorValue) / float(denumeratorValue)
+                            except TypeError:
+                                value = None
+
+                            valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
+                        except (RuntimeError, ZeroDivisionError) as r:
+                            logger.error(r)
+                            logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
+                            job_summary.add_processing_error("INDICATOR", numerator_id, str(r))
+
+                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
+                
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
                 job_summary.add_integrated_target_dates(all_times)

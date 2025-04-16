@@ -586,10 +586,14 @@ def isNoDataValue(value):
     Returns:
         bool: returns 'True' if the value is a NoData Value (i. e. 'None', 'NaN')
     """
-    if math.isnan(float(value)) or value == None:
+    try: 
+        if math.isnan(float(value)) or value == None:
+            return True
+        else:
+            return False
+    except TypeError:
         return True
-    else:
-        return False
+
 
 def getTargetDateWithPropertyPrefix(targetDate):
     """Concatenates indicator date property prefix and submitted targetDate.
@@ -875,14 +879,13 @@ class IndicatorCollection:
 
     def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary):
         for indicator in self.indicators:
+            missing_su_features = []
             for feature in self.all_su_features:
-                missing_su_features = []
                 if not feature in self.indicators[indicator].applicable_su_features:
                     missing_su_features.append(feature)
 
             if len(missing_su_features) > 0:
                 job_summary.add_missing_spatial_unit_feature_error(indicator, missing_su_features)
-
 
     def fetch_indicator_feature_time_series(self):
         for indicator in self.indicators:

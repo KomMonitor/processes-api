@@ -17,7 +17,7 @@ from .. import  pykmhelper
 from ..pykmhelper import IndicatorCalculationType, IndicatorCollection, IndicatorType
 from ..util import dataio
 
-class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
+class KmIndicatorRelChangeRefDate(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_relChange_refDate",
         version="0.0.1",
@@ -25,6 +25,36 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
         description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
+                        "apiName": "indicator_division",
+                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
+                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
+                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
+                        "inputBoxes": [
+                           {
+                            "id": "computation_id_numerator",
+                            "title": "Notwendiger Dividend-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "computation_id_denominator",
+                            "title": "Notwendiger Divisor-Indikator",
+                            "description": "",
+                            "contents": [
+                                "computation_id"
+                            ]
+                            },
+                        ]
+                    }]
+                )
+            ]
         ),
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -103,10 +133,6 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 # catch missing spatial unit error
                 collection.check_applicable_spatial_units(spatial_unit, job_summary)
 
-                # catch missing spatial unit feature error
-                """
-                Endpoint of spatial unit controller api has to be implemented
-                """
                 # query the correct indicator for all Indicators in Collection
                 for indicator in collection.indicators:
                     collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
@@ -115,17 +141,19 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                     
                 collection.fetch_indicator_feature_time_series()
 
+                # get the intersection of all applicable su_features and check for missing spatial unit feature error
+                collection.find_intersection_applicable_su_features()
+                collection.check_applicable_spatial_unit_features(job_summary)
+
                 logger.debug("Retrieved required indicators successfully")
 
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
                 try:
-                    for feature in collection.indicators[computation_id].time_series:
+                    for feature in collection.intersection_su_features:
                         valueMapping = []
                         for targetTime in all_times:
-                            time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            
-                            value = pykmhelper.changeRelative_referenceDate_percent(collection.indicators[computation_id].time_series[feature], time_with_prefix, reference_date)
+                            value = pykmhelper.changeRelative_referenceDate_percent(collection.indicators[computation_id].time_series[feature], targetTime, reference_date)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         
                         indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
