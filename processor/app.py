@@ -30,7 +30,7 @@ APP.url_map.strict_slashes = API_RULES.strict_slashes
 APP.config['JSONIFY_PRETTYPRINT_REGULAR'] = CONFIG['server'].get('pretty_print', True)
 
 CORS(APP)
-cors = CORS(APP, resource={
+cors = CORS(APP, resources={
     r"/*":{
         "origins":KOMMONITOR_CORS_ORIGIN
     }
