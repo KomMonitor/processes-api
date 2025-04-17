@@ -31,6 +31,29 @@ class KmIndicatorSum(KommonitorProcess):
             ProcessJobControlOption.ASYNC_EXECUTE,
         ],
         additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
+                        "apiName": "indicator_division",
+                        "formula": "$ dummy  $",
+                        "legend": "<br/>$dummy$ ",
+                        "dynamicLegend": "<br/> $dummy$",
+                        "inputBoxes": [
+                           {
+                            "id": "dummy",
+                            "title": "dummy",
+                            "description": "dummy",
+                            "contents": [
+                                "dummy"
+                            ]
+                            }
+                            
+                        ]
+                    }]
+                )
+            ]
         ),
         inputs=KommonitorProcess.common_inputs | {
             "computation_ids": ProcessInput(

@@ -29,29 +29,21 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Veränderung absolut",
-                        "apiName": "indicator_change_absolute",
-                        "formula": "$ I_{N} - I_{M} $",
-                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
-                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
+                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
+                        "apiName": "indicator_division",
+                        "formula": "$ dummy  $",
+                        "legend": "<br/>$dummy$ ",
+                        "dynamicLegend": "<br/> $dummy$",
                         "inputBoxes": [
-                            {
-                            "id": "computation_id",
-                            "title": "Notwendiger Basis-Indikator",
-                            "description": "",
+                           {
+                            "id": "dummy",
+                            "title": "dummy",
+                            "description": "dummy",
                             "contents": [
-                                "computation_id"
-                            ]
-                            },
-                            {
-                            "id": "temporal_options",
-                            "title": "Notwendiger zeitlicher Bezug",
-                            "description": "",
-                            "contents": [
-                                "number_of_temporal_items",
-                                "temporal_type"
+                                "dummy"
                             ]
                             }
+                            
                         ]
                     }]
                 )

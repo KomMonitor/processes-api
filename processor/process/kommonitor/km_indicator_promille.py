@@ -35,28 +35,21 @@ class KmIndicatorPromille(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (Quotient zweier Indikatoren)",
+                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
                         "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ] <br/> $I_{2}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]",
+                        "formula": "$ dummy  $",
+                        "legend": "<br/>$dummy$ ",
+                        "dynamicLegend": "<br/> $dummy$",
                         "inputBoxes": [
                            {
-                            "id": "computation_id_numerator",
-                            "title": "Notwendiger Dividend-Indikator",
-                            "description": "",
+                            "id": "dummy",
+                            "title": "dummy",
+                            "description": "dummy",
                             "contents": [
-                                "computation_id"
+                                "dummy"
                             ]
-                            },
-                            {
-                            "id": "computation_id_denominator",
-                            "title": "Notwendiger Divisor-Indikator",
-                            "description": "",
-                            "contents": [
-                                "computation_id"
-                            ]
-                            },
+                            }
+                            
                         ]
                     }]
                 )
