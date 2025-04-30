@@ -124,6 +124,10 @@ class KmIndicatorSubtract(KommonitorProcess):
                 result.init_spatial_unit_result(spatial_unit)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
+                # query data-management-api to get all spatial unit features for the current spatial unit.
+                # store the list containing all features-IDs as an attribute for the collection
+                collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
+
                 # catch missing timestamp error
                 if bool_missing_timestamp:
                      collection.check_applicable_target_dates(job_summary)
@@ -147,10 +151,11 @@ class KmIndicatorSubtract(KommonitorProcess):
 
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
-                try:
-                    for feature in collection.intersection_su_features:
-                        valueMapping = []
-                        for targetTime in all_times:
+            
+                for feature in collection.intersection_su_features:
+                    valueMapping = []
+                    for targetTime in all_times:
+                        try:
                             time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
                             
                             compSum = 0
@@ -163,13 +168,15 @@ class KmIndicatorSubtract(KommonitorProcess):
 
                             value = refValue - compSum
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
-                        
-                        indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
-                except RuntimeError as r:
-                    logger.error(r)
-                    logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                    job_summary.add_processing_error("INDICATOR", reference_id, str(r))
+                        except (RuntimeError, TypeError) as r:
+                            logger.error(r)
+                            logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
+                            job_summary.add_processing_error("INDICATOR", reference_id, str(r))
+                            valueMapping.append({"indicatorValue": None, "timestamp": targetTime})
+    
 
+                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
+                
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
                 job_summary.add_integrated_target_dates(all_times)

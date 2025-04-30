@@ -7,11 +7,13 @@ from scipy import stats
 import numpy
 import geopandas as gpd
 import geojson
+import json
 import math
 import shapely
 import datetime
 from logging import Logger
 from enum import Enum
+import openapi_client
 from openapi_client import IndicatorOverviewType
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
 from typing import Optional, Tuple
@@ -828,6 +830,15 @@ class IndicatorCollection:
     def add_indicator(self, indicator: IndicatorType):
         self.indicators[indicator.id] = indicator
 
+    def fetch_all_spatial_unit_features(self, spatial_unit_controller, spatial_unit: str):
+        # query data-management-api to get all spatial unit features for the current spatial unit.
+        # store the list containing all features-IDs as an attribute for the collection
+        response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+        geojson_all_features = json.loads(response_data.data)
+
+        self.all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+
+
     def find_intersection_target_dates_from_meta(self):
         listApplicableDates = [] 
 
@@ -855,13 +866,13 @@ class IndicatorCollection:
             listApplicableSuFeatures.append(set(self.indicators[item].applicable_su_features))
         
         intersection = listApplicableSuFeatures[0].copy()
-        union = listApplicableSuFeatures[0].copy()
+        # union = listApplicableSuFeatures[0].copy()
         for su_features in listApplicableSuFeatures[1:]:
             intersection.intersection_update(su_features)
-            union = union | su_features
+            # union = union | su_features
 
         self.intersection_su_features = intersection
-        self.all_su_features = union
+        # self.all_su_features = union
 
     def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
         for indicator in self.indicators:
@@ -2316,6 +2327,8 @@ def getChange_absolute(feature, targetDate, compareDate):
 
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         resultValue = float(targetValue) - float(compareValue)
+    else: 
+        resultValue = None
         
     return resultValue
 
@@ -2341,7 +2354,8 @@ def getChange_relative_percent(feature, targetDate, compareDate):
             throwError("The reference value is zero, a computation is not possible.")
         
         resultValue = 100 * ((float(targetValue) - float(compareValue)) / float(compareValue))
-
+    else:
+        resultValue = None
     return resultValue
 
 def changeAbsolute_n_years(feature, targetDate, numberOfYears):
@@ -2573,6 +2587,8 @@ def computeTrend(feature, dates):
         indicatorValue = getIndicatorValue(feature, date)
         if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
             indicatorValueArray.append(indicatorValue)
+        else:
+            indicatorValueArray.append(None)
 
     # make sure that feature has relevant date properties
     if not len(dates) == len(indicatorValueArray):
@@ -2657,7 +2673,7 @@ def computeContinuity(feature, dates):
             indicatorValueArray.append(indicatorValue)
 
     if not len(dates) == len(indicatorValueArray):
-        log("Error during Pearson Correlation. Length of input arrays are not equal.")
+        throwError("Error during Pearson Correlation. Length of input arrays are not equal.")
         return None
 
     for i in range(len(dates), 0, -1):

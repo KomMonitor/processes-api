@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Optional
 import logging
 
@@ -129,6 +130,10 @@ class KmIndicatorDivide(KommonitorProcess):
                 # Init results and job summary for current spatial unit
                 result.init_spatial_unit_result(spatial_unit)
                 job_summary.init_spatial_unit_summary(spatial_unit)
+
+                # query data-management-api to get all spatial unit features for the current spatial unit.
+                # store the list containing all features-IDs as an attribute for the collection
+                collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
 
                 # catch missing timestamp error
                 if bool_missing_timestamp:
