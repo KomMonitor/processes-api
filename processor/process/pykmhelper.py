@@ -3,6 +3,8 @@
 import necessary Node Module Dependencies
 
 """
+import copy
+
 from scipy import stats
 import numpy
 import geopandas as gpd
@@ -495,7 +497,7 @@ def getPropertyValueArray(featureCollection, propertyName):
             log("A feature did not contain a property value for the propertyName " + str(propertyName) + ". Feature was: " + str(feature))
     
     if len(resultArray) == 0:
-        log("No feature of the featureCollection contains a property value for the specified propertyName " + str(propertyName) + ". Thus return null.")
+        throwError("No feature of the featureCollection contains a property value for the specified propertyName " + str(propertyName) + ". Thus return null.")
         return None
     
     return resultArray
@@ -761,31 +763,56 @@ def applyComputationFilter(valueArray, computationFilterOperator, computationFil
 
     return filteredArray    
 
-def applyComputationMethod(spatialUnitFeat, targetDate, valueArray, computationMethod):
+def applyComputationMethod(valueArray, computationMethod):
     """applys a computation method to a submitted value array and sets the features indicator value to the computed value.
 
     Args:
-        spatialUnitFeat (Feature): the feature which indicator value shall be set.
-        targetDate (String): the date for which the indicator value shall be set.
         valueArray (Array): the array which is used for computation of the value
         computationMethod (string): the method used to compute the value (i.e. sum, min, mean ...) 
     """
     if computationMethod == "SUM":
-        setIndicatorValue(spatialUnitFeat, targetDate, sum(valueArray))
+        value = sum(valueArray)
+        return float(value)
     elif computationMethod == "MIN":
-        setIndicatorValue(spatialUnitFeat, targetDate, min(valueArray))
+        value = min(valueArray)
+        return float(value)
     elif computationMethod == "MAX":
-        setIndicatorValue(spatialUnitFeat, targetDate, max(valueArray))
+        value = max(valueArray)
+        return float(value)
     elif computationMethod == "MEAN":
-        setIndicatorValue(spatialUnitFeat, targetDate, mean(valueArray))
+        value = mean(valueArray)
+        return float(value)
     elif computationMethod == "MEDIAN":
-        setIndicatorValue(spatialUnitFeat, targetDate, median(valueArray))
+        value = median(valueArray)
+        return float(value)
     elif computationMethod == "STANDARD_DEVIATION":
-        setIndicatorValue(spatialUnitFeat, targetDate, standardDeviation(valueArray))
+        value = standardDeviation(valueArray, True)
+        return float(value)
     else:
-        log("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
-        setIndicatorValue(spatialUnitFeat, targetDate, None)
+        throwError("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
 
+def filter_feature_lifespan(feature_collection, targetDate: str):
+    targetDate = formatStringAsDate(targetDate)
+
+    result_collection = copy.deepcopy(feature_collection)
+    del result_collection["features"]
+    result_collection["features"] = []
+
+    for feature in feature_collection["features"]:
+        startDate = formatStringAsDate(feature["properties"]["validStartDate"])
+        if "validEndDate" in feature["properties"]:
+            endDate = formatStringAsDate(feature["properties"]["validEndDate"])
+        else: 
+            endDate = datetime.date.today()
+
+        if startDate <= targetDate <= endDate:
+            result_collection["features"].append(feature)
+
+    if len(result_collection["features"]) == 0 and len(feature_collection["features"]) > 0:
+        throwError(f"None of the features has a lifespan which contains the requested date: {targetDate}")
+
+    return result_collection
+    
 # Classes designed for use in km-script-resources
 
 class IndicatorCalculationType(str, Enum):
@@ -833,10 +860,7 @@ class IndicatorCollection:
     def fetch_all_spatial_unit_features(self, spatial_unit_controller, spatial_unit: str):
         # query data-management-api to get all spatial unit features for the current spatial unit.
         # store the list containing all features-IDs as an attribute for the collection
-        response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
-        geojson_all_features = json.loads(response_data.data)
-
-        self.all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+        self.all_su_features = fetch_spatial_unit_features(spatial_unit_controller, spatial_unit)
 
 
     def find_intersection_target_dates_from_meta(self):
@@ -910,7 +934,25 @@ class IndicatorCollection:
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
-        
+    
+
+def fetch_spatial_unit_features(spatial_unit_controller, spatial_unit: str):
+    """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
+
+    Args:
+        spatial_unit_controller (SpatialUnitControllerApi): the openapi client for querying spatial unit data
+        spatial_unit (str): the string ID which identifies the spatial unit
+
+    Returns:
+        List: returns a list containing all spatial unit features which belong to the spatial unit
+    """
+    response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+    geojson_all_features = json.loads(response_data.data)
+
+    all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+
+    return all_su_features
+
 def getTargetDate_without_prefix(dateWithPrefix: str):
     """Removes the date prefix from a submitted date string
 
@@ -1559,10 +1601,16 @@ def pointsWithinPolygon(points, polygons):
     gdfPoints = geoJSONtoGDF(points)
     gdfPolygons = geoJSONtoGDF(polygons)
 
+    if "validEndDate" in polygons["properties"]:
+        gdfPolygons = gdfPolygons.drop(columns=["validStartDate", "validEndDate"])
+    else:
+        gdfPolygons = gdfPolygons.drop(columns=["validStartDate"])
+
     joint = gdfPoints.sjoin(gdfPolygons, predicate="within")
-    gdfOut = joint.drop(columns=["index_right", "id"])
-    
-    featureOut = geojson.loads(gdfOut.to_json(drop_id=True))
+    # print(joint)
+    # gdfOut = joint.drop(columns=["index_right", "id"])
+
+    featureOut = geojson.loads(joint.to_json(drop_id=True))
     return featureOut
 
 
@@ -1682,11 +1730,15 @@ def nearestPoint_waypathDistance():
     return None
 
 
+
+
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 API_HELPER_METHODS_STATISTICAL_OPERATIONS
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 
 def convertPropertyArrayToNumberArray(propertyArray):
     """Takes a property array of arbitrary input objects and returns a valueArray of numeric values which have been converted to a number by. 
@@ -1703,13 +1755,7 @@ def convertPropertyArrayToNumberArray(propertyArray):
     
     for value in propertyArray:
         try:
-            if value is True or value is False:
-                
-                exit    
-            elif math.isnan(float(value)):
-                exit
-            else:
-                numericArray.append(float(value))
+           numericArray.append(float(value))
         except:
             print(str(value) + " is not convertible to float!")
 
