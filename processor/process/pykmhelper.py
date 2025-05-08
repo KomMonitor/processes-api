@@ -721,8 +721,50 @@ def transformMultiPolygonsToPolygons(featureCollection):
 #############################################################################################################################################
 # API_HELPER_METHODS_UTILITY   --   with the special purpose to reduce content in the computation scripts at 'KomMonitor-Script-Ressources' #  
 #############################################################################################################################################
+def bool_filterValue_byOperator(currentValue: str, computationFilterOperator: str, computationFilterValue: str):
+    if computationFilterOperator == "Equal":
+        return currentValue == computationFilterValue
+    elif computationFilterOperator == "Unequal":
+        return currentValue != computationFilterValue
+    elif computationFilterOperator == "Greater_than":
+        return currentValue > computationFilterValue
+    elif computationFilterOperator == "Less_than":
+        return currentValue < computationFilterValue
+    elif computationFilterOperator == "Greater_than_or_equal":
+        return currentValue >= computationFilterValue
+    elif computationFilterOperator == "Less_than_or_equal":
+        return currentValue <= computationFilterValue
+    elif computationFilterOperator == "Contains":
+        computationFilterPropertyValueArray = computationFilterValue.split(",")
+        
+        for trimmed_element in (element.strip() for element in computationFilterPropertyValueArray):
+            if trimmed_element == currentValue:
+                return True
+        
+        return False
+    elif computationFilterOperator == "Range":
+        value = int(currentValue)
+        computationFilterPropertyValueArray = computationFilterValue.split("-")
+        computationFilterPropertyValueArray = map(lambda x: int(x), computationFilterPropertyValueArray)
 
-def applyComputationFilter(valueArray, computationFilterOperator, computationFilterPropertyValue):
+        return currentValue >= computationFilterPropertyValueArray[0] and currentValue < computationFilterPropertyValueArray[1]
+     
+    else:
+        raise ValueError(f"Ungültiger computationFilterOperator: {computationFilterOperator}")
+    
+
+def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: str, computationFilterOperator: str, computationFilterPropertyValue: str):
+    result_collection = copy.deepcopy(featureCollection)
+    del result_collection["features"]
+    result_collection["features"] = []
+
+    for feature in featureCollection["features"]:
+        if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
+            result_collection["features"].append(feature)
+    
+    return result_collection
+
+def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, computationFilterPropertyValue):
     """applys a computation filter to a submitted value array and returns the filtered Array. Several filter operators are valid.
 
     Args:
@@ -792,6 +834,15 @@ def applyComputationMethod(valueArray, computationMethod):
         throwError("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
 
 def filter_feature_lifespan(feature_collection, targetDate: str):
+    """Applys a filter on a feature collection. Therefore it gets checked, whether a specified "targetDate" is included in the lifespan of each feature of the collection.
+
+    Args:
+        feature_collection (FeatureCollection): a valid GeoJSON Feature Collection with a number of features the shall be filtered
+        targetDate (str): a date in the form 'YYYY-MM-DD' which should be inside the features lifespan
+
+    Returns:
+        FeatureCollection: returns the FeatureCollection where all features are valid for the submitted targetDate
+    """
     targetDate = formatStringAsDate(targetDate)
 
     result_collection = copy.deepcopy(feature_collection)

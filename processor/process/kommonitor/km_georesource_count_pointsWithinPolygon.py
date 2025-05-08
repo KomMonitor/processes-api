@@ -19,9 +19,9 @@ from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 # from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
-class KmGeoresourceMiscStatistics(KommonitorProcess):
+class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_georesource_miscStatistics",
+        id="km_georesource_count_pointsWithinPolygon",
         version="0.0.1",
         title="Division zweier Indikatoren",
         description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
@@ -69,17 +69,67 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             ),
-            "compProp": ProcessInput(
-                id= "compProp",
-                title="Numerische Objekteigenschaft.",
+            "compFilterProp": ProcessInput(
+                id= "compFilterProp",
+                title="Objekteigenschaft.",
                 description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None),
             ),
-            "compMeth": ProcessInput(
-                id= "compMeth",
-                title="Auswahl der statistischen Berechnungsmethode",
-                description="Zu verwendende statistische Berechnungsmethode",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            "compFilterOperator": ProcessInput(
+                id= "compFilterOperator",
+                title="Operator der Filteroption",
+                description="Zu verwendender Operator für die Objektfilterung",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    enum=[
+                        {
+                            "apiName": "Equal",
+                            "displayName": "Gleich"
+                        },
+                        {
+                            "apiName": "Greater_than",
+                            "displayName": "Groeßer als"
+                        },
+                        {
+                            "apiName": "Greater_than_or_equal",
+                            "displayName": "Groeßer als oder gleich"
+                        },
+                        {
+                            "apiName": "Less_than",
+                            "displayName": "Kleiner als"
+                        },
+                        {
+                            "apiName": "Less_than_or_equal",
+                            "displayName": "Kleiner als oder gleich"
+                        },
+                        {
+                            "apiName": "Unequal",
+                            "displayName": "Ungleich"
+                        },
+                        {
+                            "apiName": "Contains",
+                            "displayName": "Enthaelt (Komma separierte Liste)"
+                        },
+                        {
+                            "apiName": "Range",
+                            "displayName": "Innerhalb"
+                        },
+                        {
+                            "apiName": "None",
+                            "displayName": "Ungefiltert"
+                        }
+                    ],
+                    default={
+                        "apiName": "None",
+                        "displayName": "Ungefiltert"
+                    }
+                )
+            ),
+            "compFilterPropVal": ProcessInput(
+                id= "compFilterPropVal",
+                title="Filterwert",
+                description="Wert nach dem die Objekte gefiltert werden sollen",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None)
             )
         }, 
         outputs = KommonitorProcess.common_output
@@ -101,8 +151,9 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         computation_georecources_id = inputs["compGeoId"]
-        computation_property = inputs["compProp"]
-        computation_method = inputs["compMeth"]
+        computation_filter_property = inputs["compFilterProp"]
+        computation_filter_operator = inputs["compFilterOperator"]
+        computation_filter_value = inputs["compFilterPropVal"]
 
         # Init object to store computation results
         result = KommonitorResult()
@@ -137,18 +188,20 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 georesource = georesources_controller.get_all_georesource_features_by_id_without_preload_content(computation_georecources_id)
                 georesource_collection = json.loads(georesource.data)
 
+                # apply the selected computation filter on the FeatureCollection
+                if computation_filter_operator != "None":
+                    georesource_collection = pykmhelper.applyComputationFilter_onFeatureCollection(georesource_collection, computation_filter_property, computation_filter_operator, computation_filter_value)
+
                 # iterate over all features of the spatial unit an append the indicator
                 indicator_values = []  
-
 
                 for feature in su_feature_collection["features"]:
                     valueMapping = []
                     for targetTime in allDates:
                         try:
                             points_in_polygon = pykmhelper.pointsWithinPolygon(georesource_collection, feature)
-                            filtered_points = pykmhelper.filter_feature_lifespan(points_in_polygon, targetTime)
-                            propertyValueArray = pykmhelper.getPropertyValueArray(filtered_points, computation_property)
-                            value = pykmhelper.applyComputationMethod(propertyValueArray, computation_method)
+                            collection_filtered_points = pykmhelper.filter_feature_lifespan(points_in_polygon, targetTime)
+                            value = len(collection_filtered_points["features"])
 
                         except (RuntimeError, ZeroDivisionError) as r:
                             logger.error(r)
