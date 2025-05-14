@@ -36,20 +36,21 @@ class KmIndicatorMultiply(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_multiplication",
+                        "calculation_info": "Produkt aller (Basis-)Indikatoren",
+                        "formula": "$ \\prod_{n=1}^{m} I_{n} $",
+                        "legend": "",
+                        "dynamicFormula": "$$ prod_baseIndicators $$",
+                        "dynamicLegend": "${list_baseIndicators}",
                         "inputBoxes": [
-                           {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
-                            "contents": [
-                                "dummy"
-                            ]
+                            {
+                                "id": "computation_ids",
+                                "title": "Notwendige (Basis-)Indikatoren (Faktoren)",
+                                "description": "",
+                                "contents": [
+                                    "computation_ids"
+                                ]
                             }
-                            
                         ]
                     }]
                 )
