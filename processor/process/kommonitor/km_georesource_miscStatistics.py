@@ -19,9 +19,9 @@ from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 # from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
-class KmIndicatorDivide(KommonitorProcess):
+class KmGeoresourceMiscStatistics(KommonitorProcess):
     detailed_process_description = ProcessDescription(
-        id="km_indicator_divide",
+        id="km_georesource_miscStatistics",
         version="0.0.1",
         title="Division zweier Indikatoren",
         description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
@@ -63,16 +63,22 @@ class KmIndicatorDivide(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "computation_id_numerator": ProcessInput(
-                id= "COMPUTATION_ID_NUMERATOR",
-                title="Auswahl des für die Berechnung erforderlichen Dividenden",
-                description="Indikatoren-ID des Basisindikators.",
+            "compGeoId": ProcessInput(
+                id= "compGeoId",
+                title="Auswahl der für die Berechnung erforderlichen Georesource",
+                description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             ),
-            "computation_id_denominator": ProcessInput(
-                id= "COMPUTATION_ID_DENOMINATOR",
-                title="Auswahl des für die Berechnung erforderlichen Divisors",
-                description="Indikatoren-ID des Basisindikators.",
+            "compProp": ProcessInput(
+                id= "compProp",
+                title="Numerische Objekteigenschaft.",
+                description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+            ),
+            "compMeth": ProcessInput(
+                id= "compMeth",
+                title="Auswahl der statistischen Berechnungsmethode",
+                description="Zu verwendende statistische Berechnungsmethode",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             )
         }, 
@@ -89,14 +95,15 @@ class KmIndicatorDivide(KommonitorProcess):
 
          # Load inputs
         inputs = config.inputs
+
         # Extract all relevant inputs
         target_id = inputs["target_indicator_id"]
-        numerator_id = inputs["computation_id_numerator"]
-        denominator_id = inputs["computation_id_denominator"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        
-        
+        computation_georecources_id = inputs["compGeoId"]
+        computation_property = inputs["compProp"]
+        computation_method = inputs["compMeth"]
+
         # Init object to store computation results
         result = KommonitorResult()
         job_summary = KommonitorJobSummary()
@@ -105,85 +112,57 @@ class KmIndicatorDivide(KommonitorProcess):
             # 3. Generate result || Main Script    
             indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
             spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
+            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
-            ni = IndicatorType(numerator_id, IndicatorCalculationType.NUMERATOR_INDICATOR)
-            di = IndicatorType(denominator_id, IndicatorCalculationType.DENOMINATOR_INDICATOR)
-
-            collection = IndicatorCollection()
-            collection.add_indicator(ni)
-            collection.add_indicator(di)
-
+            
             # query indicator metadate to check for errors occured
             ti.meta = indicators_controller.get_indicator_by_id(
                 target_id)
             
-            for indicator in collection.indicators:
-                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
-                indicator)
+            # extract all dates
+            allDates = target_time["includeDates"]
             
-            # calculate intersection dates and all dates that have to be computed according to target_time schema
-            bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
-
             for spatial_unit in target_spatial_units:
                 # Init results and job summary for current spatial unit
                 result.init_spatial_unit_result(spatial_unit)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
-                # store the list containing all features-IDs as an attribute for the collection
-                collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
+                response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+                su_feature_collection = json.loads(response_data.data)
 
-                # catch missing timestamp error
-                if bool_missing_timestamp:
-                     collection.check_applicable_target_dates(job_summary)
+                # fetch the georesource feature collection
+                georesource = georesources_controller.get_all_georesource_features_by_id_without_preload_content(computation_georecources_id)
+                georesource_collection = json.loads(georesource.data)
 
-                # catch missing spatial unit error
-                collection.check_applicable_spatial_units(spatial_unit, job_summary)
-
-                # query the correct indicator for numerator and denominator
-                for indicator in collection.indicators:
-                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                        indicator, 
-                        spatial_unit)
-
-                collection.fetch_indicator_feature_time_series()
-
-                # get the intersection of all applicable su_features and check for missing spatial unit feature error
-                collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
-
-                logger.debug("Retrieved required indicators successfully")
-
-                # iterate over all features an append the indicator
+                # iterate over all features of the spatial unit an append the indicator
                 indicator_values = []  
-                
-                for feature in collection.intersection_su_features:
+
+
+                for feature in su_feature_collection["features"]:
                     valueMapping = []
-                    for targetTime in all_times:
+                    for targetTime in allDates:
                         try:
-                            try:
-                                time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                                
-                                numeratorValue = collection.indicators[numerator_id].time_series[feature][time_with_prefix]
-                                denumeratorValue = collection.indicators[denominator_id].time_series[feature][time_with_prefix]
+                            points_in_polygon = pykmhelper.pointsWithinPolygon(georesource_collection, feature)
+                            filtered_points = pykmhelper.filter_feature_lifespan(points_in_polygon, targetTime)
+                            propertyValueArray = pykmhelper.getPropertyValueArray(filtered_points, computation_property)
+                            value = pykmhelper.applyComputationMethod(propertyValueArray, computation_method)
 
-                                value = float(numeratorValue) / float(denumeratorValue)
-                            except TypeError:
-                                value = None
-
-                            valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         except (RuntimeError, ZeroDivisionError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("INDICATOR", numerator_id, str(r))
+                            job_summary.add_processing_error("GEORESOURCE", computation_georecources_id, str(r))
+                            value = None
 
-                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
-                
+                        valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
+
+                    indicator_values.append({"spatialReferenceKey": feature["properties"]["ID"], "valueMapping": valueMapping})
+
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
-                job_summary.add_integrated_target_dates(all_times)
+                job_summary.add_integrated_target_dates(allDates)
                 job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_id, spatial_unit)
                 job_summary.complete_spatial_unit_summary()
 

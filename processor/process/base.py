@@ -22,7 +22,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
-
+import pyinstrument
 
 @dataclass
 class KommonitorProcessConfig:
@@ -474,6 +474,7 @@ class KommonitorProcess(BasePrefectProcessor):
             for res in result.values:
                 indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
                 res["allowedRoles"] = []
+                print(res)
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(
                         indicator_id=indicator_id,

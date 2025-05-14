@@ -3,15 +3,19 @@
 import necessary Node Module Dependencies
 
 """
+import copy
+
 from scipy import stats
 import numpy
 import geopandas as gpd
 import geojson
+import json
 import math
 import shapely
 import datetime
 from logging import Logger
 from enum import Enum
+import openapi_client
 from openapi_client import IndicatorOverviewType
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
 from typing import Optional, Tuple
@@ -493,7 +497,7 @@ def getPropertyValueArray(featureCollection, propertyName):
             log("A feature did not contain a property value for the propertyName " + str(propertyName) + ". Feature was: " + str(feature))
     
     if len(resultArray) == 0:
-        log("No feature of the featureCollection contains a property value for the specified propertyName " + str(propertyName) + ". Thus return null.")
+        throwError("No feature of the featureCollection contains a property value for the specified propertyName " + str(propertyName) + ". Thus return null.")
         return None
     
     return resultArray
@@ -717,8 +721,50 @@ def transformMultiPolygonsToPolygons(featureCollection):
 #############################################################################################################################################
 # API_HELPER_METHODS_UTILITY   --   with the special purpose to reduce content in the computation scripts at 'KomMonitor-Script-Ressources' #  
 #############################################################################################################################################
+def bool_filterValue_byOperator(currentValue: str, computationFilterOperator: str, computationFilterValue: str):
+    if computationFilterOperator == "Equal":
+        return currentValue == computationFilterValue
+    elif computationFilterOperator == "Unequal":
+        return currentValue != computationFilterValue
+    elif computationFilterOperator == "Greater_than":
+        return currentValue > computationFilterValue
+    elif computationFilterOperator == "Less_than":
+        return currentValue < computationFilterValue
+    elif computationFilterOperator == "Greater_than_or_equal":
+        return currentValue >= computationFilterValue
+    elif computationFilterOperator == "Less_than_or_equal":
+        return currentValue <= computationFilterValue
+    elif computationFilterOperator == "Contains":
+        computationFilterPropertyValueArray = computationFilterValue.split(",")
+        
+        for trimmed_element in (element.strip() for element in computationFilterPropertyValueArray):
+            if trimmed_element == currentValue:
+                return True
+        
+        return False
+    elif computationFilterOperator == "Range":
+        value = int(currentValue)
+        computationFilterPropertyValueArray = computationFilterValue.split("-")
+        computationFilterPropertyValueArray = map(lambda x: int(x), computationFilterPropertyValueArray)
 
-def applyComputationFilter(valueArray, computationFilterOperator, computationFilterPropertyValue):
+        return currentValue >= computationFilterPropertyValueArray[0] and currentValue < computationFilterPropertyValueArray[1]
+     
+    else:
+        raise ValueError(f"Ungültiger computationFilterOperator: {computationFilterOperator}")
+    
+
+def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: str, computationFilterOperator: str, computationFilterPropertyValue: str):
+    result_collection = copy.deepcopy(featureCollection)
+    del result_collection["features"]
+    result_collection["features"] = []
+
+    for feature in featureCollection["features"]:
+        if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
+            result_collection["features"].append(feature)
+    
+    return result_collection
+
+def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, computationFilterPropertyValue):
     """applys a computation filter to a submitted value array and returns the filtered Array. Several filter operators are valid.
 
     Args:
@@ -759,31 +805,65 @@ def applyComputationFilter(valueArray, computationFilterOperator, computationFil
 
     return filteredArray    
 
-def applyComputationMethod(spatialUnitFeat, targetDate, valueArray, computationMethod):
+def applyComputationMethod(valueArray, computationMethod):
     """applys a computation method to a submitted value array and sets the features indicator value to the computed value.
 
     Args:
-        spatialUnitFeat (Feature): the feature which indicator value shall be set.
-        targetDate (String): the date for which the indicator value shall be set.
         valueArray (Array): the array which is used for computation of the value
         computationMethod (string): the method used to compute the value (i.e. sum, min, mean ...) 
     """
     if computationMethod == "SUM":
-        setIndicatorValue(spatialUnitFeat, targetDate, sum(valueArray))
+        value = sum(valueArray)
+        return float(value)
     elif computationMethod == "MIN":
-        setIndicatorValue(spatialUnitFeat, targetDate, min(valueArray))
+        value = min(valueArray)
+        return float(value)
     elif computationMethod == "MAX":
-        setIndicatorValue(spatialUnitFeat, targetDate, max(valueArray))
+        value = max(valueArray)
+        return float(value)
     elif computationMethod == "MEAN":
-        setIndicatorValue(spatialUnitFeat, targetDate, mean(valueArray))
+        value = mean(valueArray)
+        return float(value)
     elif computationMethod == "MEDIAN":
-        setIndicatorValue(spatialUnitFeat, targetDate, median(valueArray))
+        value = median(valueArray)
+        return float(value)
     elif computationMethod == "STANDARD_DEVIATION":
-        setIndicatorValue(spatialUnitFeat, targetDate, standardDeviation(valueArray))
+        value = standardDeviation(valueArray, True)
+        return float(value)
     else:
-        log("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
-        setIndicatorValue(spatialUnitFeat, targetDate, None)
+        throwError("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
 
+def filter_feature_lifespan(feature_collection, targetDate: str):
+    """Applys a filter on a feature collection. Therefore it gets checked, whether a specified "targetDate" is included in the lifespan of each feature of the collection.
+
+    Args:
+        feature_collection (FeatureCollection): a valid GeoJSON Feature Collection with a number of features the shall be filtered
+        targetDate (str): a date in the form 'YYYY-MM-DD' which should be inside the features lifespan
+
+    Returns:
+        FeatureCollection: returns the FeatureCollection where all features are valid for the submitted targetDate
+    """
+    targetDate = formatStringAsDate(targetDate)
+
+    result_collection = copy.deepcopy(feature_collection)
+    del result_collection["features"]
+    result_collection["features"] = []
+
+    for feature in feature_collection["features"]:
+        startDate = formatStringAsDate(feature["properties"]["validStartDate"])
+        if "validEndDate" in feature["properties"]:
+            endDate = formatStringAsDate(feature["properties"]["validEndDate"])
+        else: 
+            endDate = datetime.date.today()
+
+        if startDate <= targetDate <= endDate:
+            result_collection["features"].append(feature)
+
+    if len(result_collection["features"]) == 0 and len(feature_collection["features"]) > 0:
+        throwError(f"None of the features has a lifespan which contains the requested date: {targetDate}")
+
+    return result_collection
+    
 # Classes designed for use in km-script-resources
 
 class IndicatorCalculationType(str, Enum):
@@ -828,6 +908,12 @@ class IndicatorCollection:
     def add_indicator(self, indicator: IndicatorType):
         self.indicators[indicator.id] = indicator
 
+    def fetch_all_spatial_unit_features(self, spatial_unit_controller, spatial_unit: str):
+        # query data-management-api to get all spatial unit features for the current spatial unit.
+        # store the list containing all features-IDs as an attribute for the collection
+        self.all_su_features = fetch_spatial_unit_features(spatial_unit_controller, spatial_unit)
+
+
     def find_intersection_target_dates_from_meta(self):
         listApplicableDates = [] 
 
@@ -855,13 +941,13 @@ class IndicatorCollection:
             listApplicableSuFeatures.append(set(self.indicators[item].applicable_su_features))
         
         intersection = listApplicableSuFeatures[0].copy()
-        union = listApplicableSuFeatures[0].copy()
+        # union = listApplicableSuFeatures[0].copy()
         for su_features in listApplicableSuFeatures[1:]:
             intersection.intersection_update(su_features)
-            union = union | su_features
+            # union = union | su_features
 
         self.intersection_su_features = intersection
-        self.all_su_features = union
+        # self.all_su_features = union
 
     def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
         for indicator in self.indicators:
@@ -899,7 +985,25 @@ class IndicatorCollection:
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
-        
+    
+
+def fetch_spatial_unit_features(spatial_unit_controller, spatial_unit: str):
+    """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
+
+    Args:
+        spatial_unit_controller (SpatialUnitControllerApi): the openapi client for querying spatial unit data
+        spatial_unit (str): the string ID which identifies the spatial unit
+
+    Returns:
+        List: returns a list containing all spatial unit features which belong to the spatial unit
+    """
+    response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+    geojson_all_features = json.loads(response_data.data)
+
+    all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+
+    return all_su_features
+
 def getTargetDate_without_prefix(dateWithPrefix: str):
     """Removes the date prefix from a submitted date string
 
@@ -1548,10 +1652,16 @@ def pointsWithinPolygon(points, polygons):
     gdfPoints = geoJSONtoGDF(points)
     gdfPolygons = geoJSONtoGDF(polygons)
 
+    if "validEndDate" in polygons["properties"]:
+        gdfPolygons = gdfPolygons.drop(columns=["validStartDate", "validEndDate"])
+    else:
+        gdfPolygons = gdfPolygons.drop(columns=["validStartDate"])
+
     joint = gdfPoints.sjoin(gdfPolygons, predicate="within")
-    gdfOut = joint.drop(columns=["index_right", "id"])
-    
-    featureOut = geojson.loads(gdfOut.to_json(drop_id=True))
+    # print(joint)
+    # gdfOut = joint.drop(columns=["index_right", "id"])
+
+    featureOut = geojson.loads(joint.to_json(drop_id=True))
     return featureOut
 
 
@@ -1671,11 +1781,15 @@ def nearestPoint_waypathDistance():
     return None
 
 
+
+
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 API_HELPER_METHODS_STATISTICAL_OPERATIONS
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 
 def convertPropertyArrayToNumberArray(propertyArray):
     """Takes a property array of arbitrary input objects and returns a valueArray of numeric values which have been converted to a number by. 
@@ -1692,13 +1806,7 @@ def convertPropertyArrayToNumberArray(propertyArray):
     
     for value in propertyArray:
         try:
-            if value is True or value is False:
-                
-                exit    
-            elif math.isnan(float(value)):
-                exit
-            else:
-                numericArray.append(float(value))
+           numericArray.append(float(value))
         except:
             print(str(value) + " is not convertible to float!")
 
@@ -2316,6 +2424,8 @@ def getChange_absolute(feature, targetDate, compareDate):
 
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         resultValue = float(targetValue) - float(compareValue)
+    else: 
+        resultValue = None
         
     return resultValue
 
@@ -2341,7 +2451,8 @@ def getChange_relative_percent(feature, targetDate, compareDate):
             throwError("The reference value is zero, a computation is not possible.")
         
         resultValue = 100 * ((float(targetValue) - float(compareValue)) / float(compareValue))
-
+    else:
+        resultValue = None
     return resultValue
 
 def changeAbsolute_n_years(feature, targetDate, numberOfYears):
@@ -2573,6 +2684,8 @@ def computeTrend(feature, dates):
         indicatorValue = getIndicatorValue(feature, date)
         if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
             indicatorValueArray.append(indicatorValue)
+        else:
+            indicatorValueArray.append(None)
 
     # make sure that feature has relevant date properties
     if not len(dates) == len(indicatorValueArray):
@@ -2657,7 +2770,7 @@ def computeContinuity(feature, dates):
             indicatorValueArray.append(indicatorValue)
 
     if not len(dates) == len(indicatorValueArray):
-        log("Error during Pearson Correlation. Length of input arrays are not equal.")
+        throwError("Error during Pearson Correlation. Length of input arrays are not equal.")
         return None
 
     for i in range(len(dates), 0, -1):
