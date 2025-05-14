@@ -128,7 +128,7 @@ class KmIndicatorDivide(KommonitorProcess):
 
             for spatial_unit in target_spatial_units:
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
@@ -197,4 +197,4 @@ class KmIndicatorDivide(KommonitorProcess):
         except ApiException as e:
 
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None
+            return JobStatus.failed, None, None

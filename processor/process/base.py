@@ -155,9 +155,12 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi):
+         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
+         su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
+
          self._su_result = {
-             "applicableSpatialUnit": spatial_unit_id
+             "applicableSpatialUnit": su_meta.spatial_unit_level
          }
 
     def complete_spatial_unit_result(self):

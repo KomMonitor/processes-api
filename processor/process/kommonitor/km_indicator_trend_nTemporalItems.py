@@ -185,7 +185,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                     valueMapping = []
                     for targetTime in all_times:
                         try:
-                            value = func(collection.indicators[computation_id].time_series[feature], time_with_prefix, number_of_temporal_items)
+                            value = func(collection.indicators[computation_id].time_series[feature], targetTime, number_of_temporal_items)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         except (TypeError, ZeroDivisionError, RuntimeError) as r:
                             logger.error(r)
@@ -211,4 +211,4 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
         except ApiException as e:
 
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None
+            return JobStatus.failed, None, None
