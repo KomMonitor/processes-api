@@ -35,21 +35,27 @@ class KmIndicatorPromille(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "titleShort": "Promille-Wert (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
+                        "apiName": "indicator_promille",
+                        "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} \\times 1000 $$",
+                        "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator multipliziert mit 1000",
                         "inputBoxes": [
                            {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
+                            "id": "reference_id",
+                            "title": "Notwendiger Referenzindikator (Divisor)",
+                            "description": "",
                             "contents": [
-                                "dummy"
+                                "reference_id"
                             ]
-                            }
-                            
+                            },
+                            {
+                            "id": "computation_ids",
+                            "title": "Notwendige (Basis-)Indikatoren (Dividend)",
+                            "description": "",
+                            "contents": [
+                                "computation_ids"
+                            ]
+                            },
                         ]
                     }]
                 )
