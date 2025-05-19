@@ -176,8 +176,11 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
             allDates = target_time["includeDates"]
             
             for spatial_unit in target_spatial_units:
+                # check for existing allowedRoles for the concatenation of indicator and spatial unit
+                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
+                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
@@ -209,7 +212,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                         except (RuntimeError, ZeroDivisionError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("GEORESOURCE", computation_georecources_id, str(r))
+                            job_summary.add_processing_error("GEORESOURCE", computation_georecources_id, str(r), targetTime, feature["properties"]["ID"])
                             value = None
 
                         valueMapping.append({"indicatorValue": value, "timestamp": targetTime})

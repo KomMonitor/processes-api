@@ -156,7 +156,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                         except RuntimeError as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("INDICATOR", computation_id, str(r))
+                            job_summary.add_processing_error("INDICATOR", computation_id, str(r), targetTime, feature)
     
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 

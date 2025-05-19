@@ -16,7 +16,7 @@ import datetime
 from logging import Logger
 from enum import Enum
 import openapi_client
-from openapi_client import IndicatorOverviewType
+from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, ApiException
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
 from typing import Optional, Tuple
 
@@ -722,23 +722,25 @@ def transformMultiPolygonsToPolygons(featureCollection):
 # API_HELPER_METHODS_UTILITY   --   with the special purpose to reduce content in the computation scripts at 'KomMonitor-Script-Ressources' #  
 #############################################################################################################################################
 def bool_filterValue_byOperator(currentValue: str, computationFilterOperator: str, computationFilterValue: str):
+    currentValue = float(currentValue)
+    
     if computationFilterOperator == "Equal":
-        return currentValue == computationFilterValue
+        return currentValue == float(computationFilterValue)
     elif computationFilterOperator == "Unequal":
-        return currentValue != computationFilterValue
+        return currentValue != float(computationFilterValue)
     elif computationFilterOperator == "Greater_than":
-        return currentValue > computationFilterValue
+        return currentValue > float(computationFilterValue)
     elif computationFilterOperator == "Less_than":
-        return currentValue < computationFilterValue
+        return currentValue < float(computationFilterValue)
     elif computationFilterOperator == "Greater_than_or_equal":
-        return currentValue >= computationFilterValue
+        return currentValue >= float(computationFilterValue)
     elif computationFilterOperator == "Less_than_or_equal":
-        return currentValue <= computationFilterValue
+        return currentValue <= float(computationFilterValue)
     elif computationFilterOperator == "Contains":
         computationFilterPropertyValueArray = computationFilterValue.split(",")
         
         for trimmed_element in (element.strip() for element in computationFilterPropertyValueArray):
-            if trimmed_element == currentValue:
+            if float(trimmed_element) == currentValue:
                 return True
         
         return False
@@ -865,7 +867,31 @@ def filter_feature_lifespan(feature_collection, targetDate: str):
     return result_collection
     
 # Classes designed for use in km-script-resources
+# class ProcessingError:
+#     resource_type: str
+#     dataset_id: str
+#     affectedTimestamps: list
+#     affectedSpatialUnitFeatures: list
+#     errorMessage: str    
+    
+# class ProcessingErrorList:
+#     errorList: list[ProcessingError]    
+    
+#     def __init__(self):
+#         self.errorList = []
 
+class DataManagementException(Exception):
+    id: str
+    resource_type: str
+    spatial_unit: str
+    
+    def __init__(self, message, id: str, resource_type: str, error_code, spatial_unit = None):
+        super().__init__(message)
+        self.id = id
+        self.resource_type = resource_type
+        self.error_code = error_code
+        self.spatial_unit = spatial_unit
+    
 class IndicatorCalculationType(str, Enum):
     TARGET_INDICATOR = "TARGET_INDICATOR"
     COMPUTATION_INDICATOR = "COMPUTATION_INDICATOR"
@@ -894,6 +920,27 @@ class IndicatorType:
         self.applicable_su = []
         self.applicable_su_features = []
     
+    def check_su_allowedRoles(self, spatialUnit: str):
+        for su in self.meta.applicable_spatial_units:
+            if su.spatial_unit_id == spatialUnit and len(su.allowed_roles) > 0:
+                return su.allowed_roles
+    
+        return self.meta.allowed_roles
+    
+    def get_indicator_by_id(self, indicator_controller: IndicatorsControllerApi):
+        try:
+            self.meta = indicator_controller.get_indicator_by_id(self.id)
+        except ApiException as e:
+            raise DataManagementException(e, self.id, "INDICATOR", e.status)
+        
+    def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsControllerApi, spatial_unit: str):
+        try:
+            self.values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                            self.id, 
+                            spatial_unit)
+        except ApiException as e:
+            raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit) 
+        
 class IndicatorCollection:
     intersection_su_features: list
     intersection_target_dates: set

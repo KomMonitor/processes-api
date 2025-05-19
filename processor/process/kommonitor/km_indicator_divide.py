@@ -16,7 +16,7 @@ from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIO
 from pygeoapi.util import JobStatus
 
 from .. import pykmhelper
-from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, DataManagementException
 # from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
 
 class KmIndicatorDivide(KommonitorProcess):
@@ -116,19 +116,23 @@ class KmIndicatorDivide(KommonitorProcess):
             collection.add_indicator(di)
 
             # query indicator metadate to check for errors occured
-            ti.meta = indicators_controller.get_indicator_by_id(
-                target_id)
+            # ti.meta = indicators_controller.get_indicator_by_id(
+            #    target_id)
+            ti.get_indicator_by_id(indicators_controller)
             
+            print(ti.meta)
             for indicator in collection.indicators:
-                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
-                indicator)
-            
+                collection.indicators[indicator].get_indicator_by_id(indicators_controller)
+                    
             # calculate intersection dates and all dates that have to be computed according to target_time schema
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
+                # check for existing allowedRoles for the concatenation of indicator and spatial unit
+                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
+                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
@@ -177,7 +181,8 @@ class KmIndicatorDivide(KommonitorProcess):
                         except (RuntimeError, ZeroDivisionError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("INDICATOR", numerator_id, str(r))
+                            job_summary.add_processing_error("INDICATOR", denumeratorValue, str(r), targetTime, feature)
+                            
 
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 
@@ -194,7 +199,13 @@ class KmIndicatorDivide(KommonitorProcess):
                 print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
-        except ApiException as e:
-
+        except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None, None
+            if e.spatial_unit:
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            else:
+                job_summary.init_spatial_unit_summary(target_spatial_units[0])
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()    
+            return JobStatus.failed, None, job_summary

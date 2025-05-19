@@ -152,14 +152,14 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
                 indicator_values = []
                 for feature in collection.intersection_su_features:
                     valueMapping = []
-                    for target_time in all_times:
+                    for targetTime in all_times:
                         try:
                             value = pykmhelper.changeAbsolute_referenceDate(collection.indicators[computation_id].time_series[feature], target_time, reference_date)
                             valueMapping.append({"indicatorValue": value, "timestamp": target_time})
                         except RuntimeError as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("INDICATOR", computation_id, str(r))
+                            job_summary.add_processing_error("INDICATOR", computation_id, str(r), targetTime, feature)
 
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 

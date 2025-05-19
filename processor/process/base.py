@@ -155,12 +155,13 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowedRoles: str):
          # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
          su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
          self._su_result = {
-             "applicableSpatialUnit": su_meta.spatial_unit_level
+             "applicableSpatialUnit": su_meta.spatial_unit_level,
+             "allowedRoles": allowedRoles,
          }
 
     def complete_spatial_unit_result(self):
@@ -281,14 +282,14 @@ class KommonitorJobSummary:
                 }
         )
 
-    def add_processing_error(self, resource_type: str, dataset_id: str, error_message: str):
+    def add_processing_error(self, resource_type: str, dataset_id: str, error_message: str, affectedTimestamps: str, affectedSpatialUnitFeatures: str):
         self._su_summary["errorsOccurred"].append(
             {
                 "type": "processingError",
                 "affectedResourceType": resource_type,
                 "affectedDatasetId": dataset_id,
-                "affectedTimestamps": [],
-                "affectedSpatialUnitFeatures": [],
+                "affectedTimestamps": [affectedTimestamps],
+                "affectedSpatialUnitFeatures": [affectedSpatialUnitFeatures],
                 "errorMessage": f"Error while processing {resource_type} with ID {dataset_id}: {error_message}."
             }
         )
@@ -463,6 +464,7 @@ class KommonitorProcess(BasePrefectProcessor):
         status, result, job_summary = p.run(config, logger, dmc)
         print(status)
         if status == JobStatus.failed:
+            
             output = {
                 "jobSummary": job_summary.summary,
                 "resultData": [],
@@ -476,7 +478,7 @@ class KommonitorProcess(BasePrefectProcessor):
             indicator_id = inputs["target_indicator_id"]
             for res in result.values:
                 indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
-                res["allowedRoles"] = []
+                # res["allowedRoles"] = []
                 print(res)
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(

@@ -178,7 +178,7 @@ class KmIndicatorShare(KommonitorProcess):
                         except (RuntimeError, ZeroDivisionError, TypeError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
-                            job_summary.add_processing_error("INDICATOR", reference_id, str(r))
+                            job_summary.add_processing_error("INDICATOR", reference_id, str(r), targetTime, feature)
                             valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
 
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
