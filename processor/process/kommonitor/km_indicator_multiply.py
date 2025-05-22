@@ -17,7 +17,9 @@ from pygeoapi.util import JobStatus
 
 from .. import pykmhelper
 from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
-# from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
+from prefect import task, flow
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+from pygeoapi_prefect import schemas
 
 class KmIndicatorMultiply(KommonitorProcess):
     detailed_process_description = ProcessDescription(
@@ -68,6 +70,7 @@ class KmIndicatorMultiply(KommonitorProcess):
     )
 
     # run Method has to be implemented for all KomMonitor Skripts
+    @task
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
@@ -184,3 +187,14 @@ class KmIndicatorMultiply(KommonitorProcess):
 
             # 4.2 Catch possible errors cleanly
             return JobStatus.failed, None
+
+
+    @flow(persist_result=True)
+    def process_flow(
+            self,
+            job_id: str,
+            execution_request: schemas.ExecuteRequest
+    ) -> dict:
+        self.execute_process_flow(job_id, execution_request)
+
+

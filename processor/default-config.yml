@@ -96,8 +96,8 @@ metadata:
 
 dynamic-resources:
 
-resources:
-  HelloWorld:
-    type: process
-    processor:
-      name: process.kommonitor.HelloWorld
+#resources:
+#  HelloWorld:
+#    type: process
+#    processor:
+#      name: process.kommonitor.HelloWorld

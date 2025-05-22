@@ -16,7 +16,6 @@ from openapi_client import ApiClient, ApiException
 from prefect import task, flow, get_run_logger
 from pygeoapi.util import JobStatus
 
-from auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
@@ -447,21 +446,31 @@ class KommonitorProcess(BasePrefectProcessor):
         super().__init__(processor_def)
         self.process_flow.__setattr__("processor", self)
 
-    @staticmethod
+
     @flow(persist_result=True)
     def process_flow(
+            self,
+            job_id: str,
+            execution_request: schemas.ExecuteRequest
+    ) -> dict:
+        ...
+
+
+    @staticmethod
+    def execute_process_flow(
+            self,
             job_id: str,
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
-        p = prefect.context.get_run_context().flow.__getattribute__("processor")
+        # p = prefect.context.get_run_context().flow.__getattribute__("processor")
         logger = setup_logging(job_id)
         inputs = format_inputs(execution_request)
         config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, result, job_summary = p.run(config, logger, dmc)
+        status, result, job_summary = self.run(config, logger, dmc)
         print(status)
         if status == JobStatus.failed:
             
@@ -513,3 +522,50 @@ class KommonitorProcess(BasePrefectProcessor):
     def detailed_process_description(self) -> schemas.ProcessDescription:
         ...
 
+
+# @flow(persist_result=True)
+# def process_flow(
+#         job_id: str,
+#         execution_request: schemas.ExecuteRequest,
+# ) -> dict:
+#     ## Setup
+#     # p = prefect.context.get_run_context().flow.__getattribute__("processor")
+#     logger = setup_logging(job_id)
+#     inputs = format_inputs(execution_request)
+#     config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
+#     dmc = data_management_client(logger, execution_request, True)
+#
+#     ## Run process
+#     status, result, job_summary = processor.run(config, logger, dmc)
+#     print(status)
+#     if status == JobStatus.failed:
+#         output = {
+#             "jobSummary": job_summary.summary,
+#             "resultData": [],
+#         }
+#         return store_output_as_file(job_id, output)
+#     else:
+#         output = {
+#             "jobSummary": None,
+#             "resultData": []
+#         }
+#         indicator_id = inputs["target_indicator_id"]
+#         for res in result.values:
+#             indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
+#             res["allowedRoles"] = []
+#             print(res)
+#             try:
+#                 resp = indicators_controller.update_indicator_as_body_with_http_info(
+#                     indicator_id=indicator_id,
+#                     indicator_data=res
+#                 )
+#                 if resp.status_code == 200:
+#                     output["resultData"].append(res)
+#                 else:
+#                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
+#             except ApiException as e:
+#                 logger.error(f"Exception when calling DataManagementAPI: {e}")
+#                 job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
+#                 job_summary.mark_failed_job(res["applicableSpatialUnit"])
+#         output["jobSummary"] = job_summary.summary
+#         return store_output_as_file(job_id, output)
