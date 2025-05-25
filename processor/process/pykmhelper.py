@@ -17,7 +17,8 @@ from logging import Logger
 from enum import Enum
 import openapi_client
 from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, ApiException
-from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from openapi_client.exceptions import ForbiddenException
+from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
 
 # Define custom CONSTANTS used within the script
@@ -880,17 +881,6 @@ def filter_feature_lifespan(feature_collection, targetDate: str):
 #     def __init__(self):
 #         self.errorList = []
 
-class DataManagementException(Exception):
-    id: str
-    resource_type: str
-    spatial_unit: str
-    
-    def __init__(self, message, id: str, resource_type: str, error_code, spatial_unit = None):
-        super().__init__(message)
-        self.id = id
-        self.resource_type = resource_type
-        self.error_code = error_code
-        self.spatial_unit = spatial_unit
     
 class IndicatorCalculationType(str, Enum):
     TARGET_INDICATOR = "TARGET_INDICATOR"
@@ -930,7 +920,7 @@ class IndicatorType:
     def get_indicator_by_id(self, indicator_controller: IndicatorsControllerApi):
         try:
             self.meta = indicator_controller.get_indicator_by_id(self.id)
-        except ApiException as e:
+        except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, self.id, "INDICATOR", e.status)
         
     def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsControllerApi, spatial_unit: str):
@@ -938,10 +928,11 @@ class IndicatorType:
             self.values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                             self.id, 
                             spatial_unit)
-        except ApiException as e:
+        except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit) 
         
 class IndicatorCollection:
+    indicators: dict[str, IndicatorType]
     intersection_su_features: list
     intersection_target_dates: set
     all_target_dates: list
@@ -1034,7 +1025,7 @@ class IndicatorCollection:
 
     
 
-def fetch_spatial_unit_features(spatial_unit_controller, spatial_unit: str):
+def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
     """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
 
     Args:
@@ -1044,12 +1035,16 @@ def fetch_spatial_unit_features(spatial_unit_controller, spatial_unit: str):
     Returns:
         List: returns a list containing all spatial unit features which belong to the spatial unit
     """
-    response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
-    geojson_all_features = json.loads(response_data.data)
+    try:
+        response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+        geojson_all_features = json.loads(response_data.data)
 
-    all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+        all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
 
-    return all_su_features
+        return all_su_features
+    except (ForbiddenException, ApiException) as e:
+        raise DataManagementException(e, spatial_unit, "SPATIAL_UNIT", e.status, spatial_unit) 
+        
 
 def getTargetDate_without_prefix(dateWithPrefix: str):
     """Removes the date prefix from a submitted date string
@@ -2736,7 +2731,7 @@ def computeTrend(feature, dates):
 
     # make sure that feature has relevant date properties
     if not len(dates) == len(indicatorValueArray):
-        return None
+        throwError("The length of the Array containing the dates and indicator values are not identical.")
     
     timeAxisArray = []
 

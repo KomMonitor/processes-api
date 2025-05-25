@@ -13,6 +13,7 @@ import prefect
 
 import requests
 from openapi_client import ApiClient, ApiException
+from openapi_client.exceptions import ForbiddenException
 from prefect import task, flow, get_run_logger
 from pygeoapi.util import JobStatus
 
@@ -22,7 +23,6 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
-import pyinstrument
 
 @dataclass
 class KommonitorProcessConfig:
@@ -145,6 +145,17 @@ class ExecutionResourceType(str, Enum):
     GEORESOURCE = "GEORESOURCE"
     INDICATOR = "INDICATOR"
 
+class DataManagementException(Exception):
+    id: str
+    resource_type: str
+    spatial_unit: str
+    
+    def __init__(self, message, id: str, resource_type: str, error_code, spatial_unit = None):
+        super().__init__(message)
+        self.id = id
+        self.resource_type = resource_type
+        self.error_code = error_code
+        self.spatial_unit = spatial_unit
 
 class KommonitorResult:
     def __init__(self):
@@ -156,13 +167,16 @@ class KommonitorResult:
         return self._values
 
     def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowedRoles: str):
-         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
-         su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
+        # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
+        try:
+            su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
-         self._su_result = {
-             "applicableSpatialUnit": su_meta.spatial_unit_level,
-             "allowedRoles": allowedRoles,
-         }
+            self._su_result = {
+                "applicableSpatialUnit": su_meta.spatial_unit_level,
+                "allowedRoles": allowedRoles,
+            }
+        except (ForbiddenException, ApiException) as e:
+            raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
 
     def complete_spatial_unit_result(self):
         if self._su_result:
