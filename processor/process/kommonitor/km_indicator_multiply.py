@@ -1,27 +1,45 @@
-from typing import Dict, Optional
-import logging
 import math
 
 import openapi_client
-from IPython.core.events import pre_run_cell
 from openapi_client import ApiClient
 from openapi_client.rest import ApiException
-from pygeoapi.process.base import *
-from pygeoapi.util import JobStatus
-
-from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
-
-from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
-from pygeoapi.util import JobStatus
-
-from .. import pykmhelper
-from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 from prefect import task, flow
-from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+from pygeoapi.process.base import *
+from pygeoapi.util import JobStatus
 from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
+    AdditionalProcessIOParameters
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+
+try:
+    from .. import pykmhelper
+except ImportError:
+    from processor.process import pykmhelper
+
+try:
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+except ImportError:
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+
+try:
+    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+except ImportError:
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+
+
+@flow(persist_result=True)
+def process_flow(
+        job_id: str,
+        execution_request: schemas.ExecuteRequest
+) -> dict:
+    KommonitorProcess.execute_process_flow(KmIndicatorMultiply.run, job_id, execution_request)
+
 
 class KmIndicatorMultiply(KommonitorProcess):
+    process_flow = process_flow
+
     detailed_process_description = ProcessDescription(
         id="km_indicator_multiply",
         version="0.0.1",
@@ -187,14 +205,4 @@ class KmIndicatorMultiply(KommonitorProcess):
 
             # 4.2 Catch possible errors cleanly
             return JobStatus.failed, None
-
-
-    @flow(persist_result=True)
-    def process_flow(
-            self,
-            job_id: str,
-            execution_request: schemas.ExecuteRequest
-    ) -> dict:
-        self.execute_process_flow(job_id, execution_request)
-
 

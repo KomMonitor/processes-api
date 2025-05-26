@@ -13,7 +13,7 @@ import prefect
 
 import requests
 from openapi_client import ApiClient, ApiException
-from prefect import task, flow, get_run_logger
+from prefect import task, flow, get_run_logger, Task
 from pygeoapi.util import JobStatus
 
 from pygeoapi_prefect import schemas
@@ -37,7 +37,7 @@ KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
-PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "http://localhost:8085/management/")
+PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 
 
 @task
@@ -89,8 +89,8 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
 
 @task
 def setup_logging(job_id: str) -> Logger:
-    os.mkdir(f"results/{job_id}/")
-    log_path = f"results/{job_id}/log.txt"
+    os.mkdir(f"{PROCESS_RESULTS_DIR}/{job_id}/")
+    log_path = f"{PROCESS_RESULTS_DIR}/{job_id}/log.txt"
 
     filelogger = logging.FileHandler(log_path)
     filelogger.setLevel(logging.DEBUG)
@@ -441,24 +441,13 @@ class KommonitorProcess(BasePrefectProcessor):
         )
     }
 
-
     def __init__(self, processor_def: dict):
         super().__init__(processor_def)
         self.process_flow.__setattr__("processor", self)
 
-
-    @flow(persist_result=True)
-    def process_flow(
-            self,
-            job_id: str,
-            execution_request: schemas.ExecuteRequest
-    ) -> dict:
-        ...
-
-
     @staticmethod
     def execute_process_flow(
-            self,
+            run: Task,
             job_id: str,
             execution_request: schemas.ExecuteRequest
     ) -> dict:
@@ -470,7 +459,7 @@ class KommonitorProcess(BasePrefectProcessor):
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, result, job_summary = self.run(config, logger, dmc)
+        status, result, job_summary = run(config, logger, dmc)
         print(status)
         if status == JobStatus.failed:
             
