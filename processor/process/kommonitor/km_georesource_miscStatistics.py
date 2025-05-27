@@ -10,7 +10,7 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
@@ -133,13 +133,11 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
-                response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
-                su_feature_collection = json.loads(response_data.data)
+                su_feature_collection = pykmhelper.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller, spatial_unit)
 
                 # fetch the georesource feature collection
-                georesource = georesources_controller.get_all_georesource_features_by_id_without_preload_content(computation_georecources_id)
-                georesource_collection = json.loads(georesource.data)
-
+                georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)
+                
                 # iterate over all features of the spatial unit an append the indicator
                 indicator_values = []  
 
@@ -176,7 +174,13 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
-        except ApiException as e:
-
+        except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None
+            if e.spatial_unit and bool(job_summary):
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            else:
+                job_summary.init_spatial_unit_summary(target_spatial_units[0])
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()    
+            return JobStatus.failed, None, job_summary

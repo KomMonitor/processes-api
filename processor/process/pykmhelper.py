@@ -16,7 +16,7 @@ import datetime
 from logging import Logger
 from enum import Enum
 import openapi_client
-from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, ApiException
+from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, GeorecourcesControllerApi, ApiException
 from openapi_client.exceptions import ForbiddenException
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
@@ -1023,6 +1023,25 @@ class IndicatorCollection:
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
+def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+    try:
+        # query data-management-api to get all spatial unit features for the current spatial unit.
+        response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
+        su_feature_collection = json.loads(response_data.data)
+        
+        return su_feature_collection
+    except (ForbiddenException, ApiException) as e:
+        raise DataManagementException(e, spatial_unit, "SPATIAL_UNIT", e.status, spatial_unit) 
+        
+def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeorecourcesControllerApi, georesource: str):
+    try:
+        # fetch the georesource feature collection
+        georesource = georesources_controller.get_all_georesource_features_by_id_without_preload_content(computation_georecources_id)
+        georesource_collection = json.loads(georesource.data)
+
+        return georesource_collection
+    except (ForbiddenException, ApiException) as e:
+        raise DataManagementException(e, georesource, "SPATIAL_UNIT", e.status) 
     
 
 def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
