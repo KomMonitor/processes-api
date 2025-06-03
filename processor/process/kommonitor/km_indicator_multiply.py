@@ -4,9 +4,11 @@ import openapi_client
 from openapi_client import ApiClient
 from openapi_client.rest import ApiException
 from prefect import task, flow
+from prefect.runtime import flow_run
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect import schemas
+from prefect.cache_policies import NO_CACHE
 from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
     AdditionalProcessIOParameters
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
@@ -23,18 +25,18 @@ except ImportError:
 
 try:
     from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
 
-@flow(persist_result=True)
+@flow(persist_result=True, name="km_indicator_multiply", flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    KommonitorProcess.execute_process_flow(KmIndicatorMultiply.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmIndicatorMultiply.run, job_id, execution_request)
 
 
 class KmIndicatorMultiply(KommonitorProcess):
@@ -88,9 +90,9 @@ class KmIndicatorMultiply(KommonitorProcess):
     )
 
     # run Method has to be implemented for all KomMonitor Skripts
-    @task
-    def run(self,
-            config: KommonitorProcessConfig,
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
+    def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
@@ -134,8 +136,11 @@ class KmIndicatorMultiply(KommonitorProcess):
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
+                # check for existing allowedRoles for the concatenation of indicator and spatial unit
+                allowed_roles = ti.check_su_allowedRoles(spatial_unit)
+
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowed_roles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
