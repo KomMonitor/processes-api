@@ -77,17 +77,39 @@ pip install --no-deps -r requirements_nodeps.txt
 
 The application is packaged as an executable `app.py` script. Configuration is based on the following environment variables which should be set accordingly prior to starting:
 
-| name             | description                                       |
-|------------------|---------------------------------------------------|
-| KC_CLIENT        | Identifier of Keycloak client                     |
-| KC_CLIENT_SECRET | Secret of Keycloak client                         |
-| KC_HOST          | Hostname of Keycloak Server `(e.g. keycloak:8080` |
-| KC_HOSTNAME_PATH | Subpath of Keycloak Hostname (e.g. /keycloak)     |
-| KC_REALM_NAME    | Name of the Keycloak realm                        |
+| name                           | description                                          |
+|--------------------------------|------------------------------------------------------|
+| KC_CLIENT_ID                   | Identifier of pygeopai client in Keycloak            |
+| KC_CLIENT_SECRET               | Secret of pygeopai client in Keycloak                |
+| KC_TARGET_CLIENT_ID            | Identifier of Data Management API client in Keycloak |
+| KC_HOSTNAME                    | Hostname of Keycloak Server (e.g. `keycloak:8080`)   |
+| KC_HOSTNAME_PATH               | Subpath of Keycloak Hostname (e.g. `/keycloak`)      |
+| KC_REALM_NAME                  | Name of the Keycloak realm                           |
+| KOMMONITOR_DATA_MANAGEMENT_URL | URL of the KomMonitor Data Management API            |
+| PROCESS_RESULTS_DIR            | Directory to store process results                   |
+| PREFECT_API_URL                | URL of the Prefect server                            |
 
 After these variables are set run the app via
 ```commandline
 python3 app.py
+```
+
+### Scheduling Processes
+Our pygeoapi server comes with a custom scheduling endpoint that enables scheduling processes
+by creating a scheduled Prefect deployment. For this purpose you must have a running Prefect instance.
+To start Prefect, run the command listed below in your virtual Python environment:
+```commandline
+prefect server start
+```
+
+Deployments will run on a worker, which can be created via Prefect UI. Visit `localhost:4200` and
+open the *Work Pools* page. For local development purpose crate a worker of type *Process*, which will
+run scheduled processes as subprocess on your localhost. Note, that you have to set the same
+environment variables listed below in JSON format when configuring your worker. After you have created
+your work pool, you have to start a worker. For a work pool named `kommonitor-work-pool` run the command
+following in a fresh CLI in your virtual environment:
+```commandline
+prefect worker start --pool "kommonitor-work-pool" 
 ```
 
 ### Structure
