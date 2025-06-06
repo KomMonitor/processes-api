@@ -10,7 +10,7 @@ from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 
 from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL
+from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 
 from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
 from pygeoapi.util import JobStatus
@@ -115,21 +115,22 @@ class KmIndicatorPromille(KommonitorProcess):
                 collection.add_indicator(IndicatorType(indicator, IndicatorCalculationType.COMPUTATION_INDICATOR))
             
             # query indicator metadate to check for errors occured
-            ti.meta = indicators_controller.get_indicator_by_id(
-                target_id)
+            ti.get_indicator_by_id(indicators_controller)
             
             for indicator in collection.indicators:
-                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
-                indicator)
+                collection.indicators[indicator].get_indicator_by_id(indicators_controller)
 
             # calculate intersection dates and all dates that have to be computed according to target_time schema
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
+                # check for existing allowedRoles for the concatenation of indicator and spatial unit
+                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
+                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller)
                 job_summary.init_spatial_unit_summary(spatial_unit)
-
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
                 collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
@@ -143,9 +144,7 @@ class KmIndicatorPromille(KommonitorProcess):
 
                 # query the correct indicator for numerator and denominator
                 for indicator in collection.indicators:
-                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                        indicator, 
-                        spatial_unit)
+                    collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller, spatial_unit)
                     
                 collection.fetch_indicator_feature_time_series()
 
@@ -198,7 +197,13 @@ class KmIndicatorPromille(KommonitorProcess):
                 print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
-        except ApiException as e:
-
+        except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None
+            if e.spatial_unit and bool(job_summary):
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            else:
+                job_summary.init_spatial_unit_summary(target_spatial_units[0])
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()    
+            return JobStatus.failed, None, job_summary

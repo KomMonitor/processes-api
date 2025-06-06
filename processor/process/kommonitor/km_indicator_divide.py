@@ -132,8 +132,8 @@ class KmIndicatorDivide(KommonitorProcess):
                 allowedRoles = ti.check_su_allowedRoles(spatial_unit)
                 
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
@@ -148,9 +148,7 @@ class KmIndicatorDivide(KommonitorProcess):
 
                 # query the correct indicator for numerator and denominator
                 for indicator in collection.indicators:
-                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
-                        indicator, 
-                        spatial_unit)
+                    collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller, spatial_unit)
 
                 collection.fetch_indicator_feature_time_series()
 
@@ -199,9 +197,10 @@ class KmIndicatorDivide(KommonitorProcess):
                 print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
+        
         except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            if e.spatial_unit:
+            if e.spatial_unit and bool(job_summary):
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
                 job_summary.complete_spatial_unit_summary()
             else:

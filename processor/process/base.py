@@ -1,26 +1,26 @@
 import abc
-import uuid
+import json
 import logging
 import os
+import urllib.parse as urlparse
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-import urllib.parse as urlparse
-import json
 
 import openapi_client
-
 import requests
 from openapi_client import ApiClient, ApiException
+from openapi_client.exceptions import ForbiddenException
 from prefect import task, get_run_logger, Task, runtime
 from prefect.cache_policies import NO_CACHE
 from pygeoapi.util import JobStatus
-
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
+
 
 @dataclass
 class KommonitorProcessConfig:
@@ -149,6 +149,17 @@ class ExecutionResourceType(str, Enum):
     GEORESOURCE = "GEORESOURCE"
     INDICATOR = "INDICATOR"
 
+class DataManagementException(Exception):
+    id: str
+    resource_type: str
+    spatial_unit: str
+
+    def __init__(self, message, id: str, resource_type: str, error_code, spatial_unit = None):
+        super().__init__(message)
+        self.id = id
+        self.resource_type = resource_type
+        self.error_code = error_code
+        self.spatial_unit = spatial_unit
 
 class KommonitorResult:
     def __init__(self):
@@ -160,13 +171,16 @@ class KommonitorResult:
         return self._values
 
     def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowed_roles: str):
-         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
-         su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
+        # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
+        try:
+            su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
-         self._su_result = {
-             "applicableSpatialUnit": su_meta.spatial_unit_level,
-             "allowedRoles": allowed_roles,
-         }
+            self._su_result = {
+                "applicableSpatialUnit": su_meta.spatial_unit_level,
+                "allowedRoles": allowed_roles,
+            }
+        except (ForbiddenException, ApiException) as e:
+            raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
 
     def complete_spatial_unit_result(self):
         if self._su_result:
@@ -456,8 +470,6 @@ class KommonitorProcess(BasePrefectProcessor):
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
-        # p = prefect.context.get_run_context().flow.__getattribute__("processor")
-        # root_id = runtime.flow_run.flow_name.root_flow_run_id
         flow_id = runtime.flow_run.name
         logger = setup_logging(flow_id)
         logger.info(f"Flow run name: {flow_id}")
@@ -505,7 +517,8 @@ class KommonitorProcess(BasePrefectProcessor):
     @staticmethod
     @task(cache_policy=NO_CACHE)
     @abc.abstractmethod
-    def run(config: KommonitorProcessConfig,
+    def run(self,
+            config: KommonitorProcessConfig,
             logger: logging.Logger,
             dmc: ApiClient) -> (JobStatus, KommonitorResult, KommonitorJobSummary):
         ...
@@ -520,50 +533,3 @@ class KommonitorProcess(BasePrefectProcessor):
     def detailed_process_description(self) -> schemas.ProcessDescription:
         ...
 
-
-# @flow(persist_result=True)
-# def process_flow(
-#         job_id: str,
-#         execution_request: schemas.ExecuteRequest,
-# ) -> dict:
-#     ## Setup
-#     # p = prefect.context.get_run_context().flow.__getattribute__("processor")
-#     logger = setup_logging(job_id)
-#     inputs = format_inputs(execution_request)
-#     config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
-#     dmc = data_management_client(logger, execution_request, True)
-#
-#     ## Run process
-#     status, result, job_summary = processor.run(config, logger, dmc)
-#     print(status)
-#     if status == JobStatus.failed:
-#         output = {
-#             "jobSummary": job_summary.summary,
-#             "resultData": [],
-#         }
-#         return store_output_as_file(job_id, output)
-#     else:
-#         output = {
-#             "jobSummary": None,
-#             "resultData": []
-#         }
-#         indicator_id = inputs["target_indicator_id"]
-#         for res in result.values:
-#             indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
-#             res["allowedRoles"] = []
-#             print(res)
-#             try:
-#                 resp = indicators_controller.update_indicator_as_body_with_http_info(
-#                     indicator_id=indicator_id,
-#                     indicator_data=res
-#                 )
-#                 if resp.status_code == 200:
-#                     output["resultData"].append(res)
-#                 else:
-#                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
-#             except ApiException as e:
-#                 logger.error(f"Exception when calling DataManagementAPI: {e}")
-#                 job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
-#                 job_summary.mark_failed_job(res["applicableSpatialUnit"])
-#         output["jobSummary"] = job_summary.summary
-#         return store_output_as_file(job_id, output)

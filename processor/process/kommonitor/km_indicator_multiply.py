@@ -2,16 +2,16 @@ import math
 
 import openapi_client
 from openapi_client import ApiClient
-from openapi_client.rest import ApiException
 from prefect import task, flow
-from prefect.runtime import flow_run
+from prefect.cache_policies import NO_CACHE
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect import schemas
-from prefect.cache_policies import NO_CACHE
 from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
     AdditionalProcessIOParameters
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+
+from ..base import DataManagementException
 
 try:
     from .. import pykmhelper
@@ -125,12 +125,10 @@ class KmIndicatorMultiply(KommonitorProcess):
             
 
             # query indicator metadate to check for errors occured
-            ti.meta = indicators_controller.get_indicator_by_id(
-                target_id)
+            ti.get_indicator_by_id(indicators_controller)
             
             for indicator in collection.indicators:
-                collection.indicators[indicator].meta = indicators_controller.get_indicator_by_id(
-                indicator)
+                collection.indicators[indicator].get_indicator_by_id(indicators_controller)
 
             # calculate intersection dates and all dates that have to be computed according to target_time schema
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
@@ -206,8 +204,13 @@ class KmIndicatorMultiply(KommonitorProcess):
                 print(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
-        except ApiException as e:
-
+        except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            return JobStatus.failed, None
-
+            if e.spatial_unit and bool(job_summary):
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            else:
+                job_summary.init_spatial_unit_summary(target_spatial_units[0])
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            return JobStatus.failed, None, job_summary
