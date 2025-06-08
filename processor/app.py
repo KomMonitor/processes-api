@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
 from auth import KomMonitorIntrospectTokenValidator
+from process.custom import km_processes
 
 if not os.getenv("PYGEOAPI_CONFIG"):
     os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
@@ -95,6 +96,12 @@ def update_process():
 @require_oauth()
 def execute_process_jobs(process_id):
     return flask_app.execute_process_jobs(process_id)
+
+@APP.post('/processes/<process_id>/schedule')
+@require_oauth()
+def schedule_process(process_id):
+    return flask_app.execute_from_flask(km_processes.schedule_process, request,
+                              process_id)
 
 
 @APP.get('/jobs')

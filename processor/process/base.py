@@ -2,27 +2,25 @@ import abc
 import json
 import logging
 import os
+import urllib.parse as urlparse
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-import urllib.parse as urlparse
-import json
 
 import openapi_client
-import prefect
-
 import requests
 from openapi_client import ApiClient, ApiException
 from openapi_client.exceptions import ForbiddenException
-from prefect import task, flow, get_run_logger
+from prefect import task, get_run_logger, Task, runtime
+from prefect.cache_policies import NO_CACHE
 from pygeoapi.util import JobStatus
-
-from auth import KC_CLIENT_ID, KC_CLIENT_SECRET, KC_HOSTNAME, KC_HOSTNAME_PATH, KC_REALM_NAME
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
+
 
 @dataclass
 class KommonitorProcessConfig:
@@ -38,7 +36,7 @@ KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
-PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "http://localhost:8085/management/")
+PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 
 
 @task
@@ -90,8 +88,8 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
 
 @task
 def setup_logging(job_id: str) -> Logger:
-    os.mkdir(f"results/{job_id}/")
-    log_path = f"results/{job_id}/log.txt"
+    os.mkdir(f"{PROCESS_RESULTS_DIR}/{job_id}/")
+    log_path = f"{PROCESS_RESULTS_DIR}/{job_id}/log.txt"
 
     filelogger = logging.FileHandler(log_path)
     filelogger.setLevel(logging.DEBUG)
@@ -102,12 +100,13 @@ def setup_logging(job_id: str) -> Logger:
 
 
 @task
-def store_output_as_file(job_id: str, output: dict) -> dict:
+def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
     storage_type = "LocalFileSystem"
     basepath = f"{PROCESS_RESULTS_DIR}"
     output_dir = get_storage(storage_type, basepath=basepath)
     filename = f"result-{job_id}.json"
-    output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
+    result_path = output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
+    logger.info(f"Successfully stored result at: {result_path}")
     return {
         'providers': {
             'file_storage_provider': {
@@ -124,6 +123,11 @@ def store_output_as_file(job_id: str, output: dict) -> dict:
             }
         ]
     }
+
+
+def generate_flow_run_name():
+    flow_run_id = str(uuid.uuid4())
+    return f'pygeoapi_job_{flow_run_id}'
 
 
 class ExecutionErrorType(str, Enum):
@@ -149,7 +153,7 @@ class DataManagementException(Exception):
     id: str
     resource_type: str
     spatial_unit: str
-    
+
     def __init__(self, message, id: str, resource_type: str, error_code, spatial_unit = None):
         super().__init__(message)
         self.id = id
@@ -166,14 +170,14 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowedRoles: str):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowed_roles: str):
         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
         try:
             su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
             self._su_result = {
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
-                "allowedRoles": allowedRoles,
+                "allowedRoles": allowed_roles,
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
@@ -456,29 +460,28 @@ class KommonitorProcess(BasePrefectProcessor):
         )
     }
 
-
     def __init__(self, processor_def: dict):
         super().__init__(processor_def)
-        self.process_flow.__setattr__("processor", self)
 
     @staticmethod
-    @flow(persist_result=True)
-    def process_flow(
+    def execute_process_flow(
+            run: Task,
             job_id: str,
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
-        p = prefect.context.get_run_context().flow.__getattribute__("processor")
-        logger = setup_logging(job_id)
+        flow_id = runtime.flow_run.name
+        logger = setup_logging(flow_id)
+        logger.info(f"Flow run name: {flow_id}")
+
         inputs = format_inputs(execution_request)
-        config = KommonitorProcessConfig(job_id, inputs, f"{job_id}/output-result.txt")
+        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt")
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, result, job_summary = p.run(config, logger, dmc)
-        print(status)
+        status, result, job_summary = run(config, logger, dmc)
+        logger.debug(f"Job status: {status}")
         if status == JobStatus.failed:
-            
             output = {
                 "jobSummary": job_summary.summary,
                 "resultData": [],
@@ -508,8 +511,11 @@ class KommonitorProcess(BasePrefectProcessor):
                     job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
-            return store_output_as_file(job_id, output)
+            return store_output_as_file(job_id, output, logger)
 
+
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
     @abc.abstractmethod
     def run(self,
             config: KommonitorProcessConfig,

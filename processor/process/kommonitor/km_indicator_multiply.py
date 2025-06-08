@@ -1,25 +1,47 @@
-from typing import Dict, Optional
-import logging
 import math
 
 import openapi_client
-from IPython.core.events import pre_run_cell
 from openapi_client import ApiClient
-from openapi_client.rest import ApiException
+from prefect import task, flow
+from prefect.cache_policies import NO_CACHE
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
+    AdditionalProcessIOParameters
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
 
-from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
+from ..base import DataManagementException
 
-from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
-from pygeoapi.util import JobStatus
+try:
+    from .. import pykmhelper
+except ImportError:
+    from processor.process import pykmhelper
 
-from .. import pykmhelper
-from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
-# from ....ressources.PyKmHelper.pykmhelper import IndicatorCalculationType, IndicatorType, IndicatorCollection
+try:
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+except ImportError:
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+
+try:
+    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+except ImportError:
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+
+
+@flow(persist_result=True, name="km_indicator_multiply", flow_run_name=generate_flow_run_name)
+def process_flow(
+        job_id: str,
+        execution_request: schemas.ExecuteRequest
+) -> dict:
+    return KommonitorProcess.execute_process_flow(KmIndicatorMultiply.run, job_id, execution_request)
+
 
 class KmIndicatorMultiply(KommonitorProcess):
+    process_flow = process_flow
+
     detailed_process_description = ProcessDescription(
         id="km_indicator_multiply",
         version="0.0.1",
@@ -68,8 +90,9 @@ class KmIndicatorMultiply(KommonitorProcess):
     )
 
     # run Method has to be implemented for all KomMonitor Skripts
-    def run(self,
-            config: KommonitorProcessConfig,
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
+    def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
@@ -112,12 +135,12 @@ class KmIndicatorMultiply(KommonitorProcess):
 
             for spatial_unit in target_spatial_units:
                 # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
+                allowed_roles = ti.check_su_allowedRoles(spatial_unit)
+
                 # Init results and job summary for current spatial unit
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowed_roles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
-                
+
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
                 collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
@@ -131,7 +154,9 @@ class KmIndicatorMultiply(KommonitorProcess):
 
                 # query the correct indicator for numerator and denominator
                 for indicator in collection.indicators:
-                    collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller, spatial_unit)
+                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                        indicator, 
+                        spatial_unit)
                     
                 collection.fetch_indicator_feature_time_series()
 
@@ -187,5 +212,5 @@ class KmIndicatorMultiply(KommonitorProcess):
             else:
                 job_summary.init_spatial_unit_summary(target_spatial_units[0])
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
-                job_summary.complete_spatial_unit_summary()    
+                job_summary.complete_spatial_unit_summary()
             return JobStatus.failed, None, job_summary
