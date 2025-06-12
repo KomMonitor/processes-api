@@ -1,25 +1,25 @@
-from http import HTTPStatus
-from typing import (
-    Any,
-    Tuple
+from pygeoapi.api import (
+    SYSTEM_LOCALE
 )
 import json
 import logging
-from .. import base
-from pygeoapi.util import (
-    JobStatus, RequestedProcessExecutionMode, to_json
+import urllib.parse
+from datetime import datetime, timezone
+from http import HTTPStatus
+from typing import Tuple
+
+from pygeoapi import l10n
+from pygeoapi.api import (
+    APIRequest, API, SYSTEM_LOCALE, F_JSON, FORMAT_TYPES, F_HTML
 )
 from pygeoapi.process.base import (
-    ProcessorExecuteError
-)
-from pygeoapi.api import (
-    APIRequest, API, SYSTEM_LOCALE
+    JobNotFoundError, ProcessorExecuteError
 )
 from pygeoapi.process.manager.base import Subscriber
-from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi.util import (
+    render_j2_template, JobStatus, RequestedProcessExecutionMode,
+    to_json, DATETIME_FORMAT)
 from pygeoapi_prefect.schemas import (
-    ExecuteRequest,
-    ProcessExecutionMode,
     RequestedProcessExecutionMode,
 )
 
@@ -78,39 +78,15 @@ def schedule_process(api: API, request: APIRequest,
 
     requested_response = data.get('response', 'raw')
 
-    subscriber = None
-    subscriber_dict = data.get('subscriber')
-    if subscriber_dict:
-        try:
-            success_uri = subscriber_dict['successUri']
-        except KeyError:
-            return api.get_exception(
-                HTTPStatus.BAD_REQUEST, headers, request.format,
-                'MissingParameterValue', 'Missing successUri')
-        else:
-            subscriber = Subscriber(
-                # NOTE: successUri is mandatory according to the standard
-                success_uri=success_uri,
-                in_progress_uri=subscriber_dict.get('inProgressUri'),
-                failed_uri=subscriber_dict.get('failedUri'),
-            )
-
-    try:
-        execution_mode = RequestedProcessExecutionMode(
-            request.headers.get('Prefer', request.headers.get('prefer'))
-        )
-    except ValueError:
-        execution_mode = None
     try:
         logger.debug('Scheduling process')
 
         result = api.manager.schedule_process(
-            process_id, data_dict, execution_mode=execution_mode)
-        job_id, mime_type, outputs, status, additional_headers = result
-        headers.update(additional_headers or {})
+            process_id, data_dict)
+        schedule_id, mime_type, status = result
 
         if api.manager.is_async:
-            headers['Location'] = f'{api.base_url}/jobs/{job_id}'
+            headers['Location'] = f'{api.base_url}/schedule/{schedule_id}'
 
     except ProcessorExecuteError as err:
         return api.get_exception(
@@ -119,18 +95,18 @@ def schedule_process(api: API, request: APIRequest,
 
     response = {}
     if status == JobStatus.failed:
-        response = outputs
+        response = {}
+    elif status not in (JobStatus.failed, JobStatus.accepted):
+        response = {"scheduling_id": schedule_id}
 
     if requested_response == 'raw':
         headers['Content-Type'] = mime_type
-        response = outputs
-    elif status not in (JobStatus.failed, JobStatus.accepted):
-        response = outputs
 
     if status == JobStatus.accepted:
         http_status = HTTPStatus.CREATED
     elif status == JobStatus.failed:
         http_status = HTTPStatus.BAD_REQUEST
+
     else:
         http_status = HTTPStatus.OK
 
