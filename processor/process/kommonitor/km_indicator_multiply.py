@@ -11,8 +11,6 @@ from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption
     AdditionalProcessIOParameters
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
 
-from ..base import DataManagementException
-
 try:
     from .. import pykmhelper
 except ImportError:
@@ -25,10 +23,10 @@ except ImportError:
 
 try:
     from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, DataManagementException
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, DataManagementException
 
 
 @flow(persist_result=True, name="km_indicator_multiply", flow_run_name=generate_flow_run_name)
