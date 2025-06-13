@@ -723,6 +723,19 @@ def transformMultiPolygonsToPolygons(featureCollection):
 # API_HELPER_METHODS_UTILITY   --   with the special purpose to reduce content in the computation scripts at 'KomMonitor-Script-Ressources' #  
 #############################################################################################################################################
 def bool_filterValue_byOperator(currentValue: str, computationFilterOperator: str, computationFilterValue: str):
+    """Encapsulates different filter operations on two submitted values. The filter method has to be submitted in a string format which is getting checked.
+
+    Args:
+        currentValue (str): the value from the timeline which is getting compared to a static compare value
+        computationFilterOperator (str): the filter operator in a string format (for allowed operators compare with GUI)
+        computationFilterValue (str): the static filter value
+
+    Raises:
+        ValueError: if an invalid filter operator is submitted
+
+    Returns:
+        Bool: returns bool if the currentValue fits to the filter operator or false if it doesnt
+    """
     currentValue = float(currentValue)
     
     if computationFilterOperator == "Equal":
@@ -757,6 +770,17 @@ def bool_filterValue_byOperator(currentValue: str, computationFilterOperator: st
     
 
 def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: str, computationFilterOperator: str, computationFilterPropertyValue: str):
+    """takes a geojson feature collection and removes all features that do not fulfill a filter operation based on a filterValue and filter operator
+
+    Args:
+        featureCollection (dict): a valid geojson feature collection
+        propertyName (str): the string name of a property which contains the values used for filtering
+        computationFilterOperator (str): the filter operator
+        computationFilterPropertyValue (str): the static filter value where the property values of the feature collection are compared to
+
+    Returns:
+        dict: returns a geojson featurecollection with only features fitting to the filter operator
+    """
     result_collection = copy.deepcopy(featureCollection)
     del result_collection["features"]
     result_collection["features"] = []
@@ -883,6 +907,12 @@ def filter_feature_lifespan(feature_collection, targetDate: str):
 
     
 class IndicatorCalculationType(str, Enum):
+    """This class represents an enum which defines allowed indicator types
+
+    Args:
+        str (str): the type of the indicator
+        Enum (_type_): _description_
+    """
     TARGET_INDICATOR = "TARGET_INDICATOR"
     COMPUTATION_INDICATOR = "COMPUTATION_INDICATOR"
     BASE_INDICATOR = "BASE_INDICATOR"
@@ -902,6 +932,12 @@ class IndicatorType:
     applicable_su_features: list
 
     def __init__(self, id : str, type : IndicatorCalculationType):
+        """creates an IndicatorType object which stores all Data that belongs to the indicator
+
+        Args:
+            id (str): the unique indicator id 
+            type (IndicatorCalculationType): the type of the indicator
+        """
         self.id = id
         self.type = type
         self.bool_missing_timestamp = False
@@ -911,6 +947,14 @@ class IndicatorType:
         self.applicable_su_features = []
     
     def check_su_allowedRoles(self, spatialUnit: str):
+        """checks whether an indicator contains allowedRoles for an explicit spatial unit, if not the allowedRoles of the indicator itself are used
+
+        Args:
+            spatialUnit (str): the id of the spatial unit
+
+        Returns:
+            str: returns the allowedRoles of the indicator and spatial unit
+        """
         for su in self.meta.applicable_spatial_units:
             if su.spatial_unit_id == spatialUnit and len(su.allowed_roles) > 0:
                 return su.allowed_roles
@@ -918,12 +962,29 @@ class IndicatorType:
         return self.meta.allowed_roles
     
     def get_indicator_by_id(self, indicator_controller: IndicatorsControllerApi):
+        """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
+
+        Args:
+            indicator_controller (IndicatorsControllerApi): the openapi module which provides the functionality
+
+        Raises:
+            DataManagementException: cath the datamanagementapierror correctly
+        """
         try:
             self.meta = indicator_controller.get_indicator_by_id(self.id)
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, self.id, "INDICATOR", e.status)
         
     def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsControllerApi, spatial_unit: str):
+        """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
+
+        Args:
+            indicators_controller (IndicatorsControllerApi): _description_
+            spatial_unit (str): the spatial unit id which shall be queried
+
+        Raises:
+            DataManagementException: catch the datamanagementapierror correctly
+        """
         try:
             self.values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
                             self.id, 
@@ -939,11 +1000,18 @@ class IndicatorCollection:
     all_su_features: list
 
     def __init__(self):
+        """create a collection which provides more functionality to the indicators
+        """
         self.indicators = {}
         self.intersection_su_features = []
         self.all_target_dates = []
     
     def add_indicator(self, indicator: IndicatorType):
+        """add an indicator to the collection
+
+        Args:
+            indicator (IndicatorType): the indicator which will be added
+        """
         self.indicators[indicator.id] = indicator
 
     def fetch_all_spatial_unit_features(self, spatial_unit_controller, spatial_unit: str):
@@ -953,6 +1021,8 @@ class IndicatorCollection:
 
 
     def find_intersection_target_dates_from_meta(self):
+        """finds all targetDates the are available in every indicator and also all targetDates that exist in every indicator
+        """
         listApplicableDates = [] 
 
         for item in self.indicators:
@@ -973,6 +1043,8 @@ class IndicatorCollection:
         return None
     
     def find_intersection_applicable_su_features(self) -> list:
+        """finds all suFeatures that exist for every indicator
+        """
         listApplicableSuFeatures = [] 
 
         for item in self.indicators:
@@ -988,6 +1060,12 @@ class IndicatorCollection:
         # self.all_su_features = union
 
     def check_applicable_spatial_units(self, spatial_unit: str, job_summary: KommonitorJobSummary):
+        """checks whether spatial units are missing for certain indicators and in this case adds a missingSpatialUnitError to the jobsummary
+
+        Args:
+            spatial_unit (str): id of the spatial unit
+            job_summary (KommonitorJobSummary): the current kommmonitor jobSummary for spatial_unit
+        """
         for indicator in self.indicators:
             for unit in self.indicators[indicator].meta.applicable_spatial_units:
                 self.indicators[indicator].applicable_su.append(unit.spatial_unit_id)
@@ -996,12 +1074,22 @@ class IndicatorCollection:
                 job_summary.add_missing_spatial_unit_error(indicator)
 
     def check_applicable_target_dates(self, job_summary: KommonitorJobSummary):
+        """checks whether targetDates are missing for certain indicators and in this case adds a missing timestamp error to the jobSummary
+
+        Args:
+            job_summary (KommonitorJobSummary): the current kommonitor jobSummary
+        """
         # catch missing timestamp error
         for indicator in self.indicators:
             if self.indicators[indicator].bool_missing_timestamp:
                 job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
 
     def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary):
+        """checks whether spatial unit features are missing for certain indicators and in this case adds a missing timestamp error to the jobSummary
+
+        Args:
+            job_summary (KommonitorJobSummary): the current kommonitor jobSummary
+        """
         for indicator in self.indicators:
             missing_su_features = []
             for feature in self.all_su_features:
@@ -1012,6 +1100,8 @@ class IndicatorCollection:
                 job_summary.add_missing_spatial_unit_feature_error(indicator, missing_su_features)
 
     def fetch_indicator_feature_time_series(self):
+        """creates a time series which allows direct access to the data using indicator id and su feature id and target date
+        """
         for indicator in self.indicators:
             su_features = []
             for feature in self.indicators[indicator].values:
@@ -1024,6 +1114,18 @@ class IndicatorCollection:
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
 def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+    """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
+
+    Args:
+        spatial_unit_controller (SpatialUnitsControllerApi): the spatial unit controller from openapi client
+        spatial_unit (str): the spatial unit id
+
+    Raises:
+        DataManagementException: raises exception to catch datamanagementapierror
+
+    Returns:
+        dict: returns a valid geojson featurecollection containing the spatial unit
+    """
     try:
         # query data-management-api to get all spatial unit features for the current spatial unit.
         response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
@@ -1034,9 +1136,21 @@ def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_con
         raise DataManagementException(e, spatial_unit, "SPATIAL_UNIT", e.status, spatial_unit) 
         
 def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeorecourcesControllerApi, georesource: str):
+    """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
+
+    Args:
+        georesource_controller (GeorecourcesControllerApi): the georecource controller from openapi client
+        georesource (str): the georesource id
+
+    Raises:
+        DataManagementException: raises exception to catch datamanagementapierror
+
+    Returns:
+        dict: returns a valid geojson featurecollection containing the georesource dataset
+    """
     try:
         # fetch the georesource feature collection
-        georesource = georesources_controller.get_all_georesource_features_by_id_without_preload_content(computation_georecources_id)
+        georesource = georesource_controller.get_all_georesource_features_by_id_without_preload_content(georesource)
         georesource_collection = json.loads(georesource.data)
 
         return georesource_collection
@@ -1130,7 +1244,17 @@ def getAll_target_time(targetTimeDict, target_applicable_dates: set, all_input_a
 def getAll_target_time_from_indicator_collection(target_indicator: IndicatorType, 
                                                 collection: IndicatorCollection, 
                                                 target_time_dict: dict) -> Tuple[bool, list]:
+    """returns all applicable target dates for the target indicator and all computation indicators, based on the the applicable target dates from the time series
 
+    Args:
+        targetTimeDict (dict): the dictionary containing the target times according to kommonitors schema
+        collection (IndicatorCollection): the indicator collection
+        target_indicator (IndicatorType): the target indicator which is a single indicator type
+
+    Returns:
+        Bool: returns true if timestamps are missing
+        list: returns the list of the computation dates
+    """
     collection.find_intersection_target_dates_from_meta()
     intersectionDates = collection.intersection_target_dates
     computeDates = []
