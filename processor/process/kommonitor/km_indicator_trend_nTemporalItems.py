@@ -1,21 +1,42 @@
-from typing import Dict, Optional, Tuple
 import logging
-
+from typing import Tuple
 import openapi_client
 from openapi_client import ApiClient
-from openapi_client.rest import ApiException
+from prefect import task, flow
+from prefect.cache_policies import NO_CACHE
 from pygeoapi.process.base import *
 from pygeoapi.util import JobStatus
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
+    AdditionalProcessIOParameters
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
 
-from pygeoapi.process.base import *
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
+# from ..base import DataManagementException
 
-from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
-from pygeoapi.util import JobStatus
+try:
+    from .. import pykmhelper
+except ImportError:
+    from processor.process import pykmhelper
 
-from .. import  pykmhelper
-from ..pykmhelper import IndicatorCalculationType, IndicatorCollection, IndicatorType
-from ..util import dataio
+try:
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+except ImportError:
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+
+try:
+    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+except ImportError:
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+
+
+@flow(persist_result=True, name="km_indicator_trend_nTemporalItems", flow_run_name=generate_flow_run_name)
+def process_flow(
+        job_id: str,
+        execution_request: schemas.ExecuteRequest
+) -> dict:
+    return KommonitorProcess.execute_process_flow(KmIndicatorTrendNTemporalItems.run, job_id, execution_request)
 
 class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
@@ -97,6 +118,8 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     )
 
     # run Method has to be implemented for all KomMonitor Skripts
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
@@ -185,13 +208,13 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                     for targetTime in all_times:
                         try:
                             value = func(collection.indicators[computation_id].time_series[feature], targetTime, number_of_temporal_items)
-                            valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                         except (TypeError, ZeroDivisionError, RuntimeError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
                             job_summary.add_processing_error("INDICATOR", computation_id, str(r), targetTime, feature)
-                            valueMapping.append({"indicatorValue": None, "timestamp": targetTime})
+                            value = None
                         
+                        valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 
                 # Job Summary and results
