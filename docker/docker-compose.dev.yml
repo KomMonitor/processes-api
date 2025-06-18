@@ -1,0 +1,83 @@
+version: '3'
+
+networks:
+  kommonitor:
+    name: kommonitor
+    external: true
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    #container_name: keycloak
+    restart: unless-stopped
+    volumes:
+      - ./realms/realm-export.json:/opt/keycloak/data/import/realm.json
+    command:
+      - start-dev
+      - --import-realm
+    expose:
+      - 8080
+    ports:
+      - 8080:8080
+    networks:
+      - kommonitor
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=dev-file
+  kommonitor-proxy:
+    image: nginx:latest
+    #container_name: kommonitor-proxy
+    restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - ./templates:/etc/nginx/templates
+    environment:
+      - NGINX_PORT=80
+      - PROCESSOR=host.docker.internal:8095
+      - DATA_MANAGEMENT=kommonitor-data-management:8085
+    networks:
+      - kommonitor
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  kommonitor-data-management:
+    image: kommonitor/data-management:4.0.1
+    #container_name: kommonitor-data-management
+    restart: unless-stopped
+    depends_on:
+      - kommonitor-db
+    ports:
+      - "8085:8085"
+    networks:
+      - kommonitor
+    links:
+      - kommonitor-db
+    env_file:
+      - ./config/data-management.env
+      - ./config/keycloak.env
+  kommonitor-db:
+    image: postgis/postgis:latest
+    #container_name: kommonitor-db
+    restart: unless-stopped
+    networks:
+      - kommonitor
+    ports:
+      - 5432:5432
+    env_file:
+      - ./config/db.env
+  #kommonitor-processes-api:
+  #  image: kommonitor/processes-api:latest
+  #  environment:
+  #  - KC_HOSTNAME=keycloak.url
+  #  - KC_HOSTNAME_PATH=
+  #  - KC_REALM_NAME=kommonitor
+  #  - KC_CLIENT_ID=kommonitor-processes-api
+  #  - KC_CLIENT_SECRET=secret
+  #  - KOMMONITOR_DATA_MANAGEMENT_URL=http://localhost:8085/management/
+  #  - PROCESS_RESULTS_DIR=http://localhost:8085/management/
+  #  - KOMMONITOR_PROCESSES_API_ALLOWED_CORS_ORIGINS=http://localhost:8000
+  #  ports:
+  #    - 9999:9999
+  #  networks:
+  #    - kommonitor

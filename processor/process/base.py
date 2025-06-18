@@ -13,6 +13,7 @@ import requests
 from openapi_client import ApiClient, ApiException
 from openapi_client.exceptions import ForbiddenException
 from prefect import task, get_run_logger, Task, runtime
+from prefect.runtime import flow_run
 from prefect.cache_policies import NO_CACHE
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect import schemas
@@ -88,8 +89,10 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
 
 @task
 def setup_logging(job_id: str) -> Logger:
-    os.mkdir(f"{PROCESS_RESULTS_DIR}/{job_id}/")
-    log_path = f"{PROCESS_RESULTS_DIR}/{job_id}/log.txt"
+    job_dir = os.path.join(PROCESS_RESULTS_DIR, job_id)
+    if not os.path.isdir(job_dir):
+        os.mkdir(job_dir)
+    log_path = os.path.join(job_dir, "log.txt")
 
     filelogger = logging.FileHandler(log_path)
     filelogger.setLevel(logging.DEBUG)
@@ -102,8 +105,12 @@ def setup_logging(job_id: str) -> Logger:
 @task
 def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
     storage_type = "LocalFileSystem"
-    basepath = f"{PROCESS_RESULTS_DIR}"
-    output_dir = get_storage(storage_type, basepath=basepath)
+
+    job_dir = os.path.join(PROCESS_RESULTS_DIR, job_id)
+    if not os.path.isdir(job_dir):
+        os.mkdir(job_dir)
+
+    output_dir = get_storage(storage_type, basepath=job_dir)
     filename = f"result-{job_id}.json"
     result_path = output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
     logger.info(f"Successfully stored result at: {result_path}")
@@ -111,7 +118,7 @@ def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
         'providers': {
             'file_storage_provider': {
                 'type': storage_type,
-                'basepath': basepath
+                'basepath': job_dir
             }
         },
         'results': [
@@ -126,7 +133,10 @@ def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
 
 
 def generate_flow_run_name():
-    flow_run_id = str(uuid.uuid4())
+    parameters = flow_run.parameters
+    flow_run_id = parameters["job_id"]
+    if not flow_run_id:
+        flow_run_id = str(uuid.uuid4())
     return f'pygeoapi_job_{flow_run_id}'
 
 
@@ -486,7 +496,7 @@ class KommonitorProcess(BasePrefectProcessor):
                 "jobSummary": job_summary.summary,
                 "resultData": [],
             }
-            return store_output_as_file(job_id, output)
+            return store_output_as_file(flow_id, output)
         else:
             output = {
                 "jobSummary": None,
@@ -511,7 +521,7 @@ class KommonitorProcess(BasePrefectProcessor):
                     job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
-            return store_output_as_file(job_id, output, logger)
+            return store_output_as_file(flow_id, output, logger)
 
 
     @staticmethod
