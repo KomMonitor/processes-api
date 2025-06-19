@@ -225,7 +225,7 @@ class KommonitorJobSummary:
         self._su_summary = None
 
     def add_modified_resource(self, base_url: str, indicator_id: str, spatial_unit_id: str):
-        self._su_summary["modifiedResource"] = urlparse.urljoin(base_url, f"indicators/{indicator_id}/{spatial_unit_id}")
+        self._su_summary["modifiedResource"] = f"{base_url}/indicators/{indicator_id}/{spatial_unit_id}"
 
     def add_number_of_integrated_features(self, number: int):
         self._su_summary["numberOfIntegratedIndicatorFeatures"] = number

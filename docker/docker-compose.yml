@@ -5,11 +5,14 @@ services:
     image: kommonitor/processes-api:dev
     container_name: kommonitor-processes-api
     restart: unless-stopped
+    volumes:
+      - ./storage/prefect:/root/.prefect
+      - ./storage/results:/app/results
     env_file:
       - ./dev.env
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
-      PROCESS_RESULTS_DIR: /app/processor/results
+      PROCESS_RESULTS_DIR: /app/results
     ports:
      - 8000:8000
      - 8099:8099
@@ -27,7 +30,6 @@ services:
       retries: 5
     environment:
       POSTGRES_USER: ${DB_USER}
-#      PGUSER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
   prefect-server:
@@ -35,6 +37,8 @@ services:
     container_name: prefect-server
     restart: unless-stopped
     command: prefect server start
+    volumes:
+      - ./storage/prefect:/root/.prefect
     ports:
       - "4200:4200"
     depends_on:
@@ -48,15 +52,19 @@ services:
     environment:
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_API_URL: http://127.0.0.1:4200/api
-      PREFECT_SERVER_DATABASE_CONNECTION_URL: postgresql+asyncpg://prefect:prefect@prefect-db:5432/prefect
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@prefect-db:5432/prefect
   prefect-worker:
-    image: prefecthq/prefect:3.4.6-python3.13
+    image: kommonitor/processes-api:dev
     container_name: prefect-worker
     restart: unless-stopped
     command: prefect worker start -p kommonitor-work-pool --type process
+    volumes:
+      - ./storage/prefect:/root/.prefect
+      - ./storage/results:/app/results
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
-      PROCESS_RESULTS_DIR: /opt/prefect
+      PROCESS_RESULTS_DIR: /app/results
+      PYTHONPATH: ${PYTHONPATH}:/app
     env_file:
       - ./dev.env
     depends_on:

@@ -14,6 +14,8 @@ RUN pip install --no-deps -r requirements_nodeps.txt
 COPY data-management-client data-management-client
 RUN cd data-management-client && python setup.py install --user
 
+RUN mkdir -p /app/results
+
 # copy runner
 COPY run.sh .
 RUN chmod +x run.sh
