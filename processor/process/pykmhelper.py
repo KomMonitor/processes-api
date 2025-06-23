@@ -2630,7 +2630,7 @@ def getChange_relative_percent(feature, targetDate, compareDate):
     
     targetValue = feature[targetDatePrefix]
     compareValue = feature[compareDatePrefix]
-    if not isNoDataValue(compareValue) or not isNoDataValue(targetValue):
+    if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         if float(compareValue) == 0:
             resultValue = None
             throwError("The reference value is zero, a computation is not possible.")

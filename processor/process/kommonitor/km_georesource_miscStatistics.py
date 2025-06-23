@@ -39,6 +39,8 @@ def process_flow(
     return KommonitorProcess.execute_process_flow(KmGeoresourceMiscStatistics.run, job_id, execution_request)
 
 class KmGeoresourceMiscStatistics(KommonitorProcess):
+    process_flow = process_flow
+    
     detailed_process_description = ProcessDescription(
         id="km_georesource_miscStatistics",
         version="0.0.1",
@@ -107,8 +109,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
     # run Method has to be implemented for all KomMonitor Skripts
     @staticmethod
     @task(cache_policy=NO_CACHE)
-    def run(self,
-            config: KommonitorProcessConfig,
+    def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
@@ -191,8 +192,8 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 result.add_indicator_values(indicator_values)
                 result.complete_spatial_unit_result()
 
-                print(result.values)
-                print(job_summary.summary)
+                logger.info(result.values)
+                logger.info(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:

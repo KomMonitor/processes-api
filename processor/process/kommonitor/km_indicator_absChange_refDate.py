@@ -39,6 +39,8 @@ def process_flow(
     return KommonitorProcess.execute_process_flow(KmIndicatorAbsChangeRefDate.run, job_id, execution_request)
 
 class KmIndicatorAbsChangeRefDate(KommonitorProcess):
+    process_flow = process_flow
+    
     detailed_process_description = ProcessDescription(
         id="km_indicator_absChange_refDate",
         version="0.0.1",
@@ -101,8 +103,7 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
     # run Method has to be implemented for all KomMonitor Skripts
     @staticmethod
     @task(cache_policy=NO_CACHE)
-    def run(self,
-            config: KommonitorProcessConfig,
+    def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
@@ -177,14 +178,14 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
                     valueMapping = []
                     for targetTime in all_times:
                         try:
-                            value = pykmhelper.changeAbsolute_referenceDate(collection.indicators[computation_id].time_series[feature], target_time, reference_date)
+                            value = pykmhelper.changeAbsolute_referenceDate(collection.indicators[computation_id].time_series[feature], targetTime, reference_date)
                         except RuntimeError as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
                             job_summary.add_processing_error("INDICATOR", computation_id, str(r), targetTime, feature)
                             value = None
                             
-                        valueMapping.append({"indicatorValue": value, "timestamp": target_time})
+                        valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
                     indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
                 
                 # Job Summary and results
@@ -196,8 +197,8 @@ class KmIndicatorAbsChangeRefDate(KommonitorProcess):
                 result.add_indicator_values(indicator_values)
                 result.complete_spatial_unit_result()
 
-                print(result.values)
-                print(job_summary.summary)
+                logger.info(result.values)
+                logger.info(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:

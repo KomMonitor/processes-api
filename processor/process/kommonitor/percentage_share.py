@@ -1,22 +1,56 @@
-import datetime
-from typing import Dict, Optional
+import json
+from typing import Tuple
+import logging
+import math
 
 import openapi_client
 from openapi_client import ApiClient
-from openapi_client.rest import ApiException
+from prefect import task, flow
+from prefect.cache_policies import NO_CACHE
+from pygeoapi.process.base import *
+from pygeoapi.util import JobStatus
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
+    AdditionalProcessIOParameters
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+
 # from pandas import isnull
 import pandas as pd
 
-from pygeoapi.process.base import *
-from pygeoapi.util import JobStatus
-from pygeoapi_prefect.schemas import ProcessInput, ProcessDescription, ProcessIOType, ProcessIOSchema, ProcessJobControlOption, Parameter, AdditionalProcessIOParameters, OutputExecutionResultInternal, ProcessOutput
+# from ..base import DataManagementException
 
-from ..base import KOMMONITOR_DATA_MANAGEMENT_URL, fetch_indicator_timeseries, fetch_spatial_unit_metadata
-from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorJobSummary, KommonitorResult
-from ..util import dataio
+try:
+    from .. import pykmhelper
+except ImportError:
+    from processor.process import pykmhelper
+
+try:
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+except ImportError:
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+
+try:
+    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+    from ..util import dataio
+except ImportError:
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+    from processor.process.util import dataio
+
+
+@flow(persist_result=True, name="hello_world", flow_run_name=generate_flow_run_name)
+def process_flow(
+        job_id: str,
+        execution_request: schemas.ExecuteRequest
+) -> dict:
+    return KommonitorProcess.execute_process_flow(PercentageShare.run, job_id, execution_request)
 
 
 class PercentageShare(KommonitorProcess):
+
+    process_flow = process_flow
+
     detailed_process_description = ProcessDescription(
         id="percentage-share",
         version="0.0.1",
@@ -91,10 +125,13 @@ class PercentageShare(KommonitorProcess):
         outputs = KommonitorProcess.common_output
     )
 
+
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
     def run(self,
             config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> (JobStatus, KommonitorResult):
+            data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
 
         logger.debug("Starting execution...")
 

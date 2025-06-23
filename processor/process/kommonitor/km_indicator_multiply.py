@@ -200,8 +200,8 @@ class KmIndicatorMultiply(KommonitorProcess):
                 result.add_indicator_values(indicator_values)
                 result.complete_spatial_unit_result()
 
-                print(result.values)
-                print(job_summary.summary)
+                logger.info(result.values)
+                logger.info(job_summary.summary)
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
