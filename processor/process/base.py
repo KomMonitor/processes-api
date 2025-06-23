@@ -489,7 +489,7 @@ class KommonitorProcess(BasePrefectProcessor):
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        status, result, job_summary = run(config, logger, dmc)
+        status, result, job_summary = run(config = config, logger = logger, data_management_client = dmc)
         logger.debug(f"Job status: {status}")
         if status == JobStatus.failed:
             output = {
