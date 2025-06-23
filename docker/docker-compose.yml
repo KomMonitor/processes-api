@@ -13,6 +13,7 @@ services:
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
       PROCESS_RESULTS_DIR: /app/results
+      PYTHONPATH: ${PYTHONPATH}:/app
     ports:
      - 8000:8000
      - 8099:8099
