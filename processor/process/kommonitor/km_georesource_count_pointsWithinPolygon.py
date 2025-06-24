@@ -47,8 +47,8 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_count_pointsWithinPolygon",
         version="0.0.1",
-        title="Division zweier Indikatoren",
-        description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
+        title="Anzahl Punkte in Polygon",
+        description= "Auswahl einer punktbasierten Georessource, für die eine Punkt-in-Polygon Analyse durchgeführt wird, um die Anzahl der Punkte pro Raumeinheit zu erhalten. Optional können die Punktdaten anhand einer Objekteigenschaft sowie einem Filterwert dieser Objekteigenschaft gefiltert werden (z. B. Objekteigenschaft: Schulform, Filterwert: Grundschule, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Anzahl, Filterwert: 50, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -59,30 +59,30 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "titleShort": "Anzahl Punkte in Polygon",
+                        "apiName": "georesource_pointsInPolygon",
+                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
+                        "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
+                        "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [
-                           {
-                            "id": "reference_id",
-                            "title": "Notwendiger Dividend-Indikator",
+                            {
+                            "id": "georesource_id",
+                            "title": "Benötigte punktbasierte Georessource",
                             "description": "",
                             "contents": [
-                                "reference_id"
+                                "georesource_id"
                             ]
                             },
                             {
-                            "id": "computation_id",
-                            "title": "Notwendiger Divisor-Indikator",
+                            "id": "comp_filter",
+                            "title": "Filter durch eine Objekteigenschaft (Optional)",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "comp_filter"
                             ]
-                            },
+                            }
                         ]
-                    }]
+                        }]
                 )
             ]
         ),
@@ -154,6 +154,19 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 title="Filterwert",
                 description="Wert nach dem die Objekte gefiltert werden sollen",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None)
+            ),
+            "comp_filter": ProcessInput(
+                id="comp_filter",
+                title="Filter durch eine Objekteigenschaft",
+                description="",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    default={
+                        "compFilterProp": "",
+                        "compFilterOperator" : "",
+                        "compFilterPropVal" : ""
+                    }
+                )
             )
         }, 
         outputs = KommonitorProcess.common_output

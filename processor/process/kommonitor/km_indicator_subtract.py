@@ -56,21 +56,28 @@ class KmIndicatorSubtract(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_subtract",
+                        "formula": "$ I_{ref} - \sum_{n=1}^{m} I_{n} $",
+                        "calculation_info": "Subtraktion der (Basis-)Indikatoren vom Referenzindikator",
+                        "dynamicFormula": "$$  I_{ref} - ( sum_baseIndicators ) $$",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${refIndicatorSelection.indicatorName} [${refIndicatorSelection.unit}]<br/>",
                         "inputBoxes": [
                            {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
+                            "id": "reference_id",
+                            "title": "Notwendiger Referenzindikator (Minuend)",
+                            "description": "",
                             "contents": [
-                                "dummy"
+                                "reference_id"
                             ]
-                            }
-                            
+                            },
+                            {
+                            "id": "computation_ids",
+                            "title": "Notwendige (Basis-)Indikatoren (Subtrahenden)",
+                            "description": "",
+                            "contents": [
+                                "computation_ids"
+                            ]
+                            },
                         ]
                     }]
                 )

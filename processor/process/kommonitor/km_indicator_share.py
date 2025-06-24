@@ -60,7 +60,7 @@ class KmIndicatorShare(KommonitorProcess):
                         "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator",
                         "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} $$",
                         "dynamicFormula": "$$ \\frac{ sum_baseIndicators }{ I_{ref}} $$",
-                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${indicatorName} [ ${unit} ]<br/>",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]<br/>",
                         "inputBoxes": [
                            {
                             "id": "reference_id",
