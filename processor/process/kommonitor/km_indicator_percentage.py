@@ -141,7 +141,7 @@ class KmIndicatorPercentage(KommonitorProcess):
             ti.get_indicator_by_id(indicators_controller)
             
             for indicator in collection.indicators:
-                collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller)
+                collection.indicators[indicator].get_indicator_by_id(indicators_controller)
 
             # calculate intersection dates and all dates that have to be computed according to target_time schema
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   

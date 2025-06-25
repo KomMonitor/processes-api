@@ -209,9 +209,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                     valueMapping = []
                     for targetTime in all_times:
                         try:
-                            time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            
-                            value = func(collection.indicators[computation_id].time_series[feature], time_with_prefix, number_of_temporal_items)
+                            value = func(collection.indicators[computation_id].time_series[feature], targetTime, number_of_temporal_items)
                         except RuntimeError as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
