@@ -44,8 +44,8 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_miscStatistics",
         version="0.0.1",
-        title="Division zweier Indikatoren",
-        description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
+        title="Statistiken anhand Eigenschaft der punktbasierten Georessource",
+        description= "Auswahl einer punktbasierten Georessource, für die anhand einer bestimmten Eigenschaft und Auswahl einer statistischen Methode Indikatoren-Kennwerte pro Raumeinheit zu enthalten.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -56,28 +56,34 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "apiName": "georesource_miscStatistics",
+                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> f&uuml;r alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gew&auml;hlter Objekt-Eigenschaft",
                         "inputBoxes": [
-                           {
-                            "id": "reference_id",
-                            "title": "Notwendiger Dividend-Indikator",
+                            {
+                            "id": "georesource_id",
+                            "title": "Benötigte punkthafte Georessource",
                             "description": "",
                             "contents": [
-                                "reference_id"
+                                "georesource_id"
                             ]
                             },
                             {
-                            "id": "computation_id",
-                            "title": "Notwendiger Divisor-Indikator",
+                            "id": "compProp",
+                            "title": "Notwendige Objekt-Eigenschaft",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "compProp"
                             ]
                             },
+                            {
+                            "id": "comp_meth",
+                            "title": "Notwendige statistische Berechnungsmethode",
+                            "description": "Auswahl der statistischen Berechnungsmethode",
+                            "contents": [
+                                "compMeth"
+                            ]
+                            }
                         ]
                     }]
                 )
@@ -99,8 +105,40 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             "compMeth": ProcessInput(
                 id= "compMeth",
                 title="Auswahl der statistischen Berechnungsmethode",
-                description="Zu verwendende statistische Berechnungsmethode",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                description="",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    enum=[
+                        {
+                            "apiName": "MIN",
+                            "displayName": "Minimum",
+                        },
+                        {
+                            "apiName": "MAX",
+                            "displayName": "Maximum",
+                        },
+                        {
+                            "apiName": "MEAN",
+                            "displayName": "Arithmetisches Mittel",
+                        },
+                        {
+                            "apiName": "MEDIAN",
+                            "displayName": "Median",
+                        },
+                        {
+                            "apiName": "SUM",
+                            "displayName": "Summe",
+                        },
+                        {
+                            "apiName": "STANDARD_DEVIATION",
+                            "displayName": "Standardabweichung",
+                        }
+                    ],                    
+                    default={
+                        "apiName": "MIN",
+                        "displayName": "Minimum",
+                    }
+                )
             )
         }, 
         outputs = KommonitorProcess.common_output
