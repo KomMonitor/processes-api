@@ -42,31 +42,39 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_absChange_nTemporalItems",
+        id="km_indicator_trend_nTemporalItems",
         version="0.0.1",
-        title="Absolute Veränderung bezogen auf Zeitspanne",
-        description= "Berechnet die absolute Veränderung zwischen zwei Zeitpunkten eines Indikators.",
+        title="Trendberechnung bezogen auf Zeitspanne",
+        description= "Berechnet den Trend über eine vergangene Zeitspanne eines Indikators als Steigung b der Geraden bei einer linearen Regression im Verhältnis zum Indikatorwert des ersten Jahres.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
             parameters=[
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_trend_nTemporalItems",
+                        "formula": "$$ T = 100 \\times \\frac{b}{I_{1}} $$ wobei $$ b = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (I_{n} - \\bar{I}))}{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2} $$",
+                        "legend": "$T$ = Trend <br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",
+                        "dynamicFormula": "$$ T = 100 \\times \\frac{b}{B_{1}} $$ wobei $$ b = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (B_{n} - \\bar{B}))}{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2} $$",
+                        "dynamicLegend": "<br/> $T$: Trend <br/> $m$ = ${number_of_temporal_items} konsekutive vergangene ${temporal_type} <br/> $A_{n}$ = aufeinander folgende ${temporal_type}<br/> $\\bar{A}$ = arithmetisches Mittel der aufeinander folgenden ${temporal_type}<br/> $B_{n}$ = Indikatorenwerte der aufeinander folgenden ${temporal_type}<br/> $\\bar{B}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden ${temporal_type}<br/> $B$ = Indikator ' ${compIndicatorSelection.indicatorName}  [${compIndicatorSelection.unit}]'",
                         "inputBoxes": [
-                           {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
+                            {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
                             "contents": [
-                                "dummy"
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "temporal_options",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "number_of_temporal_items",
+                                "temporal_type"
                             ]
                             }
-                            
                         ]
                     }]
                 )

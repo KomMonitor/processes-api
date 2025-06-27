@@ -60,6 +60,8 @@ class KmIndicatorPromille(KommonitorProcess):
                         "apiName": "indicator_promille",
                         "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} \\times 1000 $$",
                         "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator multipliziert mit 1000",
+                        "dynamicFormula": "$$ \\frac{ sum_baseIndicators }{ I_{ref}} \\times 1000 $$",
+                        "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]<br/>",
                         "inputBoxes": [
                            {
                             "id": "reference_id",
