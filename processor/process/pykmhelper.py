@@ -2867,7 +2867,7 @@ def computeTrend(feature, dates):
     # build array of indicator values corresponding to dates array
     for date in dates:
         indicatorValue = getIndicatorValue(feature, date)
-        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
+        if not isNoDataValue(indicatorValue) and not math.isnan(indicatorValue):
             indicatorValueArray.append(indicatorValue)
         else:
             indicatorValueArray.append(None)
@@ -2888,12 +2888,12 @@ def computeTrend(feature, dates):
         
         if firstYearValue == 0:
             return None
-        
+
+
         trend_percent = 100 * (linearRegressionSlope / firstYearValue)
         return trend_percent
     except:
-        log("Error during trend computation for feature with ID: " + str(getSpatialUnitFeatureIdValue(feature)) + " and NAME: " + str(getSpatialUnitFeatureNameValue(feature)))
-        log("Returning None")
+        log("Error during trend computation, Returning None")
         return None
     
 
