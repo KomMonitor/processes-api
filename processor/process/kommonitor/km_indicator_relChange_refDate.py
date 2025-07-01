@@ -52,21 +52,27 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_relChange_refDate",
+                        "formula": "$$ 100 \\times \\frac{A_{N} - A_{M}}{A_{M}} $$",
+                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt ",
+                        "dynamicLegend": "<br/> $A$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt '${reference_date}'",
                         "inputBoxes": [
-                           {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
+                            {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
                             "contents": [
-                                "dummy"
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "reference_date",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "reference_date"
                             ]
                             }
-                            
                         ]
                     }]
                 )

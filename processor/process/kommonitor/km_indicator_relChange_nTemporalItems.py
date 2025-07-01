@@ -53,20 +53,28 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_change_absolute",
+                        "formula": "$ 100 \\times \\frac{I_{N} - I_{M}}{I_{M}} $",
+                        "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
+                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
                         "inputBoxes": [
-                           {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
+                            {
+                            "id": "computation_id",
+                            "title": "Notwendiger Basis-Indikator",
+                            "description": "",
                             "contents": [
-                                "dummy"
+                                "computation_id"
+                            ]
+                            },
+                            {
+                            "id": "temporal_options",
+                            "title": "Notwendiger zeitlicher Bezug",
+                            "description": "",
+                            "contents": [
+                                "number_of_temporal_items",
+                                "temporal_type"
                             ]
                             }
-                            
                         ]
                     }]
                 )

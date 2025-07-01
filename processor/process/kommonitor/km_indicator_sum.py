@@ -56,21 +56,21 @@ class KmIndicatorSum(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ dummy  $",
-                        "legend": "<br/>$dummy$ ",
-                        "dynamicLegend": "<br/> $dummy$",
+                        "apiName": "indicator_sum",
+                        "calculation_info": "Summe aller (Basis-)Indikatoren",
+                        "formula": "$ \\sum_{n=1}^{m} I_{n} $",
+                        "legend": "",
+                        "dynamicFormula": "$$ sum_baseIndicators $$",
+                        "dynamicLegend": "${list_baseIndicators}",
                         "inputBoxes": [
-                           {
-                            "id": "dummy",
-                            "title": "dummy",
-                            "description": "dummy",
-                            "contents": [
-                                "dummy"
-                            ]
+                            {
+                                "id": "computation_ids",
+                                "title": "Notwendige (Basis-)Indikatoren (Summanden)",
+                                "description": "",
+                                "contents": [
+                                    "computation_ids"
+                                ]
                             }
-                            
                         ]
                     }]
                 )

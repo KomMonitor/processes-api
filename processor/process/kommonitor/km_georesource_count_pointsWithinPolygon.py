@@ -61,7 +61,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                     value=[{
                         "titleShort": "Anzahl Punkte in Polygon",
                         "apiName": "georesource_pointsInPolygon",
-                        "dynamicLegend": "<br/> $A$: ${indicatorName} [ ${unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",
+                        "dynamicLegend": "<b>Berechnung gem&auml;&szlig; Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> 'georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [
