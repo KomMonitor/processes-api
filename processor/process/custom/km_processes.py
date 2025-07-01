@@ -278,7 +278,6 @@ def delete_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, i
                 'scheduleID': schedule_id,
                 'status': "DISMISSED",
                 'message': 'Schedule dismissed',
-                'progress': 100,
                 'links': [{
                     'href': schedules_url,
                     'rel': 'up',
