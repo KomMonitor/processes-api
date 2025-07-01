@@ -22,6 +22,7 @@ from pygeoapi.util import (
 from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
+from pygeoapi_prefect.process.base import (ScheduleNotFoundError,)
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
     else:
         try:
             schedules = [api.manager.get_schedule(schedule_id)]
-        except JobNotFoundError:
+        except ScheduleNotFoundError:
             return api.get_exception(
                 HTTPStatus.NOT_FOUND, headers, request.format,
                 'InvalidParameterValue', schedule_id)
@@ -248,3 +249,48 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
 
     return headers, HTTPStatus.OK, to_json(serialized_schedules,
                                            api.pretty_print)
+
+
+def delete_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, int, str]:
+    """
+    Delete a schedule
+
+    :param schedule_id: schedule identifier
+
+    :returns: tuple of headers, status code, content
+    """
+
+    response_headers = request.get_response_headers(
+        SYSTEM_LOCALE, **api.api_headers)
+    try:
+        success = api.manager.delete_schedule(schedule_id)
+    except ScheduleNotFoundError:
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, response_headers, request.format,
+            'NoSuchSchedule', schedule_id
+        )
+    else:
+        if success:
+            http_status = HTTPStatus.OK
+            schedules_url = f"{api.base_url}/schedules"
+
+            response = {
+                'scheduleID': schedule_id,
+                'status': "DISMISSED",
+                'message': 'Schedule dismissed',
+                'progress': 100,
+                'links': [{
+                    'href': schedules_url,
+                    'rel': 'up',
+                    'type': FORMAT_TYPES[F_JSON],
+                    'title': l10n.translate('The schedule list for the current process', request.locale)  # noqa
+                }]
+            }
+        else:
+            return api.get_exception(
+                HTTPStatus.INTERNAL_SERVER_ERROR, response_headers,
+                request.format, 'InternalError', schedule_id
+            )
+    logger.info(response)
+    # TODO: this response does not have any headers
+    return {}, http_status, to_json(response, api.pretty_print)
