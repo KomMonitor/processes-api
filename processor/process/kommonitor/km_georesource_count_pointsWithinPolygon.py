@@ -61,7 +61,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                     value=[{
                         "titleShort": "Anzahl Punkte in Polygon",
                         "apiName": "georesource_pointsInPolygon",
-                        "dynamicLegend": "<b>Berechnung gem&auml;&szlig; Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> 'georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gem&auml;&szlig; Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [
@@ -92,68 +92,6 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
-            ),
-            "compFilterProp": ProcessInput(
-                id= "compFilterProp",
-                title="Objekteigenschaft.",
-                description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None),
-            ),
-            "compFilterOperator": ProcessInput(
-                id= "compFilterOperator",
-                title="Operator der Filteroption",
-                description="Zu verwendender Operator für die Objektfilterung",
-                schema_=ProcessIOSchema(
-                    type_=ProcessIOType.OBJECT,
-                    enum=[
-                        {
-                            "apiName": "Equal",
-                            "displayName": "Gleich"
-                        },
-                        {
-                            "apiName": "Greater_than",
-                            "displayName": "Groeßer als"
-                        },
-                        {
-                            "apiName": "Greater_than_or_equal",
-                            "displayName": "Groeßer als oder gleich"
-                        },
-                        {
-                            "apiName": "Less_than",
-                            "displayName": "Kleiner als"
-                        },
-                        {
-                            "apiName": "Less_than_or_equal",
-                            "displayName": "Kleiner als oder gleich"
-                        },
-                        {
-                            "apiName": "Unequal",
-                            "displayName": "Ungleich"
-                        },
-                        {
-                            "apiName": "Contains",
-                            "displayName": "Enthaelt (Komma separierte Liste)"
-                        },
-                        {
-                            "apiName": "Range",
-                            "displayName": "Innerhalb"
-                        },
-                        {
-                            "apiName": "None",
-                            "displayName": "Ungefiltert"
-                        }
-                    ],
-                    default={
-                        "apiName": "None",
-                        "displayName": "Ungefiltert"
-                    }
-                )
-            ),
-            "compFilterPropVal": ProcessInput(
-                id= "compFilterPropVal",
-                title="Filterwert",
-                description="Wert nach dem die Objekte gefiltert werden sollen",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None)
             ),
             "comp_filter": ProcessInput(
                 id="comp_filter",
