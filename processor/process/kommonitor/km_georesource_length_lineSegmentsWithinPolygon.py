@@ -44,8 +44,8 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_length_lineSegmentsWithinPolygon",
         version="0.0.1",
-        title="Division zweier Indikatoren",
-        description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
+        title="Summierte Linienlänge pro Gebietskörperschaft",
+        description= "Auswahl einer linienbasierten Georessource, für die eine Liniensegment-in-Polygon Analyse durchgeführt wird, um die Länge der Linien pro Raumeinheits-Feature zu ermitteln. Optional können die Liniendaten anhand einer Objekteigenschaft sowie eines Filterwerts dieser Objekteigenschaft gefiltert werden (z. B. Objekteigenschaft: Straßentyp, Filterwert: Autobahn, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Steigung, Filterwert: 15, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -56,101 +56,51 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "apiName": "georesource_length_lineSegmentsWithinPolygon",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Summierte Linienlänge des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "calculation_info": "Summe der Länge aller Linien innerhalb jedes Raumeinheits-Features.",
+                        "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [
-                           {
-                            "id": "reference_id",
-                            "title": "Notwendiger Dividend-Indikator",
+                            {
+                            "id": "georesource_id_line",
+                            "title": "Benötigte linienbasierte Georessource",
                             "description": "",
                             "contents": [
-                                "reference_id"
+                                "georesource_id_line"
                             ]
                             },
                             {
-                            "id": "computation_id",
-                            "title": "Notwendiger Divisor-Indikator",
+                            "id": "comp_filter",
+                            "title": "Filter durch eine Objekteigenschaft (Optional)",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "comp_filter"
                             ]
-                            },
+                            }
                         ]
                     }]
                 )
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "compGeoId": ProcessInput(
+            "compGeoId_line": ProcessInput(
                 id= "compGeoId",
                 title="Auswahl der für die Berechnung erforderlichen Linienhaften Georesource",
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             ),
-            "compFilterProp": ProcessInput(
-                id= "compFilterProp",
-                title="Objekteigenschaft.",
-                description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None),
-            ),
-            "compFilterOperator": ProcessInput(
-                id= "compFilterOperator",
-                title="Operator der Filteroption",
-                description="Zu verwendender Operator für die Objektfilterung",
+            "comp_filter": ProcessInput(
+                id="comp_filter",
+                title="Filter durch eine Objekteigenschaft",
+                description="",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
-                    enum=[
-                        {
-                            "apiName": "Equal",
-                            "displayName": "Gleich"
-                        },
-                        {
-                            "apiName": "Greater_than",
-                            "displayName": "Groeßer als"
-                        },
-                        {
-                            "apiName": "Greater_than_or_equal",
-                            "displayName": "Groeßer als oder gleich"
-                        },
-                        {
-                            "apiName": "Less_than",
-                            "displayName": "Kleiner als"
-                        },
-                        {
-                            "apiName": "Less_than_or_equal",
-                            "displayName": "Kleiner als oder gleich"
-                        },
-                        {
-                            "apiName": "Unequal",
-                            "displayName": "Ungleich"
-                        },
-                        {
-                            "apiName": "Contains",
-                            "displayName": "Enthaelt (Komma separierte Liste)"
-                        },
-                        {
-                            "apiName": "Range",
-                            "displayName": "Innerhalb"
-                        },
-                        {
-                            "apiName": "None",
-                            "displayName": "Ungefiltert"
-                        }
-                    ],
                     default={
-                        "apiName": "None",
-                        "displayName": "Ungefiltert"
+                        "compFilterProp": "",
+                        "compFilterOperator" : "",
+                        "compFilterPropVal" : ""
                     }
                 )
-            ),
-            "compFilterPropVal": ProcessInput(
-                id= "compFilterPropVal",
-                title="Filterwert",
-                description="Wert nach dem die Objekte gefiltert werden sollen",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None)
             )
         }, 
         outputs = KommonitorProcess.common_output

@@ -44,8 +44,8 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_share_byPropertyValue",
         version="0.0.1",
-        title="Division zweier Indikatoren",
-        description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
+        title="Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
+        description= "Auswahl einer punktbasierten Georessource, für die eine Punkt-in-Polygon Analyse durchgeführt wird. Hierbei wird der prozentuale Anteil der gewählten Punkte an allen Punkten der Georessource pro Raumeinheits-Feature ermittelt. Die Punktdaten werden anhand einer Objekteigenschaft sowie einem Filterwert dieser Objekteigenschaft gefiltert (z. B. Objekteigenschaft: Schulform, Filterwert: Grundschule, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Anzahl, Filterwert: 50, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -56,28 +56,26 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
-                        "apiName": "indicator_division",
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "apiName": "georesource_subset_share",
+                        "calculation_info": "Prozentualer Anteil gewählter Punkte innerhalb jedes Raumeinheits-Features. Auswahl: Anwenden eines Filters durch eine Objekteigenschaft",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i>  <br/> <i>Auswahlkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "inputBoxes": [
-                           {
-                            "id": "reference_id",
-                            "title": "Notwendiger Dividend-Indikator",
+                            {
+                            "id": "georesource_id",
+                            "title": "Benötigte punktbasierte Georessource",
                             "description": "",
                             "contents": [
-                                "reference_id"
+                                "georesource_id"
                             ]
                             },
                             {
-                            "id": "computation_id",
-                            "title": "Notwendiger Divisor-Indikator",
+                            "id": "comp_filter",
+                            "title": "Auswahl durch eine Objekteigenschaft",
                             "description": "",
                             "contents": [
-                                "computation_id"
+                                "comp_filter"
                             ]
-                            },
+                            }
                         ]
                     }]
                 )
@@ -90,63 +88,18 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
             ),
-            "compFilterProp": ProcessInput(
-                id= "compFilterProp",
-                title="Objekteigenschaft.",
-                description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None),
-            ),
-            "compFilterOperator": ProcessInput(
-                id= "compFilterOperator",
-                title="Operator der Filteroption",
-                description="Zu verwendender Operator für die Objektfilterung",
+            "comp_filter": ProcessInput(
+                id="comp_filter",
+                title="Filter durch eine Objekteigenschaft",
+                description="",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
-                    enum=[
-                        {
-                            "apiName": "Equal",
-                            "displayName": "Gleich"
-                        },
-                        {
-                            "apiName": "Greater_than",
-                            "displayName": "Groeßer als"
-                        },
-                        {
-                            "apiName": "Greater_than_or_equal",
-                            "displayName": "Groeßer als oder gleich"
-                        },
-                        {
-                            "apiName": "Less_than",
-                            "displayName": "Kleiner als"
-                        },
-                        {
-                            "apiName": "Less_than_or_equal",
-                            "displayName": "Kleiner als oder gleich"
-                        },
-                        {
-                            "apiName": "Unequal",
-                            "displayName": "Ungleich"
-                        },
-                        {
-                            "apiName": "Contains",
-                            "displayName": "Enthaelt (Komma separierte Liste)"
-                        },
-                        {
-                            "apiName": "Range",
-                            "displayName": "Innerhalb"
-                        }
-                    ],
                     default={
-                        "apiName": "None",
-                        "displayName": "Ungefiltert"
+                        "compFilterProp": "",
+                        "compFilterOperator" : "",
+                        "compFilterPropVal" : ""
                     }
                 )
-            ),
-            "compFilterPropVal": ProcessInput(
-                id= "compFilterPropVal",
-                title="Filterwert",
-                description="Wert nach dem die Objekte gefiltert werden sollen",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, default=None)
             )
         }, 
         outputs = KommonitorProcess.common_output
