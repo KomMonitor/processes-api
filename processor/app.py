@@ -106,13 +106,16 @@ def schedule_process(process_id):
 
 @APP.get('/schedules')
 @APP.route('/schedules/<schedule_id>',
-           methods=['GET'])
+           methods=['GET', 'DELETE'])
 @require_oauth()
 def get_schedules(schedule_id=None):
     if schedule_id is None:
         return flask_app.execute_from_flask(km_processes.get_schedules, request)
     else:
-        return flask_app.execute_from_flask(km_processes.get_schedules, request, schedule_id)
+        if request.method == 'DELETE':
+            return flask_app.execute_from_flask(km_processes.delete_schedule, request, schedule_id)
+        else:
+            return flask_app.execute_from_flask(km_processes.get_schedules, request, schedule_id)
 
 
 @APP.get('/jobs')
