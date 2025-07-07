@@ -80,7 +80,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                             {
                             "id": "comp_meth",
                             "title": "Notwendige statistische Berechnungsmethode",
-                            "description": "Auswahl der statistischen Berechnungsmethode",
+                            "description": "",
                             "contents": [
                                 "compMeth"
                             ]
