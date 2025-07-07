@@ -44,7 +44,7 @@ class KmIndicatorContinuityNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_continuity_nTemporalItems",
         version="0.0.1",
-        title="Grad der Kontinuität bezogen auf Zeitspanne",
+        title="Kontinuität (mittels Pearson Korrelation)",
         description= "Berechnet den Grad der Kontinuität über eine vergangene Zeitspanne eines Indikators als Pearson Korrelation bei einer linearen Regression über die betrachtete Zeitspanne.",
         example={},
         job_control_options=[
@@ -56,7 +56,7 @@ class KmIndicatorContinuityNTemporalItems(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Kontinuität (mittels Pearson Korrelation)",
+                        "longTitle": "Grad der Kontinuität bezogen auf Zeitspanne",
                         "apiName": "indicator_continuity",
                         "formula": "$$ r = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (I_{n} - \\bar{I}))}{\\sqrt{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2 \\times \\sum_{n=1}^{m} (I_{n} - \\bar{I})^2}} $$",
                         "legend": "<br/>$r$ = Korrelationskoeffizient nach Pearson bei linearer Regression &uuml;ber die betrachtete Zeitspanne <br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",

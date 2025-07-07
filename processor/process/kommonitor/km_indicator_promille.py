@@ -44,7 +44,7 @@ class KmIndicatorPromille(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_promille",
         version="0.0.1",
-        title="Promille Wert mehrerer Basisindikatoren von einem Referenzindikator",
+        title="Promille Wert (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
         description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren durch den Wert des Referenzindikators dividiert.",
         example={},
         job_control_options=[
@@ -56,7 +56,7 @@ class KmIndicatorPromille(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Promille-Wert (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
+                        "longTitle": "Promille Wert mehrerer Basisindikatoren von einem Referenzindikator",
                         "apiName": "indicator_promille",
                         "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} \\times 1000 $$",
                         "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator multipliziert mit 1000",

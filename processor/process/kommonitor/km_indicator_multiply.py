@@ -44,7 +44,7 @@ class KmIndicatorMultiply(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_multiply",
         version="0.0.1",
-        title="Multiplikation beliebig vieler Indikatoren",
+        title="Multiplikation (beliebiger Indikatoren)",
         description= "Berechnet den Wert welcher durch Multiplikation beliebig vieler Indikatoren entsteht.",
         example={},
         job_control_options=[
@@ -56,7 +56,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
+                        "longTitle": "Multiplikation beliebig vieler Indikatoren",
                         "apiName": "indicator_multiplication",
                         "calculation_info": "Produkt aller (Basis-)Indikatoren",
                         "formula": "$ \\prod_{n=1}^{m} I_{n} $",

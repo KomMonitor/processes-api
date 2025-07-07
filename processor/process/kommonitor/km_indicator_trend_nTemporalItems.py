@@ -44,7 +44,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_trend_nTemporalItems",
         version="0.0.1",
-        title="Trendberechnung bezogen auf Zeitspanne",
+        title="Trend (mittels linearer Regression)",
         description= "Berechnet den Trend über eine vergangene Zeitspanne eines Indikators als Steigung b der Geraden bei einer linearen Regression im Verhältnis zum Indikatorwert des ersten Jahres.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
@@ -52,6 +52,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Trendberechnung bezogen auf Zeitspanne",
                         "apiName": "indicator_trend_nTemporalItems",
                         "formula": "$$ T = 100 \\times \\frac{b}{I_{1}} $$ wobei $$ b = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (I_{n} - \\bar{I}))}{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2} $$",
                         "legend": "$T$ = Trend <br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",

@@ -44,7 +44,7 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_absChange_nTemporalItems",
         version="0.0.1",
-        title="Absolute Veränderung bezogen auf Zeitspanne",
+        title="Veränderung absolut",
         description= "Berechnet die absolute Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
@@ -52,7 +52,7 @@ class KmIndicatorAbsChangeNTemporalItems(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Veränderung absolut",
+                        "longTitle": "Absolute Veränderung bezogen auf Zeitspanne",
                         "apiName": "indicator_change_absolute",
                         "formula": "$ I_{N} - I_{M} $",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",

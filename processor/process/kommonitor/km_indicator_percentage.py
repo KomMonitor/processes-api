@@ -44,7 +44,7 @@ class KmIndicatorPercentage(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_percentage",
         version="0.0.1",
-        title="Prozentualer Anteil mehrerer Basisindikatoren von einem Referenzindikator",
+        title="Prozentualer Anteil (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
         description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren durch den Wert des Referenzindikators dividiert.",
         example={},
         job_control_options=[
@@ -56,6 +56,7 @@ class KmIndicatorPercentage(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Prozentualer Anteil mehrerer Basisindikatoren von einem Referenzindikator",
                         "apiName": "indicator_percentage",
                         "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator multipliziert mit 100",
                         "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} \\times 100 $$",

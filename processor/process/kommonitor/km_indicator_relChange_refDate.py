@@ -44,7 +44,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_relChange_refDate",
         version="0.0.1",
-        title="Relative Veränderung bezogen auf einen Referenzzeitpunkt",
+        title="Veränderung relativ mit festem Referenzzeitpunkt",
         description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
@@ -52,6 +52,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Relative Veränderung bezogen auf einen Referenzzeitpunkt",
                         "apiName": "indicator_relChange_refDate",
                         "formula": "$$ 100 \\times \\frac{A_{N} - A_{M}}{A_{M}} $$",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt ",
