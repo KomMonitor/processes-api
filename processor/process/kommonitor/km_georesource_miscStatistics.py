@@ -44,7 +44,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_miscStatistics",
         version="0.0.1",
-        title="Statistiken anhand Eigenschaft der punktbasierten Georessource",
+        title="Statistiken anhand Objekteigenschaft (Punktdatensätze)",
         description= "Auswahl einer punktbasierten Georessource, für die anhand einer bestimmten Eigenschaft und Auswahl einer statistischen Methode Indikatoren-Kennwerte pro Raumeinheit zu enthalten.",
         example={},
         job_control_options=[
@@ -56,9 +56,10 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Statistiken anhand Eigenschaft der punktbasierten Georessource",
                         "apiName": "georesource_miscStatistics",
-                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> f&uuml;r alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
-                        "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gew&auml;hlter Objekt-Eigenschaft",
+                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gewählter Objekt-Eigenschaft",
                         "inputBoxes": [
                             {
                             "id": "georesource_id",
@@ -79,7 +80,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                             {
                             "id": "comp_meth",
                             "title": "Notwendige statistische Berechnungsmethode",
-                            "description": "Auswahl der statistischen Berechnungsmethode",
+                            "description": "",
                             "contents": [
                                 "compMeth"
                             ]

@@ -44,7 +44,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_relChange_nTemporalItems",
         version="0.0.1",
-        title="Relative Veränderung bezogen auf Zeitspanne",
+        title="Veränderung relativ",
         description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
         example={},
         additional_parameters=AdditionalProcessIOParameters(
@@ -52,7 +52,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Multiplikation (beliebiger Indikatoren)",
+                        "longTitle": "Relative Veränderung bezogen auf Zeitspanne",
                         "apiName": "indicator_change_absolute",
                         "formula": "$ 100 \\times \\frac{I_{N} - I_{M}}{I_{M}} $",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",

@@ -370,7 +370,7 @@ class KommonitorProcess(BasePrefectProcessor):
                 min_items=1
             )
         ),
-        "target_time ": ProcessInput(
+        "target_time": ProcessInput(
             title="target_time",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
@@ -387,7 +387,7 @@ class KommonitorProcess(BasePrefectProcessor):
                 }
             )
         ),
-        "execution_interval ": ProcessInput(
+        "execution_interval": ProcessInput(
             title="execution_interval",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,

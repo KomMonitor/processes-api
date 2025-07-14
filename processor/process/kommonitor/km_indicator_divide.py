@@ -44,7 +44,7 @@ class KmIndicatorDivide(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_divide",
         version="0.0.1",
-        title="Division zweier Indikatoren",
+        title="Division (Quotient zweier Indikatoren)",
         description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
         example={},
         job_control_options=[
@@ -56,7 +56,7 @@ class KmIndicatorDivide(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Division (Quotient zweier Indikatoren)",
+                        "longTitle": "Division zweier Indikatoren",
                         "apiName": "indicator_division",
                         "formula": "$ \\frac{I_{1}}{I_{2}}  $",
                         "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",

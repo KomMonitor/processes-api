@@ -44,7 +44,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_georesource_share_byPropertyValue",
         version="0.0.1",
-        title="Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
+        title="Prozentualer Anteil anhand Objekteigenschaft (Punktdatensätze)",
         description= "Auswahl einer punktbasierten Georessource, für die eine Punkt-in-Polygon Analyse durchgeführt wird. Hierbei wird der prozentuale Anteil der gewählten Punkte an allen Punkten der Georessource pro Raumeinheits-Feature ermittelt. Die Punktdaten werden anhand einer Objekteigenschaft sowie einem Filterwert dieser Objekteigenschaft gefiltert (z. B. Objekteigenschaft: Schulform, Filterwert: Grundschule, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Anzahl, Filterwert: 50, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
         example={},
         job_control_options=[
@@ -56,6 +56,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
                         "apiName": "georesource_subset_share",
                         "calculation_info": "Prozentualer Anteil gewählter Punkte innerhalb jedes Raumeinheits-Features. Auswahl: Anwenden eines Filters durch eine Objekteigenschaft",
                         "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i>  <br/> <i>Auswahlkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",

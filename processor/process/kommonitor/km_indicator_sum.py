@@ -56,6 +56,7 @@ class KmIndicatorSum(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Summe aus mehreren Indikatoren",
                         "apiName": "indicator_sum",
                         "calculation_info": "Summe aller (Basis-)Indikatoren",
                         "formula": "$ \\sum_{n=1}^{m} I_{n} $",

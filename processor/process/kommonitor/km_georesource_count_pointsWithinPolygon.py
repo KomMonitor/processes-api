@@ -59,9 +59,9 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "titleShort": "Anzahl Punkte in Polygon",
+                        "longTitle": "Anzahl Punktobjekte pro Gebietskörperschaft",
                         "apiName": "georesource_pointsInPolygon",
-                        "dynamicLegend": "<b>Berechnung gem&auml;&szlig; Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [

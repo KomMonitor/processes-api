@@ -44,7 +44,7 @@ class KmIndicatorSubtract(KommonitorProcess):
     detailed_process_description = ProcessDescription(
         id="km_indicator_subtract",
         version="0.0.1",
-        title="Subtraktion mehrerer Basisindikatoren von einem Referenzindikator",
+        title="Subtraktion von Basis-Indikatoren von einem Referenzindikator",
         description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren vom Wert des Referenzindikators abgezogen.",
         example={},
         job_control_options=[
@@ -56,6 +56,7 @@ class KmIndicatorSubtract(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
+                        "longTitle": "Subtraktion mehrerer Basisindikatoren von einem Referenzindikator",
                         "apiName": "indicator_subtract",
                         "formula": "$ I_{ref} - \sum_{n=1}^{m} I_{n} $",
                         "calculation_info": "Subtraktion der (Basis-)Indikatoren vom Referenzindikator",
