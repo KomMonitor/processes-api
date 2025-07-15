@@ -1898,16 +1898,17 @@ def intersectLineFeatureCollectionByPolygonFeature(lineStringCollection, polygon
     gdfLine = geoJSONtoGDF(lineStringCollection)
     gdfPolygon = geoJSONtoGDF(polygonFeature)
 
-    featureCollection = geojson.FeatureCollection({})
+    gdfLine = gdfLine.set_crs("EPSG:4326")
+    gdfPolygon = gdfPolygon.set_crs("EPSG:4326")
+
+    gdfLine = gdfLine.to_crs("EPSG:25832")
+    gdfPolygon = gdfPolygon.to_crs("EPSG:25832")
+
     i = 0
 
-    geoms = gdfLine.intersection(gdfPolygon.loc[0, "geometry"])
+    geoms = gpd.clip(gdfLine, gdfPolygon)
 
-    for geom in geoms:
-        gdfLine.loc[i, "geometry"] = geom
-        i = i + 1
-
-    featureOut = geojson.loads(gdfLine.to_json(drop_id=True))
+    featureOut = geojson.loads(geoms.to_json(drop_id=True))
     return featureOut
 
 
@@ -1921,9 +1922,12 @@ def summarizeLineSegmentLenghts(featureCollection):
     Returns:
         float64: returns the summarized length of all line segments
     """
-    gdf = geoJSONtoGDF(featureCollection)
-    length = gdf.length
-    return length.sum()
+    if len(featureCollection["features"]) == 0:
+        return None
+    else:
+        gdf = geoJSONtoGDF(featureCollection)
+        length = gdf.length
+        return length.sum()
 
 #
 #   From Here OpenRouteService
