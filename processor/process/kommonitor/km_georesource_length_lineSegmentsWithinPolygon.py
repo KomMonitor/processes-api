@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_georesource_length_lineSegmentsWithinPolygon"
 
-@flow(persist_result=True, name="km_georesource_length_lineSegmentsWithinPolygon", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_georesource_length_lineSegmentsWithinPolygon",
+        id=processName,
         version="0.0.1",
         title="Summierte Linienlänge je Polygon",
         description= "Auswahl einer linienbasierten Georessource, für die eine Liniensegment-in-Polygon Analyse durchgeführt wird, um die Länge der Linien pro Raumeinheits-Feature zu ermitteln. Optional können die Liniendaten anhand einer Objekteigenschaft sowie eines Filterwerts dieser Objekteigenschaft gefiltert werden (z. B. Objekteigenschaft: Straßentyp, Filterwert: Autobahn, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Steigung, Filterwert: 15, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
@@ -57,7 +61,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Summierte Linienlänge pro Gebietskörperschaft",
-                        "apiName": "georesource_length_lineSegmentsWithinPolygon",
+                        "apiName": processName,
                         "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Summierte Linienlänge des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe der Länge aller Linien innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",

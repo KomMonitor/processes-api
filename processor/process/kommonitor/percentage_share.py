@@ -41,7 +41,7 @@ except ImportError:
 # this name should be set for @flow(name='<processName>') and within detailed_process_description as 
 # additional_parameters.parameters[0].value[0].apiName
 # this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
-processName = "hello_world"
+processName = "hello_world_2"
 
 @flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
