@@ -181,9 +181,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                         try:
                             lines_in_polygon = pykmhelper.intersectLineFeatureCollectionByPolygonFeature(georesource_collection, feature)
                             collection_filtered_lines = pykmhelper.filter_feature_lifespan(lines_in_polygon, targetTime)
-                            
                             value = pykmhelper.summarizeLineSegmentLenghts(collection_filtered_lines)
-
                         except (RuntimeError, ZeroDivisionError) as r:
                             logger.error(r)
                             logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
