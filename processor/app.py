@@ -13,6 +13,8 @@ from flask_cors import CORS
 from auth import KomMonitorIntrospectTokenValidator
 from process.custom import km_processes
 
+import logging
+
 if not os.getenv("PYGEOAPI_CONFIG"):
     os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
 if not os.getenv("PYGEOAPI_OPENAPI"):
@@ -29,6 +31,11 @@ require_oauth.register_token_validator(KomMonitorIntrospectTokenValidator())
 APP = Flask(__name__, static_folder=STATIC_FOLDER, static_url_path='/static')
 APP.url_map.strict_slashes = API_RULES.strict_slashes
 APP.config['JSONIFY_PRETTYPRINT_REGULAR'] = CONFIG['server'].get('pretty_print', True)
+
+if __name__ != '__main__':
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    APP.logger.handlers = gunicorn_logger.handlers
+    APP.logger.setLevel(gunicorn_logger.level)
 
 CORS(APP)
 cors = CORS(APP, resources={

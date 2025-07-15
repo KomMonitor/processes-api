@@ -39,7 +39,6 @@ KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 
-
 @task
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
     if private:
@@ -98,6 +97,12 @@ def setup_logging(job_id: str) -> Logger:
     filelogger.setLevel(logging.DEBUG)
     logger = get_run_logger()
     logger.logger.addHandler(filelogger)
+
+    if __name__ != '__main__':
+        gunicorn_logger = logging.getLogger('gunicorn.error')
+        logger.handlers = gunicorn_logger.handlers
+        logger.setLevel(gunicorn_logger.level)
+
     logger.debug("Setup logging ...")
     return logger
 
