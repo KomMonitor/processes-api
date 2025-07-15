@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_georesource_miscStatistics"
 
-@flow(persist_result=True, name="km_georesource_miscStatistics", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_georesource_miscStatistics",
+        id=processName,
         version="0.0.1",
         title="Statistiken anhand Objekteigenschaft (Punktdatensätze)",
         description= "Auswahl einer punktbasierten Georessource, für die anhand einer bestimmten Eigenschaft und Auswahl einer statistischen Methode Indikatoren-Kennwerte pro Raumeinheit zu enthalten.",
@@ -57,7 +61,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Statistiken anhand Eigenschaft der punktbasierten Georessource",
-                        "apiName": "georesource_miscStatistics",
+                        "apiName": processName,
                         "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gewählter Objekt-Eigenschaft",
                         "inputBoxes": [

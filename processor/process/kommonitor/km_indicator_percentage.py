@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_percentage"
 
-@flow(persist_result=True, name="km_indicator_percentage", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmIndicatorPercentage(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_percentage",
+        id=processName,
         version="0.0.1",
         title="Prozentualer Anteil (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
         description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren durch den Wert des Referenzindikators dividiert.",
@@ -57,7 +61,7 @@ class KmIndicatorPercentage(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Prozentualer Anteil mehrerer Basisindikatoren von einem Referenzindikator",
-                        "apiName": "indicator_percentage",
+                        "apiName": processName,
                         "calculation_info": "Quotient zwischen (Basis-)Indikatoren und dem Referenzindikator multipliziert mit 100",
                         "formula": "$$ \\frac{\\sum_{n=1}^{m} I_{n}}{I_{ref}} \\times 100 $$",
                         "dynamicFormula": "$$ \\frac{ sum_baseIndicators }{ I_{ref}} \\times 100 $$",

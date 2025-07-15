@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_relChange_nTemporalItems"
 
-@flow(persist_result=True, name="km_indicator_relChange_nTemporalItems", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_relChange_nTemporalItems",
+        id=processName,
         version="0.0.1",
         title="Veränderung relativ",
         description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
@@ -53,7 +57,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Relative Veränderung bezogen auf Zeitspanne",
-                        "apiName": "indicator_change_absolute",
+                        "apiName": processName,
                         "formula": "$ 100 \\times \\frac{I_{N} - I_{M}}{I_{M}} $",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = Ziel-Zeitpunkt minus Anzahl Tage/Monate/Jahre ",
                         "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: Ziel-Zeitpunkt minus ${number_of_temporal_items} ${temporal_type}",

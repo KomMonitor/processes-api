@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_trend_nTemporalItems"
 
-@flow(persist_result=True, name="km_indicator_trend_nTemporalItems", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_trend_nTemporalItems",
+        id=processName,
         version="0.0.1",
         title="Trend (mittels linearer Regression)",
         description= "Berechnet den Trend über eine vergangene Zeitspanne eines Indikators als Steigung b der Geraden bei einer linearen Regression im Verhältnis zum Indikatorwert des ersten Jahres.",
@@ -53,7 +57,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Trendberechnung bezogen auf Zeitspanne",
-                        "apiName": "indicator_trend_nTemporalItems",
+                        "apiName": processName,
                         "formula": "$$ T = 100 \\times \\frac{b}{I_{1}} $$ wobei $$ b = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (I_{n} - \\bar{I}))}{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2} $$",
                         "legend": "$T$ = Trend <br/>$m$ = Anzahl konsekutiver vergangener Tage/Monate/Jahre <br/>$A_{n}$ = aufeinander folgende Jahre<br/>$\\bar{A}$ = arithmetisches Mittel der aufeinander folgenden Jahre<br/>$I_{n}$ = Indikatorenwerte der aufeinander folgenden Jahre<br/>$\\bar{I}$ = arithmetisches Mittel der Indikatorenwerte der aufeinander folgenden Jahre",
                         "dynamicFormula": "$$ T = 100 \\times \\frac{b}{B_{1}} $$ wobei $$ b = \\frac{\\sum_{n=1}^{m}((A_{n} - \\bar{A}) \\times (B_{n} - \\bar{B}))}{\\sum_{n=1}^{m} (A_{n} - \\bar{A})^2} $$",

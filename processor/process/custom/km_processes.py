@@ -202,7 +202,6 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
     for schedule_ in schedules:
         logger.debug("schedule data model:")
         logger.debug(schedule_)
-        print(schedule_, )
         schedule2 = {
             'type': 'process',
             'processID': schedule_['process_id'],

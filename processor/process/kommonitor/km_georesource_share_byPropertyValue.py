@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_georesource_share_byPropertyValue"
 
-@flow(persist_result=True, name="km_georesource_share_byPropertyValue", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_georesource_share_byPropertyValue",
+        id=processName,
         version="0.0.1",
         title="Prozentualer Anteil anhand Objekteigenschaft (Punktdatensätze)",
         description= "Auswahl einer punktbasierten Georessource, für die eine Punkt-in-Polygon Analyse durchgeführt wird. Hierbei wird der prozentuale Anteil der gewählten Punkte an allen Punkten der Georessource pro Raumeinheits-Feature ermittelt. Die Punktdaten werden anhand einer Objekteigenschaft sowie einem Filterwert dieser Objekteigenschaft gefiltert (z. B. Objekteigenschaft: Schulform, Filterwert: Grundschule, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Anzahl, Filterwert: 50, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
@@ -57,7 +61,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
-                        "apiName": "georesource_subset_share",
+                        "apiName": processName,
                         "calculation_info": "Prozentualer Anteil gewählter Punkte innerhalb jedes Raumeinheits-Features. Auswahl: Anwenden eines Filters durch eine Objekteigenschaft",
                         "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i>  <br/> <i>Auswahlkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "inputBoxes": [
