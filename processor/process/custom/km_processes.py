@@ -204,7 +204,8 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
             'scheduleCreated': schedule_['created'],
             'scheduleUpdated': schedule_['updated'],
             'scheduleActive': schedule_['active'],
-            'scheduleCron': schedule_['cron']
+            'scheduleCron': schedule_['cron'],
+            'inputs': schedule_['inputs']
         }
 
         serialized_schedules['schedules'].append(schedule2)
