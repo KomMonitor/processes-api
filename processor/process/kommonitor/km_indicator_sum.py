@@ -188,7 +188,7 @@ class KmIndicatorSum(KommonitorProcess):
                             value = None
 
                         valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
-                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
+                    indicator_values.append({"spatialReferenceKey": str(feature), "valueMapping": valueMapping})
                 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))
