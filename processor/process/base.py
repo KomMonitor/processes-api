@@ -496,7 +496,7 @@ class KommonitorProcess(BasePrefectProcessor):
                 "jobSummary": job_summary.summary,
                 "resultData": [],
             }
-            return store_output_as_file(flow_id, output)
+            return store_output_as_file(flow_id, output, logger)
         else:
             output = {
                 "jobSummary": None,
@@ -516,9 +516,9 @@ class KommonitorProcess(BasePrefectProcessor):
                         output["resultData"].append(res)
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
-                except ApiException as e:
-                    logger.error(f"Exception when calling DataManagementAPI: {e}")
-                    job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
+                except: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
+                    logger.error(f"Exception when trying to update indicator as body with http info.")
+                    job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
             return store_output_as_file(flow_id, output, logger)
