@@ -22,10 +22,10 @@ from pygeoapi.util import (
 from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
-# from pygeoapi_prefect.process.base import ScheduleNotFoundError
+from pygeoapi_prefect.process.base import ScheduleNotFoundError
 
-class ScheduleNotFoundError(Exception):
-    pass
+# class ScheduleNotFoundError(Exception):
+#     pass
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,8 @@ def schedule_process(api: API, request: APIRequest,
 
         result = api.manager.schedule_process(
             process_id, data_dict)
-        schedule_id, mime_type, tempOut, status, tempHeader = result
+        # schedule_id, mime_type, tempOut, status, tempHeader = result
+        schedule_id, mime_type, status = result
 
         if api.manager.is_async:
             headers['Location'] = f'{api.base_url}/schedule/{schedule_id}'
