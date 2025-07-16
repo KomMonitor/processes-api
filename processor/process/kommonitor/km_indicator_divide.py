@@ -69,6 +69,7 @@ class KmIndicatorDivide(KommonitorProcess):
                         "inputBoxes": [
                            {
                             "id": "reference_id",
+                            "processInputName": "computation_id_numerator",
                             "title": "Notwendiger Dividend-Indikator",
                             "description": "",
                             "contents": [
@@ -77,6 +78,7 @@ class KmIndicatorDivide(KommonitorProcess):
                             },
                             {
                             "id": "computation_id",
+                            "processInputName": "computation_id_denominator",
                             "title": "Notwendiger Divisor-Indikator",
                             "description": "",
                             "contents": [

@@ -95,8 +95,8 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "compGeoId": ProcessInput(
-                id= "compGeoId",
+            "georesource_id": ProcessInput(
+                id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
@@ -165,7 +165,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        computation_georecources_id = inputs["compGeoId"]
+        computation_georecources_id = inputs["georesource_id"]
         computation_property = inputs["compProp"]
         computation_method = inputs["compMeth"]
 
