@@ -362,13 +362,17 @@ class KommonitorProcess(BasePrefectProcessor):
 
     common_inputs = {
         "target_indicator_id": ProcessInput(
-            title="target_indicator_id",
+            id="target_indicator_id",
+            title="Ziel-Indikator",
+            description="Auswahl des Ziel-Indikators, der neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.STRING
             )
         ),
         "target_spatial_units": ProcessInput(
-            title="target_spatial_units",
+            id="target_spatial_units",
+            title="Ziel-Raumebenen",
+            description="Auswahl der Raumebenen, für die der Ziel-Indikators neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
                 items=ProcessIOSchema(type_=ProcessIOType.STRING),
@@ -376,7 +380,9 @@ class KommonitorProcess(BasePrefectProcessor):
             )
         ),
         "target_time": ProcessInput(
-            title="target_time",
+            id="target_time",
+            title="Ziel-Zeitstempel",
+            description="Auswahl der Zeitstempel, für die der Ziel-Indikators neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
                 required=["mode"],
@@ -393,7 +399,9 @@ class KommonitorProcess(BasePrefectProcessor):
             )
         ),
         "execution_interval": ProcessInput(
-            title="execution_interval",
+            id="execution_interval",
+            title="Ausführungsintervall",
+            description="Definition des Zeitintervalls, in dem Ausführungen des Prozesses automatisch angestoßen werden sollen.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
                 required=["cron"],
