@@ -40,8 +40,8 @@ class SpatialUnitOverviewType(BaseModel):
     next_upper_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
     spatial_unit_id: StrictStr = Field(description="the unique identifier of the spatial unit level the features apply to", alias="spatialUnitId")
     spatial_unit_level: StrictStr = Field(description="the name of the spatial unit level the features apply to", alias="spatialUnitLevel")
-    wfs_url: StrictStr = Field(description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
-    wms_url: StrictStr = Field(description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
+    wfs_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
+    wms_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
     user_permissions: Optional[List[StrictStr]] = Field(default=None, description="List of permissions that are effective on this dataset for the current user", alias="userPermissions")
     __properties: ClassVar[List[str]] = ["allowedRoles", "availablePeriodsOfValidity", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "spatialUnitId", "spatialUnitLevel", "wfsUrl", "wmsUrl", "userPermissions"]
 

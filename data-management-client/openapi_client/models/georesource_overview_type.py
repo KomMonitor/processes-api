@@ -49,8 +49,8 @@ class GeoresourceOverviewType(BaseModel):
     poi_symbol_bootstrap3_name: Optional[StrictStr] = Field(default=None, description="If georesource is a POI then custom POI marker symbol can be set by specifying the name of a Bootstrap 3 glyphicon symbol (i.e. \"home\" for a home symbol or \"education\" for a students hat symbol)", alias="poiSymbolBootstrap3Name")
     poi_symbol_color: Optional[StrictStr] = Field(default=None, description="If georesource is a POI then custom POI symbol color can be set by specifying one of the following color names", alias="poiSymbolColor")
     topic_reference: StrictStr = Field(description="id of the last topic hierarchy entity ", alias="topicReference")
-    wfs_url: StrictStr = Field(description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
-    wms_url: StrictStr = Field(description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
+    wfs_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
+    wms_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
     user_permissions: Optional[List[StrictStr]] = Field(default=None, description="List of permissions that are effective on this dataset for the current user", alias="userPermissions")
     __properties: ClassVar[List[str]] = ["allowedRoles", "aoiColor", "availablePeriodsOfValidity", "datasetName", "georesourceId", "isAOI", "isLOI", "isPOI", "loiColor", "loiDashArrayString", "loiWidth", "metadata", "poiMarkerColor", "poiSymbolBootstrap3Name", "poiSymbolColor", "topicReference", "wfsUrl", "wmsUrl", "userPermissions"]
 
