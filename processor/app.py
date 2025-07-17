@@ -52,7 +52,6 @@ def landing_page():
 
 @APP.get('/processes')
 @APP.get('/processes/<process_id>')
-@require_oauth()
 def get_processes(process_id=None):
     return flask_app.get_processes(process_id)
 
