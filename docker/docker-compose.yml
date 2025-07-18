@@ -6,6 +6,7 @@ services:
     container_name: kommonitor-processes-api
     restart: unless-stopped
     volumes:
+      - ./config/default-config.yml:/app/processor/default-config.yml
       - ./storage/prefect:/root/.prefect
       - ./storage/results:/app/results
     env_file:
