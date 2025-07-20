@@ -33,8 +33,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "hello_world"
 
-@flow(persist_result=True, name="hello_world", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -46,7 +50,7 @@ class HelloWorld(KommonitorProcess):
     process_flow = process_flow
 
     detailed_process_description = ProcessDescription(
-        id="hello-world",
+        id=processName,
         version="1.0.0",
         title="Hello World! ",
         example={

@@ -31,7 +31,12 @@ except ImportError:
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
 
-@flow(persist_result=True, name="km_indicator_divide", flow_run_name=generate_flow_run_name)
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_divide"
+
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +47,7 @@ class KmIndicatorDivide(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_divide",
+        id=processName,
         version="0.0.1",
         title="Division (Quotient zweier Indikatoren)",
         description= "Berechnet den Wert eines Indikators geteilt durch einen Weiteren.",
@@ -57,13 +62,14 @@ class KmIndicatorDivide(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Division zweier Indikatoren",
-                        "apiName": "indicator_division",
+                        "apiName": processName,
                         "formula": "$ \\frac{I_{1}}{I_{2}}  $",
                         "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
                         "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
                         "inputBoxes": [
                            {
                             "id": "reference_id",
+                            "processInputName": "computation_id_numerator",
                             "title": "Notwendiger Dividend-Indikator",
                             "description": "",
                             "contents": [
@@ -72,6 +78,7 @@ class KmIndicatorDivide(KommonitorProcess):
                             },
                             {
                             "id": "computation_id",
+                            "processInputName": "computation_id_denominator",
                             "title": "Notwendiger Divisor-Indikator",
                             "description": "",
                             "contents": [
@@ -204,7 +211,7 @@ class KmIndicatorDivide(KommonitorProcess):
                             value = None
                         
                         valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
-                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
+                    indicator_values.append({"spatialReferenceKey": str(feature), "valueMapping": valueMapping})
                 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))

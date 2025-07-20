@@ -38,8 +38,12 @@ except ImportError:
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
     from processor.process.util import dataio
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "hello_world_2"
 
-@flow(persist_result=True, name="hello_world", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -52,7 +56,7 @@ class PercentageShare(KommonitorProcess):
     process_flow = process_flow
 
     detailed_process_description = ProcessDescription(
-        id="percentage-share",
+        id=processName,
         version="0.0.1",
         title="Prozentualer Anteil mehrerer Basisindikatoren von einem Referenzindikator",
         description= "Mindestens ein (Basis-)Indikator muss angegeben werden. Bei mehreren wird die Gesamtsumme der (Basis-)Indikatoren durch den Wert des Referenzindikators dividiert",
@@ -76,7 +80,7 @@ class PercentageShare(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "titleShort": "Prozentualer Anteil (Quotient zwischen Basis-Indikatoren und einem Referenzindikator)",
-                        "apiName": "indicator_share_percentage",
+                        "apiName": processName,
                         "formula": "$$ \frac{\sum_{n=1}^{m} I_{n}}{I_{ref}} \times 100 $$",
                         "legend": "<br/>$I_{n}$ = Basis-Indikatoren <br/>$I_{ref}$ = Referenzindikator ",
                         "dynamicLegend": "${list_baseIndicators} <br/>$ I_{ref} $: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ]<br/>",

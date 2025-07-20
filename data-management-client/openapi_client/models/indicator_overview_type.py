@@ -51,7 +51,7 @@ class IndicatorOverviewType(BaseModel):
     is_headline_indicator: StrictBool = Field(description="boolean value indicating if the indicator is a headline indicator", alias="isHeadlineIndicator")
     lowest_spatial_unit_for_computation: Optional[StrictStr] = Field(default=None, description="identifier/name of the lowest spatial unit for which the indicator can be computed and thus is available (only necessary for computable indicators)", alias="lowestSpatialUnitForComputation")
     metadata: CommonMetadataType
-    ogc_services: List[OgcServicesType] = Field(description="list of available OGC services for that indicator for different spatial units", alias="ogcServices")
+    ogc_services: Optional[List[OgcServicesType]] = Field(default=None, description="list of available OGC services for that indicator for different spatial units", alias="ogcServices")
     process_description: Optional[StrictStr] = Field(description="description about how the indicator was computed", alias="processDescription")
     reference_date_note: Optional[StrictStr] = Field(default=None, description="an optional note on the reference date of the indicator", alias="referenceDateNote")
     display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")

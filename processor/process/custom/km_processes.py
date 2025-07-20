@@ -22,12 +22,17 @@ from pygeoapi.util import (
 from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
-# from pygeoapi_prefect.process.base import ScheduleNotFoundError
+from pygeoapi_prefect.process.base import ScheduleNotFoundError
 
-class ScheduleNotFoundError(Exception):
-    pass
+# class ScheduleNotFoundError(Exception):
+#     pass
 
 logger = logging.getLogger(__name__)
+
+if __name__ != '__main__':
+        gunicorn_logger = logging.getLogger('gunicorn.error')
+        logger.handlers = gunicorn_logger.handlers
+        logger.setLevel(gunicorn_logger.level)
 
 def schedule_process(api: API, request: APIRequest,
                     process_id) -> Tuple[dict, int, str]:
@@ -87,6 +92,7 @@ def schedule_process(api: API, request: APIRequest,
 
         result = api.manager.schedule_process(
             process_id, data_dict)
+
         schedule_id, mime_type, status = result
 
         if api.manager.is_async:
@@ -198,6 +204,8 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
         }]
     }
     for schedule_ in schedules:
+        logger.debug("schedule data model:")
+        logger.debug(schedule_)
         schedule2 = {
             'type': 'process',
             'processID': schedule_['process_id'],
@@ -207,7 +215,8 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
             'scheduleCreated': schedule_['created'],
             'scheduleUpdated': schedule_['updated'],
             'scheduleActive': schedule_['active'],
-            'scheduleCron': schedule_['cron']
+            'scheduleCron': schedule_['cron'],
+            'inputs': schedule_['inputs'] if 'inputs' in schedule_ else ''
         }
 
         serialized_schedules['schedules'].append(schedule2)

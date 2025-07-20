@@ -33,8 +33,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_georesource_count_pointsWithinPolygon"
 
-@flow(persist_result=True, name="km_georesource_count_pointsWithinPolygon", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -45,7 +49,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_georesource_count_pointsWithinPolygon",
+        id=processName,
         version="0.0.1",
         title="Anzahl Punkte in Polygon",
         description= "Auswahl einer punktbasierten Georessource, für die eine Punkt-in-Polygon Analyse durchgeführt wird, um die Anzahl der Punkte pro Raumeinheit zu erhalten. Optional können die Punktdaten anhand einer Objekteigenschaft sowie einem Filterwert dieser Objekteigenschaft gefiltert werden (z. B. Objekteigenschaft: Schulform, Filterwert: Grundschule, Operatoren: gleich/ungleich/enthält). Für numerische Werte lassen sich zudem Wertebereiche spezifizieren (z. B. Objekteigenschaft: Anzahl, Filterwert: 50, Operatoren: <, <=, =, >, >=, !=, Wertebereich)",
@@ -60,7 +64,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Anzahl Punktobjekte pro Gebietskörperschaft",
-                        "apiName": "georesource_pointsInPolygon",
+                        "apiName": processName,
                         "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
@@ -87,8 +91,8 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "compGeoId": ProcessInput(
-                id= "compGeoId",
+            "georesource_id": ProcessInput(
+                id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
                 schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
@@ -126,7 +130,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        computation_georecources_id = inputs["compGeoId"]
+        computation_georecources_id = inputs["georesource_id"]
         computation_filter_property = inputs["compFilterProp"]
         computation_filter_operator = inputs["compFilterOperator"]
         computation_filter_value = inputs["compFilterPropVal"]
@@ -187,7 +191,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
 
                         valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
 
-                    indicator_values.append({"spatialReferenceKey": feature["properties"]["ID"], "valueMapping": valueMapping})
+                    indicator_values.append({"spatialReferenceKey": str(feature["properties"]["ID"]), "valueMapping": valueMapping})
 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))

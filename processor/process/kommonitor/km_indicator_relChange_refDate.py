@@ -30,8 +30,12 @@ except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_relChange_refDate"
 
-@flow(persist_result=True, name="km_indicator_relChange_refDate", flow_run_name=generate_flow_run_name)
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
@@ -42,7 +46,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
-        id="km_indicator_relChange_refDate",
+        id=processName,
         version="0.0.1",
         title="Veränderung relativ mit festem Referenzzeitpunkt",
         description= "Berechnet die relative Veränderung zwischen zwei Zeitpunkten eines Indikators.",
@@ -53,7 +57,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                     name="kommonitorUiParams",
                     value=[{
                         "longTitle": "Relative Veränderung bezogen auf einen Referenzzeitpunkt",
-                        "apiName": "indicator_relChange_refDate",
+                        "apiName": processName,
                         "formula": "$$ 100 \\times \\frac{A_{N} - A_{M}}{A_{M}} $$",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt ",
                         "dynamicLegend": "<br/> $A$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt '${reference_date}'",
@@ -189,7 +193,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                             value = None
 
                         valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
-                    indicator_values.append({"spatialReferenceKey": feature, "valueMapping": valueMapping})
+                    indicator_values.append({"spatialReferenceKey": str(feature), "valueMapping": valueMapping})
                 
                 # Job Summary and results
                 job_summary.add_number_of_integrated_features(len(indicator_values))

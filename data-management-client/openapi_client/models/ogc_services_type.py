@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import BaseModel, StrictStr
 from pydantic import Field
 try:
@@ -31,10 +31,10 @@ class OgcServicesType(BaseModel):
     """
     OgcServicesType
     """ # noqa: E501
-    default_style_name: StrictStr = Field(description="the name of the default style (SLD) that is published and applied to the associated dataset", alias="defaultStyleName")
-    spatial_unit: StrictStr = Field(description="the name of the spatial unit", alias="spatialUnit")
-    wfs_url: StrictStr = Field(description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
-    wms_url: StrictStr = Field(description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
+    default_style_name: Optional[StrictStr] = Field(default=None, description="the name of the default style (SLD) that is published and applied to the associated dataset", alias="defaultStyleName")
+    spatial_unit: Optional[StrictStr] = Field(default=None, description="the name of the spatial unit", alias="spatialUnit")
+    wfs_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
+    wms_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
     __properties: ClassVar[List[str]] = ["defaultStyleName", "spatialUnit", "wfsUrl", "wmsUrl"]
 
     model_config = {

@@ -39,7 +39,6 @@ KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 
-
 @task
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
     if private:
@@ -98,6 +97,12 @@ def setup_logging(job_id: str) -> Logger:
     filelogger.setLevel(logging.DEBUG)
     logger = get_run_logger()
     logger.logger.addHandler(filelogger)
+
+    if __name__ != '__main__':
+        gunicorn_logger = logging.getLogger('gunicorn.error')
+        logger.handlers = gunicorn_logger.handlers
+        logger.setLevel(gunicorn_logger.level)
+
     logger.debug("Setup logging ...")
     return logger
 
@@ -357,13 +362,17 @@ class KommonitorProcess(BasePrefectProcessor):
 
     common_inputs = {
         "target_indicator_id": ProcessInput(
-            title="target_indicator_id",
+            id="target_indicator_id",
+            title="Ziel-Indikator",
+            description="Auswahl des Ziel-Indikators, der neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.STRING
             )
         ),
         "target_spatial_units": ProcessInput(
-            title="target_spatial_units",
+            id="target_spatial_units",
+            title="Ziel-Raumebenen",
+            description="Auswahl der Raumebenen, für die der Ziel-Indikators neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
                 items=ProcessIOSchema(type_=ProcessIOType.STRING),
@@ -371,7 +380,9 @@ class KommonitorProcess(BasePrefectProcessor):
             )
         ),
         "target_time": ProcessInput(
-            title="target_time",
+            id="target_time",
+            title="Ziel-Zeitstempel",
+            description="Auswahl der Zeitstempel, für die der Ziel-Indikators neu berechnet werden soll.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
                 required=["mode"],
@@ -388,7 +399,9 @@ class KommonitorProcess(BasePrefectProcessor):
             )
         ),
         "execution_interval": ProcessInput(
-            title="execution_interval",
+            id="execution_interval",
+            title="Ausführungsintervall",
+            description="Definition des Zeitintervalls, in dem Ausführungen des Prozesses automatisch angestoßen werden sollen.",
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.OBJECT,
                 required=["cron"],
