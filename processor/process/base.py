@@ -191,8 +191,11 @@ class KommonitorResult:
             su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
             self._su_result = {
-                "applicableSpatialUnit": su_meta.spatial_unit_level,
-                "allowedRoles": allowed_roles,
+                "values": {
+                    "applicableSpatialUnit": su_meta.spatial_unit_level,
+                    "allowedRoles": allowed_roles
+                },
+                "spatial_unit_id": spatial_unit_id
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
@@ -203,7 +206,7 @@ class KommonitorResult:
         self._su_result = None
 
     def add_indicator_values(self, values: list):
-        self._su_result["indicatorValues"] = values
+        self._su_result["values"]["indicatorValues"] = values
 
 
 class KommonitorJobSummary:
@@ -518,21 +521,20 @@ class KommonitorProcess(BasePrefectProcessor):
             indicator_id = inputs["target_indicator_id"]
             for res in result.values:
                 indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
-                # res["allowedRoles"] = []
                 print(res)
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(
                         indicator_id=indicator_id,
-                        indicator_data=res
+                        indicator_data=res #["values"]
                     )
                     if resp.status_code == 200:
-                        output["resultData"].append(res)
+                        output["resultData"].append(res["values"])
                     else:
-                        job_summary.mark_failed_job(res["applicableSpatialUnit"])
+                        job_summary.mark_failed_job(res["spatial_unit_id"])
                 except: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
                     logger.error(f"Exception when trying to update indicator as body with http info.")
-                    job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
-                    job_summary.mark_failed_job(res["applicableSpatialUnit"])
+                    job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["spatial_unit_id"])
+                    job_summary.mark_failed_job(res["spatial_unit_id"])
             output["jobSummary"] = job_summary.summary
             return store_output_as_file(flow_id, output, logger)
 
