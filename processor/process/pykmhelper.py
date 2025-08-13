@@ -781,6 +781,10 @@ def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: 
     Returns:
         dict: returns a geojson featurecollection with only features fitting to the filter operator
     """
+
+    if len(propertyName) == 0 or len(computationFilterOperator) == 0 or len(computationFilterPropertyValue) == 0:
+        return featureCollection
+
     result_collection = copy.deepcopy(featureCollection)
     del result_collection["features"]
     result_collection["features"] = []
@@ -802,6 +806,10 @@ def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, c
     Returns:
         Array | None: returns the filtered Array or None if the wrong computation filter is used. None value has to be handeld separately in the script.
     """
+
+    if len(computationFilterOperator) == 0 or len(computationFilterPropertyValue) == 0:
+        return valueArray
+
     filteredArray = []    
 
     if computationFilterOperator == "Equal":
