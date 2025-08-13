@@ -186,8 +186,19 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             ti.meta = indicators_controller.get_indicator_by_id(
                 target_id)
             
+            # fetch georesourceMetadata
+            # georesource_metadata_request = georesources_controller.get_georesource_by_id(computation_georecources_id)
+            georesource_metadata = georesources_controller.get_georesource_by_id(computation_georecources_id)
             # extract all dates
-            allDates = target_time["includeDates"]
+            # allDates = target_time["includeDates"]
+
+            target_indicator_applicable_dates = ti.meta.applicable_dates
+            periodsOfValidity = georesource_metadata.available_periods_of_validity            
+            georesource_validStart_dates = []
+            for periodOfValidity in periodsOfValidity:
+                georesource_validStart_dates.append(periodOfValidity.start_date.strftime("%Y-%m-%d"))
+
+            allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
             
             for spatial_unit in target_spatial_units:
                 # check for existing allowedRoles for the concatenation of indicator and spatial unit

@@ -127,13 +127,15 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
         inputs = config.inputs
 
         # Extract all relevant inputs
+        print("inputs")
+        print(inputs)
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         computation_georecources_id = inputs["georesource_id"]
-        computation_filter_property = inputs["compFilterProp"]
-        computation_filter_operator = inputs["compFilterOperator"]
-        computation_filter_value = inputs["compFilterPropVal"]
+        computation_filter_property = inputs["comp_filter"]["compFilterProp"]
+        computation_filter_operator = inputs["comp_filter"]["compFilterOperator"]
+        computation_filter_value = inputs["comp_filter"]["compFilterPropVal"]
 
         # Init object to store computation results
         result = KommonitorResult()
@@ -150,9 +152,23 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
             
             # query indicator metadate to check for errors occured
             ti.get_indicator_by_id(indicators_controller)
-            
+
+            # fetch georesourceMetadata
+            # georesource_metadata_request = georesources_controller.get_georesource_by_id(computation_georecources_id)
+            georesource_metadata = georesources_controller.get_georesource_by_id(computation_georecources_id)
             # extract all dates
-            allDates = target_time["includeDates"]
+            # allDates = target_time["includeDates"]
+
+            target_indicator_applicable_dates = ti.meta.applicable_dates
+            periodsOfValidity = georesource_metadata.available_periods_of_validity            
+            georesource_validStart_dates = []
+            for periodOfValidity in periodsOfValidity:
+                georesource_validStart_dates.append(periodOfValidity.start_date.strftime("%Y-%m-%d"))
+
+            allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
+
+            # fetch the georesource feature collection
+            georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)        
             
             for spatial_unit in target_spatial_units:
                 # check for existing allowedRoles for the concatenation of indicator and spatial unit
@@ -164,9 +180,6 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 su_feature_collection = pykmhelper.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller, spatial_unit)
-
-                # fetch the georesource feature collection
-                georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)
                 
                 # apply the selected computation filter on the FeatureCollection
                 if computation_filter_operator != "None":
