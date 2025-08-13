@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import BaseModel, StrictStr
 from pydantic import Field
 try:
@@ -31,8 +31,8 @@ class DefaultClassificationMappingItemType(BaseModel):
     """
     DefaultClassificationMappingItemType
     """ # noqa: E501
-    default_color_as_hex: StrictStr = Field(description="the default color for the specified value interval as hex string inclusive leading #, i.e. '#ffffff'", alias="defaultColorAsHex")
-    default_custom_rating: StrictStr = Field(description="the default custom rating string for the specified value interval, i.e. 'very high'/'very low' or 'good'/'bad'", alias="defaultCustomRating")
+    default_color_as_hex: Optional[StrictStr] = Field(description="the default color for the specified value interval as hex string inclusive leading #, i.e. '#ffffff'", alias="defaultColorAsHex")
+    default_custom_rating: Optional[StrictStr] = Field(description="the default custom rating string for the specified value interval, i.e. 'very high'/'very low' or 'good'/'bad'", alias="defaultCustomRating")
     __properties: ClassVar[List[str]] = ["defaultColorAsHex", "defaultCustomRating"]
 
     model_config = {
