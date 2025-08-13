@@ -1049,7 +1049,6 @@ class IndicatorCollection:
 
         for item in self.indicators:
             listApplicableSuFeatures.append(set(self.indicators[item].applicable_su_features))
-        
         intersection = listApplicableSuFeatures[0].copy()
         # union = listApplicableSuFeatures[0].copy()
         for su_features in listApplicableSuFeatures[1:]:
@@ -1093,7 +1092,7 @@ class IndicatorCollection:
         for indicator in self.indicators:
             missing_su_features = []
             for feature in self.all_su_features:
-                if not feature in self.indicators[indicator].applicable_su_features:
+                if not str(feature) in self.indicators[indicator].applicable_su_features:
                     missing_su_features.append(feature)
 
             if len(missing_su_features) > 0:
@@ -1105,7 +1104,7 @@ class IndicatorCollection:
         for indicator in self.indicators:
             su_features = []
             for feature in self.indicators[indicator].values:
-                id = feature["ID"]
+                id = str(feature["ID"])
                 self.indicators[indicator].time_series[id] = feature
                 su_features.append(id)
 
@@ -1172,7 +1171,7 @@ def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerA
         response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
         geojson_all_features = json.loads(response_data.data)
 
-        all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+        all_su_features = [str(feature["properties"]["ID"]) for feature in geojson_all_features["features"]]
 
         return all_su_features
     except (ForbiddenException, ApiException) as e:
