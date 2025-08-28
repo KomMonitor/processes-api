@@ -36,8 +36,8 @@ class SpatialUnitOverviewType(BaseModel):
     allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
     available_periods_of_validity: Optional[List[PeriodOfValidityType]] = Field(default=None, alias="availablePeriodsOfValidity")
     metadata: CommonMetadataType
-    next_lower_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
-    next_upper_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
+    next_lower_hierarchy_level: Optional[StrictStr] = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
+    next_upper_hierarchy_level: Optional[StrictStr] = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
     spatial_unit_id: StrictStr = Field(description="the unique identifier of the spatial unit level the features apply to", alias="spatialUnitId")
     spatial_unit_level: StrictStr = Field(description="the name of the spatial unit level the features apply to", alias="spatialUnitLevel")
     wfs_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
