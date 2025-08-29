@@ -92,7 +92,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                 id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Linienhaften Georesource",
                 description="ID der Georesource.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "comp_filter": ProcessInput(
                 id="comp_filter",

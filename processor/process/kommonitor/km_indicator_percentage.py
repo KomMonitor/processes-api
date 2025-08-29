@@ -93,13 +93,13 @@ class KmIndicatorPercentage(KommonitorProcess):
                 id= "COMPUTATION_IDS",
                 title="für die Berechnung erforderliche Basisindikatoren",
                 description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY)
+                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, required=["true"])
             ),
             "reference_id": ProcessInput(
                 id= "REFERENCE_ID",
                 title="für die Berechnung erforderlicher Referenzindikator",
                 description="Divisor",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             )
         }, 
         outputs = KommonitorProcess.common_output

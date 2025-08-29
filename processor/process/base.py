@@ -366,7 +366,8 @@ class KommonitorProcess(BasePrefectProcessor):
             title="Ziel-Indikator",
             description="Auswahl des Ziel-Indikators, der neu berechnet werden soll.",
             schema_=ProcessIOSchema(
-                type_=ProcessIOType.STRING
+                type_=ProcessIOType.STRING,
+                required=["true"]
             )
         ),
         "target_spatial_units": ProcessInput(
@@ -376,7 +377,8 @@ class KommonitorProcess(BasePrefectProcessor):
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
                 items=ProcessIOSchema(type_=ProcessIOType.STRING),
-                min_items=1
+                min_items=1,
+                required=["true"]
             )
         ),
         "target_time": ProcessInput(

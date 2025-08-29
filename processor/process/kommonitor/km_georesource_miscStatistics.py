@@ -99,13 +99,13 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "compProp": ProcessInput(
                 id= "compProp",
                 title="Numerische Objekteigenschaft.",
                 description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "compMeth": ProcessInput(
                 id= "compMeth",
@@ -113,6 +113,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 description="",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
+                    required=["true"],
                     enum=[
                         {
                             "apiName": "MIN",

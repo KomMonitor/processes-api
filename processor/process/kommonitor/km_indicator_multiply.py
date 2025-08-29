@@ -86,7 +86,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                 id= "COMPUTATION_IDS",
                 title="für die Berechnung erforderliche Basisindikatoren",
                 description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
+                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, required=["true"], items=ProcessIOSchema(type_=ProcessIOType.STRING))
             )
         }, 
         outputs = KommonitorProcess.common_output

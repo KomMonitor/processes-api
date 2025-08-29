@@ -95,13 +95,13 @@ class KmIndicatorDivide(KommonitorProcess):
                 id= "COMPUTATION_ID_NUMERATOR",
                 title="Auswahl des für die Berechnung erforderlichen Dividenden",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "computation_id_denominator": ProcessInput(
                 id= "COMPUTATION_ID_DENOMINATOR",
                 title="Auswahl des für die Berechnung erforderlichen Divisors",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             )
         }, 
         outputs = KommonitorProcess.common_output

@@ -94,13 +94,13 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 id= "COMPUTATION_ID",
                 title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "number_of_temporal_items": ProcessInput(
                 id= "number_of_temporal_items",
                 title="Anzahl",
                 description= "Anzahl der Zeiteinheiten. Standard ist '1'.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER, minimum=1, maximum=100000)
+                schema_=ProcessIOSchema(type_=ProcessIOType.INTEGER, minimum=1, maximum=100000, required=["true"])
             ),
             "temporal_type": ProcessInput(
                 id="temporal_type",
@@ -108,6 +108,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
                 description="Angabe des Zeitbezug-Typs. Standard ist 'Jahre'.",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
+                    required=["true"],
                     enum=[
                         {
                         "apiName": "YEARS",

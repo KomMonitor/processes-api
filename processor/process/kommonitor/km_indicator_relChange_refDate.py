@@ -92,13 +92,13 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                 id= "COMPUTATION_ID",
                 title="Auswahl des für die Berechnung erforderlichen Basis-Indikators",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "reference_date": ProcessInput(
                 id= "reference_date",
                 title="fester Referenz-Zeitpunkt",
                 description= "fester Referenz-Zeitpunkt.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             )   
         },
         outputs = KommonitorProcess.common_output
