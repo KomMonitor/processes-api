@@ -13,6 +13,8 @@ import json
 import math
 import shapely
 import datetime
+import time
+import requests
 from logging import Logger
 from enum import Enum
 import openapi_client
@@ -20,6 +22,7 @@ from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, Spati
 from openapi_client.exceptions import ForbiddenException
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
+
 
 # Define custom CONSTANTS used within the script
 
@@ -31,6 +34,13 @@ spatialUnitFeatureNamePropertyName = "NAME"
 
 # This constant is required to access indicator timeseries values correctly (i.e. DATE_2018-01-01)
 indicator_date_prefix = "DATE_"
+
+# This constant limits the number of allowed locations for requests against Open Route Service
+# This is necessary especially for GET requests, to keep the GET request length within handable sizes
+MAX_LOCATIONS_FOR_MATRIX = 200 # unsicher
+MAX_LOCATIONS_FOR_ISOCHRONES = 5
+OPENROUTESERVICE_URL = "https://ors5.fbg-hsbo.de/v2/"
+ORS_API_KEY = "ORS_API_KEY"
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -1933,37 +1943,342 @@ def summarizeLineSegmentLenghts(featureCollection):
 #   From Here OpenRouteService
 #
 
-def distance_waypath_kilometers():
-    #TODO:  
-    return None
+def distance_waypath_kilometers(point_A, point_B, vehicle_type):
+    """
+    #TODO testing of whole method, docstring
+    """
+    if not isGeoJSONPointFeature(point_A):
+        throwError(f"The submitted object point_A is not a valid GeoJSON point feature. It was: {point_A}")
 
-def distance_matrix_kilometers():
-    #TODO
-    return None
+    if not isGeoJSONPointFeature(point_B):
+        throwError(f"The submitted object point_B is not a valid GeoJSON point feature. It was: {point_B}")
 
-def duration_matrix_seconds():
-    #TODO
-    return None
+    coordinates_A = point_A["geometry"]["coordinates"]
+    coordinates_B = point_B["geometry"]["coordinates"]
 
-def isochrones_byTime():
-    #TODO
-    return None
+    vehicle_map = {
+        "PEDESTRIAN": "foot-walking",
+        "BIKE": "cycling-regular",
+        "CAR": "driving-car"
+    }
+    
+    try:
+        vehicle_string = vehicle_map[vehicle_type]
+    except:
+        vehicle_string = "foot-walking"
 
-def computeIsochrones_byTime():
-    #TODO
-    return None
+    body = {
+        "coordinates":[coordinates_A, coordinates_B]
+    }
 
-def isochrones_byDistance():
-    #TODO
-    return None
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    call = requests.post('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', json=body, headers=headers)
 
-def computeIsochrones_byDistance():
-    #TODO
-    return None
+    log(call.status_code, call.reason)
+    
+    json = call.json()
+    
+    return json["features"][0]["properties"]["summary"]["distance"]
 
-def executeOrsQuery():
-    #TODO
-    return None
+def distance_matrix_kilometers(locations, source_indices, destination_indices, vehicle_type):
+    # Überprüfen, ob alle Locations GeoJSON-Point-Features sind
+    for location in locations:
+        if not isGeoJSONPointFeature(location):
+            raise ValueError(f"The submitted locations array contains objects "
+                             f"that are not valid GeoJSON point features. It was: {location}")
+
+    # Koordinaten-Array extrahieren (Longitude, Latitude!)
+    coordinates_array = [loc["geometry"]["coordinates"] for loc in locations]
+
+    # Fahrzeugtyp umwandeln
+    if vehicle_type == "PEDESTRIAN":
+        vehicle_string = "foot-walking"
+    elif vehicle_type == "BIKE":
+        vehicle_string = "cycling-regular"
+    elif vehicle_type == "CAR":
+        vehicle_string = "driving-car"
+    else:
+        vehicle_string = "foot-walking"
+
+    # Body für POST Request
+    matrix_post_body = {
+        "locations": coordinates_array,
+        "sources": source_indices,
+        "destinations": destination_indices,
+        "metrics": ["distance"],
+        "resolve_locations": True,
+        "units": "km"
+    }
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    url = f"{OPENROUTESERVICE_URL}/matrix/{vehicle_string}"
+    
+    log(f"Query OpenRouteService matrix endpoint ('{url}') "
+        f"with following matrix POST request: {matrix_post_body}")
+
+    try:
+        response = requests.post(url, json=matrix_post_body, headers=headers)
+        matrix = response.json()
+    except Exception as e:
+        log(f"Error while executing OpenRouteService POST request. Error was: {e}")
+        raise
+
+    return matrix
+
+def duration_matrix_seconds(locations, source_indices, destination_indices, vehicle_type):
+    # Überprüfen, ob alle Locations GeoJSON-Point-Features sind
+    for location in locations:
+        if not isGeoJSONPointFeature(location):
+            raise ValueError(f"The submitted locations array contains objects "
+                             f"that are not valid GeoJSON point features. It was: {location}")
+
+    # Koordinaten-Array extrahieren (Longitude, Latitude!)
+    coordinates_array = [loc["geometry"]["coordinates"] for loc in locations]
+
+    # Fahrzeugtyp umwandeln
+    if vehicle_type == "PEDESTRIAN":
+        vehicle_string = "foot-walking"
+    elif vehicle_type == "BIKE":
+        vehicle_string = "cycling-regular"
+    elif vehicle_type == "CAR":
+        vehicle_string = "driving-car"
+    else:
+        vehicle_string = "foot-walking"
+
+    # Body für POST Request
+    matrix_post_body = {
+        "locations": coordinates_array,
+        "sources": source_indices,
+        "destinations": destination_indices,
+        "metrics": ["duration"],
+        "resolve_locations": True
+    }
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    url = f"{OPENROUTESERVICE_URL}/matrix/{vehicle_string}"
+    
+    log(f"Query OpenRouteService matrix endpoint ('{url}') "
+        f"with following matrix POST request: {matrix_post_body}")
+
+    try:
+        response = requests.post(url, json=matrix_post_body, headers=headers)
+        matrix = response.json()
+    except Exception as e:
+        log(f"Error while executing OpenRouteService POST request. Error was: {e}")
+        raise
+
+    return matrix
+
+    
+def isochrones_by_time(
+    starting_points, 
+    vehicle_type: str, 
+    travel_time_seconds: list[int], 
+    dissolve: bool = True, 
+    avoid_features: str = None):
+    """
+    Ruft Isochronen von OpenRouteService ab und batcht Requests,
+    falls mehr als MAX_LOCATIONS_FOR_ORS_REQUEST Locations angegeben sind.
+    """
+    # Validierung der GeoJSON Point Features
+    # for pt in starting_points:
+        # if not isGeoJSONPointFeature(pt):
+        #     throwError(f"Ungültiges GeoJSON Point Feature: {pt}")
+    
+    # Wenn Liste kurz genug → Einmaliger Request
+    if len(starting_points) <= MAX_LOCATIONS_FOR_ISOCHRONES:
+        result_isochrones = compute_isochrones(
+            starting_points,
+            vehicle_type,
+            travel_time_seconds,
+            avoid_features,
+            range_type="time"
+        )
+    
+    #log(f"[INFO] Starte Batch-Verarbeitung: {len(starting_points)} Punkte > {MAX_LOCATIONS_FOR_ISOCHRONES}")
+    
+    result_isochrones = None
+    batch_counter = 0
+    temp_batch = []
+    for idx, pt in enumerate(starting_points):
+        temp_batch.append(pt)
+        
+        # Wenn Batch voll oder letzter Punkt erreicht
+        if len(temp_batch) == MAX_LOCATIONS_FOR_ISOCHRONES or idx == len(starting_points) - 1:
+            temp_iso = compute_isochrones(
+                temp_batch,
+                vehicle_type,
+                travel_time_seconds,
+                avoid_features=avoid_features,
+                range_type="time"
+            )
+            batch_counter += 1
+            
+            if batch_counter == 19:
+                batch_counter = 0
+                log("Maximum amount of OpenRouteService Slots is used. The Script is paused for one minute and will continue after that.")
+                time.sleep(60)
+                
+            if result_isochrones is None:
+                result_isochrones = temp_iso
+            else:
+                # Features zusammenführen
+                print(temp_iso)
+                result_isochrones["features"].extend(temp_iso["features"])
+            
+            # Batch leeren
+            temp_batch = []
+    
+    # Optional: Dissolve
+    if dissolve:
+        return dissolve_features(result_isochrones, "value")
+    return result_isochrones
+
+
+def compute_isochrones(
+    points,
+    vehicle_type,
+    travel_time_seconds,
+    avoid_features: Optional[str],
+    range_type: str
+):
+    """Einzelner ORS-Isochronen-Request"""
+    
+    # Extrahiere Coordinates (lon, lat)
+    coords = [pt["geometry"]["coordinates"] for pt in points]
+    
+    profile_map = {
+        "CAR": "driving-car",
+        "BIKE": "cycling-regular",
+        "PEDESTRIAN": "foot-walking"
+    }
+    profile = profile_map.get(vehicle_type.upper(), "foot-walking")
+    
+    body = {
+        "locations": coords,
+        "range": travel_time_seconds,
+        "range_type": range_type,
+        "attributes": ["area", "reachfactor", "total_pop"]
+    }
+    
+    if avoid_features:
+        body["options"] = {"avoid_features": avoid_features}
+    
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    call = requests.post(f"{OPENROUTESERVICE_URL}/isochrones/{profile}", json=body, headers=headers)
+        
+    return call.json()
+
+def dissolve_features(feature_collection, range_column):
+    """
+    Platzhalter für GeoJSON-Dissolve-Logik.
+    Wenn du Shapely oder GeoPandas nutzt, kannst du hier die Features verschmelzen.
+    """
+    gdf = geoJSONtoGDF(feature_collection)
+    dissolved_list = []
+    
+    # Iteriere über jede eindeutige Isochronen-Range
+    for rng in gdf[range_column].unique():
+        subset = gdf[gdf[range_column] == rng]
+
+        # Alle Polygone vereinigen
+        merged = shapely.ops.unary_union(subset.geometry)
+
+        # Als Feature speichern
+        dissolved_list.append({
+            range_column: rng,
+            "geometry": merged
+        })
+
+    # Neues GeoDataFrame erzeugen und FeatureCollection
+    dissolved_gdf = gpd.GeoDataFrame(dissolved_list, crs=gdf.crs)
+    output_collection = geojson.loads(dissolved_gdf.to_json(drop_id=True))
+    return output_collection    
+
+def isochrones_by_distance(
+    starting_points, 
+    vehicle_type: str, 
+    travel_dist_meters: list[int], 
+    dissolve: bool = True, 
+    avoid_features: str = None):
+    """
+    Ruft Isochronen von OpenRouteService ab und batcht Requests,
+    falls mehr als MAX_LOCATIONS_FOR_ORS_REQUEST Locations angegeben sind.
+    """
+    # Validierung der GeoJSON Point Features
+    # for pt in starting_points:
+        # if not isGeoJSONPointFeature(pt):
+        #     throwError(f"Ungültiges GeoJSON Point Feature: {pt}")
+    
+    # Wenn Liste kurz genug → Einmaliger Request
+    if len(starting_points) <= MAX_LOCATIONS_FOR_ISOCHRONES:
+        result_isochrones = compute_isochrones(
+            starting_points,
+            vehicle_type,
+            travel_dist_meters,
+            avoid_features,
+            range_type="distance"
+        )
+    
+    #log(f"[INFO] Starte Batch-Verarbeitung: {len(starting_points)} Punkte > {MAX_LOCATIONS_FOR_ISOCHRONES}")
+    
+    result_isochrones = None
+    batch_counter = 0
+    temp_batch = []
+    for idx, pt in enumerate(starting_points):
+        temp_batch.append(pt)
+        
+        # Wenn Batch voll oder letzter Punkt erreicht
+        if len(temp_batch) == MAX_LOCATIONS_FOR_ISOCHRONES or idx == len(starting_points) - 1:
+            temp_iso = compute_isochrones(
+                temp_batch,
+                vehicle_type,
+                travel_dist_meters,
+                avoid_features=avoid_features,
+                range_type="distance"
+            )
+            batch_counter += 1
+            
+            if batch_counter == 19:
+                batch_counter = 0
+                log("Maximum amount of OpenRouteService Slots is used. The Script is paused for one minute and will continue after that.")
+                time.sleep(60)
+                
+            if result_isochrones is None:
+                result_isochrones = temp_iso
+            else:
+                # Features zusammenführen
+                print(temp_iso)
+                result_isochrones["features"].extend(temp_iso["features"])
+            
+            # Batch leeren
+            temp_batch = []
+    
+    # Optional: Dissolve
+    if dissolve:
+        return dissolve_features(result_isochrones, "value")
+    return result_isochrones
+
 
 def nearestPoint_waypathDistance():
     #TODO
