@@ -10,6 +10,7 @@ import numpy
 import geopandas as gpd
 import geojson
 import json
+import numbers
 import math
 import shapely
 import datetime
@@ -418,7 +419,7 @@ def getIndicatorValueArray(featureCollection, targetDate):
     for feature in featureCollection["features"]:
         indicatorValue = feature["properties"][targetDateWithPrefix]
 
-        if bool(indicatorValue):
+        if not isNoDataValue(indicatorValue) :
             resultArray.append(indicatorValue)
         else: 
             log("A feature did not contain an indicator value for the targetDate " + str(targetDate) + ". Feature was: " + str(feature))
@@ -447,7 +448,7 @@ def getIndicatorIDValueDict(featureCollection, targetDate):
         indicatorValue = feature["properties"][targetDateWithPrefix]
         featureID = getSpatialUnitFeatureIdValue(feature)
 
-        if bool(indicatorValue):
+        if not isNoDataValue(indicatorValue) :
             resultDict[featureID] = indicatorValue
         else:
             log("A feature did not contain an indicator value for the targetDate " + str(targetDate) + ". Feature was: " + str(feature))
@@ -470,8 +471,9 @@ def getIndicatorValueArray_fromIdValueDict(indicatorIdValueDict: dict):
     resultArray = []
 
     for key in indicatorIdValueDict.keys():
-        if bool(key):
-            resultArray.append(indicatorIdValueDict[key])
+        indicatorValue = indicatorIdValueDict[key]
+        if not isNoDataValue(indicatorValue) :
+            resultArray.append(indicatorValue)
         else:
             log("A feature from indicator id value map did not contain an indicator value. Feature has ID: " + str(key))
     
@@ -492,7 +494,7 @@ def getPropertyValueArray(featureCollection, propertyName):
     for feature in featureCollection["features"]:
         propertyValue = feature["properties"][propertyName]
 
-        if bool(propertyValue):
+        if not isNoDataValue(propertyValue):
             resultArray.append(propertyValue)
         else:
             log("A feature did not contain a property value for the propertyName " + str(propertyName) + ". Feature was: " + str(feature))
@@ -583,7 +585,7 @@ def indicatorValueIsNoDataValue(feature, targetDate):
     return isNoDataValue(value)
 
 def isNoDataValue(value):
-    """Checks wheter the value is a NoData value
+    """Checks wheter the value is a NoData value. Already considers if indicator value is a non-empty string for categorial data
 
     Args:
         value (Object): the Value object to be inspected
@@ -592,7 +594,11 @@ def isNoDataValue(value):
         bool: returns 'True' if the value is a NoData Value (i. e. 'None', 'NaN')
     """
     try: 
-        if math.isnan(float(value)) or value == None:
+        if value == None or value == "":
+            return True
+        if isinstance(value, str) and value != "":
+            return False
+        if isinstance(value, numbers.Number) and math.isnan(value):
             return True
         else:
             return False
@@ -2935,7 +2941,7 @@ def computeLinearRegressionSlope(indicatorValueArray, daysArray):
     sumA2 = 0
 
     for i in range(len(indicatorValueArray)):
-        if bool(indicatorValueArray[i]) and bool(daysArray[i]):
+        if indicatorValueArray[i] and bool(daysArray[i]):
             a_NextValue = daysArray[i] - A_mean
             b_NextValue = indicatorValueArray[i]  - B_mean
 
@@ -2962,7 +2968,7 @@ def computeContinuity(feature, dates):
 
     for date in dates: 
         indicatorValue = getIndicatorValue(feature, date)
-        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(float(indicatorValue)):
+        if not isNoDataValue(indicatorValue) :
             indicatorValueArray.append(indicatorValue)
 
     if not len(dates) == len(indicatorValueArray):
