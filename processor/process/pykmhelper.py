@@ -925,6 +925,7 @@ class IndicatorType:
     type: IndicatorCalculationType
     meta: Optional[IndicatorOverviewType]
     values: Optional[list]
+    lists: Optional[dict]
     bool_missing_timestamp: bool
     missing_timestamps: list
     applicable_su: list

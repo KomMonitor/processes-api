@@ -509,7 +509,7 @@ class KommonitorProcess(BasePrefectProcessor):
                 "jobSummary": job_summary.summary,
                 "resultData": [],
             }
-            return store_output_as_file(flow_id, output)
+            return store_output_as_file(flow_id, output, logger)
         else:
             output = {
                 "jobSummary": None,
