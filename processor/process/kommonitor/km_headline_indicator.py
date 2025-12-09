@@ -76,6 +76,14 @@ class KmHeadlineIndicator(KommonitorProcess):
                                 ]
                            },
                            {
+                                "id": "computation_method",
+                                "title": "Art der Normierung (Min/Max oder Z-Wert)",
+                                "description": "",
+                                "contents": [
+                                    "computation_method"
+                                ]
+                           },
+                           {
                                 "id": "aggregation_method",
                                 "title": "Notwendige statistische Aggregationsmethode",
                                 "description": "",
@@ -150,6 +158,28 @@ class KmHeadlineIndicator(KommonitorProcess):
                         "displayName": "normal ([value - min] / [max - min])",
                     }
                 )
+            ),
+            "computation_method": ProcessInput(
+                id= "COMPUTATION_METHOD",
+                title="Art der Normalisierung (Ranked Min/Max, Z-Wert)",
+                description="",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.OBJECT,
+                    enum=[
+                        {
+                            "apiName": "RANKEDMINMAX",
+                            "displayName": "normal ([value - min] / [max - min])",
+                        },
+                        {
+                            "apiName": "ZSCORE",
+                            "displayName": "z = (x - mean) / stdev",
+                        }
+                    ],                    
+                    default={
+                        "apiName": "RANKEDMINMAX",
+                        "displayName": "normal ([value - min] / [max - min])",
+                    }
+                )
             )
         }, 
         outputs = KommonitorProcess.common_output
@@ -173,6 +203,7 @@ class KmHeadlineIndicator(KommonitorProcess):
         computation_ids = inputs["computation_ids"]
         aggregation_method = inputs["aggregation_method"]
         popularity = inputs["popularity"]
+        computation_method = inputs["computation_method"]
         
         # Init object to store computation results
         result = KommonitorResult()
@@ -240,24 +271,30 @@ class KmHeadlineIndicator(KommonitorProcess):
                     agg_func = pykmhelper.geomean
                 elif aggregation_method == "MIN":
                     agg_func = pykmhelper.min
-                                     
-                if popularity == "NORMAL":
-                    func = pykmhelper.minMaxNormalization_wholeValueArray
-                elif popularity == "INVERT":
-                    func = pykmhelper.minMaxNormalization_inverted_wholeValueArray
+                         
+                if computation_method == "RANKEDMINMAX":
+                    z_score = False
+                    if popularity == "NORMAL":
+                        func = pykmhelper.minMaxNormalization_wholeValueArray
+                    elif popularity == "INVERT":
+                        func = pykmhelper.minMaxNormalization_inverted_wholeValueArray
+                    
+                elif computation_method == "ZSCORE":
+                    z_score = True
+                    func = pykmhelper.zScore_normalization_wholeValueArray       
+                
 
-                nan_features = {}
-                for indicator_id, indicator_obj in collection.indicators.items():
-                    for raw_time in all_times:
-                        time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
-                        nan_features[time_key] = []
-                        for feature in collection.intersection_su_features:
-                            # defensiv aus time_series lesen, Standard None wenn fehlt
-                            feature_series = indicator_obj.time_series.get(feature, {})
-                            value = feature_series.get(time_key)
-                            if pykmhelper.isNoDataValue(value):
-                                nan_features[time_key].append(feature)
-
+                # nan_features = {}
+                # for indicator_id, indicator_obj in collection.indicators.items():
+                #     for raw_time in all_times:
+                #         time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
+                #         nan_features[time_key] = []
+                #         for feature in collection.intersection_su_features:
+                #             feature_series = indicator_obj.time_series.get(feature, {})
+                #             value = feature_series.get(time_key)
+                #             if pykmhelper.isNoDataValue(value):
+                #                 nan_features[time_key].append(feature)
+                collection.search_nan_features(all_times)
 
                 for indicator_id, indicator_obj in collection.indicators.items():
                     indicator_obj.lists = {}
@@ -265,17 +302,21 @@ class KmHeadlineIndicator(KommonitorProcess):
                         time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
                         indicator_obj.lists[time_key] = []
                         for feature in collection.intersection_su_features:
-                            if not feature in nan_features[time_key]:
+                            if not feature in collection.nan_features[time_key]:
                                 feature_series = indicator_obj.time_series.get(feature, {})
                                 value = feature_series.get(time_key)
                                 indicator_obj.lists[time_key].append(value)
 
-                        ranked = pykmhelper.rank(indicator_obj.lists[time_key])
-                        normalized = func(ranked)
+                        if not z_score:
+                            ranked = pykmhelper.rank(indicator_obj.lists[time_key])
+                            normalized = func(ranked)
+                        else:
+                            normalized = func(indicator_obj.lists[time_key])
+                            
                         indicator_obj.lists[time_key] = normalized
 
 
-                # iterate over all features an append the indicator
+                # iterate over all features and append the indicator
                 y = 0
                 indicator_values = []
                 for i, feature in enumerate(collection.intersection_su_features):
@@ -283,7 +324,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                     for targetTime in all_times:
                         try:
                             time_key = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            if feature in nan_features[time_key]:
+                            if feature in collection.nan_features[time_key]:
                                 y += 1
                                 raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
 
