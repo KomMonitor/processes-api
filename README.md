@@ -72,6 +72,8 @@ Installing required python packages
 # Install requirements
 pip install -r requirements.txt
 pip install --no-deps -r requirements_nodeps.txt
+# In Repo-Root
+pip install -e .
 ```
 ### Running
 
