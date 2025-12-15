@@ -14,10 +14,10 @@ from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOTyp
 # from ..base import DataManagementException
 try:
     from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
 
 try:
     from .. import pykmhelper
@@ -25,7 +25,7 @@ except ImportError:
     from processor.process import pykmhelper
     
 try:
-    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, isNoDataValue
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 except ImportError:
     from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 
@@ -69,7 +69,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                         "inputBoxes": [
                            {
                                 "id": "computation_ids",
-                                "title": "Notwendige (Basis-)Indikatoren",
+                                "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Popularität",
                                 "description": "",
                                 "contents": [
                                     "computation_ids"
@@ -90,14 +90,6 @@ class KmHeadlineIndicator(KommonitorProcess):
                                 "contents": [
                                     "aggregation_method"
                                 ]
-                           },
-                           {
-                                "id": "popularity",
-                                "title": "Popularität für die Normierung (normal oder invers)",
-                                "description": "",
-                                "contents": [
-                                    "popularity"
-                                ]
                            }
                         ]
                     }]
@@ -106,10 +98,24 @@ class KmHeadlineIndicator(KommonitorProcess):
         ),
         inputs=KommonitorProcess.common_inputs | {
             "computation_ids": ProcessInput(
-                id= "COMPUTATION_IDS",
+                id="COMPUTATION_IDS",
                 title="für die Berechnung erforderliche Basisindikatoren",
-                description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
+                description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Popularitätseinstellung.",
+                schema_=ProcessIOSchema(
+                    type_=ProcessIOType.ARRAY,
+                    items=ProcessIOSchema(
+                        type_=ProcessIOType.OBJECT,
+                        properties={
+                            "ID": ProcessIOSchema(type_=ProcessIOType.STRING, title="Indikator-ID"),
+                            "POPULARITY": ProcessIOSchema(
+                                type_=ProcessIOType.STRING,
+                                title="Popularität für die Normierung (normal oder invers)",
+                                enum=[Popularity.INVERT, Popularity.NORMAL]
+                            )
+                        },
+                        required=["ID", "POPULARITY"]
+                    )
+                )
             ),
             "aggregation_method": ProcessInput(
                 id= "AGGREGATION_METHOD",
@@ -134,28 +140,6 @@ class KmHeadlineIndicator(KommonitorProcess):
                     default={
                         "apiName": "MEAN",
                         "displayName": "Arithmetisches Mittel",
-                    }
-                )
-            ),
-            "popularity": ProcessInput(
-                id= "POPULARITY",
-                title="Popularität der angewendeten min - max Normalisation.",
-                description="",
-                schema_=ProcessIOSchema(
-                    type_=ProcessIOType.OBJECT,
-                    enum=[
-                        {
-                            "apiName": "NORMAL",
-                            "displayName": "normal ([value - min] / [max - min])",
-                        },
-                        {
-                            "apiName": "INVERT",
-                            "displayName": "invertiert (1 - ([value - min] / [max - min]))",
-                        }
-                    ],                    
-                    default={
-                        "apiName": "NORMAL",
-                        "displayName": "normal ([value - min] / [max - min])",
                     }
                 )
             ),
@@ -202,7 +186,6 @@ class KmHeadlineIndicator(KommonitorProcess):
         target_time = inputs["target_time"]
         computation_ids = inputs["computation_ids"]
         aggregation_method = inputs["aggregation_method"]
-        popularity = inputs["popularity"]
         computation_method = inputs["computation_method"]
         
         # Init object to store computation results
@@ -219,8 +202,9 @@ class KmHeadlineIndicator(KommonitorProcess):
             
             collection = IndicatorCollection()
             for indicator in computation_ids:
-                collection.add_indicator(IndicatorType(indicator, IndicatorCalculationType.COMPUTATION_INDICATOR))
-            
+                collection.add_indicator(IndicatorType(indicator["ID"], IndicatorCalculationType.COMPUTATION_INDICATOR))
+                collection.indicators[indicator["ID"]].method = indicator["POPULARITY"]
+                
             # query indicator metadate to check for errors occured
             # ti.meta = indicators_controller.get_indicator_by_id(
             #    target_id)
@@ -274,30 +258,23 @@ class KmHeadlineIndicator(KommonitorProcess):
                          
                 if computation_method == "RANKEDMINMAX":
                     z_score = False
-                    if popularity == "NORMAL":
-                        func = pykmhelper.minMaxNormalization_wholeValueArray
-                    elif popularity == "INVERT":
-                        func = pykmhelper.minMaxNormalization_inverted_wholeValueArray
+                    normal = pykmhelper.minMaxNormalization_wholeValueArray
+                    invert = pykmhelper.minMaxNormalization_wholeValueArray_inverted
                     
                 elif computation_method == "ZSCORE":
                     z_score = True
-                    func = pykmhelper.zScore_normalization_wholeValueArray       
-                
-
-                # nan_features = {}
-                # for indicator_id, indicator_obj in collection.indicators.items():
-                #     for raw_time in all_times:
-                #         time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
-                #         nan_features[time_key] = []
-                #         for feature in collection.intersection_su_features:
-                #             feature_series = indicator_obj.time_series.get(feature, {})
-                #             value = feature_series.get(time_key)
-                #             if pykmhelper.isNoDataValue(value):
-                #                 nan_features[time_key].append(feature)
+                    normal = pykmhelper.zScore_normalization_wholeValueArray       
+                    invert = pykmhelper.zScore_normalization_wholeValueArray_inverted
+                    
                 collection.search_nan_features(all_times)
 
                 for indicator_id, indicator_obj in collection.indicators.items():
                     indicator_obj.lists = {}
+                    if indicator_obj.method == "NORMAL":
+                        func = normal
+                    elif indicator_obj.method == "INVERT":
+                        func = invert
+                        
                     for raw_time in all_times:
                         time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
                         indicator_obj.lists[time_key] = []

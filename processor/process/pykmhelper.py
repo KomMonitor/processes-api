@@ -922,10 +922,11 @@ class IndicatorCalculationType(str, Enum):
     REFERENCE_INDICATOR = "REFERENCE_INDICATOR"
     NUMERATOR_INDICATOR = "NUMERATOR_INDICATOR"
     DENOMINATOR_INDICATOR = "DENOMINATOR_INDICATOR"
-
+    
 class IndicatorType:
     id: str
     type: IndicatorCalculationType
+    method: Optional[str]
     meta: Optional[IndicatorOverviewType]
     values: Optional[list]
     lists: Optional[dict]
@@ -2153,7 +2154,7 @@ def minMaxNormalization_inverted_singleValue(min, max, value):
     normalizedValue = 1 - minMaxNormalization_singleValue(min, max, value)
     return normalizedValue
 
-def minMaxNormalization_inverted_wholeValueArray(populationArray):
+def minMaxNormalization_wholeValueArray_inverted(populationArray):
     """Implements an inverted min max normalization for a whole submitted value array using function 'minMaxNormalization_inverted_singleValue'
 
     Args:
@@ -2560,6 +2561,18 @@ def zScore_normalization_wholeValueArray(populationArray):
         
     return zScoreArray
     
+def zScore_normalization_wholeValueArray_inverted(populationArray):
+    numberArray = convertPropertyArrayToNumberArray(populationArray)
+    
+    meanValue = mean(numberArray)
+    std = standardDeviation(numberArray, False)
+    
+    zScoreArray = []
+    for value in numberArray:
+        zScoreArray.append(1 - zScore_byMeanAndStdev(value, meanValue, std))
+        
+    return zScoreArray
+
 
 def formatDateAsString(date: datetime.date):
     """Creates a string describing the date of a submitted datetime.date object.

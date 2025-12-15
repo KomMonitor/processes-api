@@ -76,15 +76,55 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
 def format_inputs(execution_request: schemas.ExecuteRequest):
     inputs = {}
 
+    # Iterate through all inputs provided in the execution request
     for k, v in execution_request.inputs.items():
-        if type(v) is ExecutionInputValueNoObject or type(v) is ExecutionInputValueNoObjectArray:
-            inputs[k] = v.model_dump()
-        elif type(v) is ExecutionQualifiedInputValue:
-            inputs[k] = v.model_dump()["value"]
-        else:
-            raise Exception("Unsupported input value!")
-    return inputs
 
+        # 1. Handle Array/List Inputs (e.g., "computation_ids")
+        # If the input value 'v' is a list/array, we need to process each item inside.
+        if isinstance(v, list):
+            processed_list = []
+            for item in v:
+                # Check the type of the item inside the list (the Union members)
+
+                # Check if the item is the specific wrapper we expect for complex objects
+                if isinstance(item, schemas.ExecutionQualifiedInputValue):
+                    # For ExecutionQualifiedInputValue, extract the actual data under the 'value' key.
+                    # Use model_dump() if 'value' is a Pydantic model itself, otherwise just take the value.
+                    if hasattr(item.value, 'model_dump'):
+                        processed_list.append(item.value.model_dump())
+                    else:
+                        processed_list.append(item.value)
+
+                # Handle other wrapper types if they can appear in the list (e.g., Link, ExecutionInputValueNoObject)
+                # Note: You might need to adjust this based on the specific requirements of the API
+                # elif isinstance(item, schemas.Link):
+                #     processed_list.append(item.href)
+
+                else:
+                    # Raise an error if a list item is an unexpected type
+                    raise Exception(f"Unsupported item type inside array for key {k}: {type(item)}")
+
+            # Assign the fully processed list to the final inputs dictionary
+            inputs[k] = processed_list
+
+        # 2. Handle Simple/Scalar Inputs (Non-Array)
+
+        # Handle inputs that are simple Pydantic models (e.g., bool, int, string, but wrapped)
+        elif type(v) is ExecutionInputValueNoObject or type(v) is ExecutionInputValueNoObjectArray:
+            # Dump the model to get the underlying value/structure
+            inputs[k] = v.model_dump()
+
+        # Handle single ExecutionQualifiedInputValue wrappers
+        elif type(v) is ExecutionQualifiedInputValue:
+            # Extract the actual value from the wrapper
+            inputs[k] = v.model_dump()["value"]
+
+        # 3. Catch All Unsupported Inputs
+        else:
+            # Raise an error for any input type not explicitly handled
+            raise Exception(f"Unsupported input value! Key: {k}, Type: {type(v)}")
+
+    return inputs
 
 @task
 def setup_logging(job_id: str) -> Logger:
@@ -159,6 +199,9 @@ class ExecutionMode(str, Enum):
     ALL = "ALL"
     DATES = "DATES"
 
+class Popularity(str, Enum):
+    NORMAL = "NORMAL"
+    INVERT = "INVERT"
 
 class ExecutionResourceType(str, Enum):
     GEORESOURCE = "GEORESOURCE"
