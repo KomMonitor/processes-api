@@ -975,6 +975,36 @@ class IndicatorType:
                 return su.permissions
     
         return self.meta.permissions
+
+    def check_su_is_public(self, spatial_unit_id):
+        """checks whether an indicator is public for an explicit spatial unit, if not the is public flag of the indicator itself are used
+
+        Args:
+            spatial_unit_id (str): the id of the spatial unit
+
+        Returns:
+            bool: returns the is public property of the indicator and spatial unit
+        """
+        for su in self.meta.applicable_spatial_units:
+            if su.spatial_unit_id == spatial_unit_id and su.is_public is not None:
+                return su.is_public
+
+        return self.meta.is_public
+
+    def check_su_owner(self, spatial_unit_id):
+        """checks whether an indicator has an owner for an explicit spatial unit, if not the is owner of the indicator itself are used
+
+        Args:
+            spatial_unit_id (str): the id of the spatial unit
+
+        Returns:
+            str: returns the owner of the indicator and spatial unit
+        """
+        for su in self.meta.applicable_spatial_units:
+            if su.spatial_unit_id == spatial_unit_id and su.owner_id is not None:
+                return su.owner_id
+
+        return self.meta.owner_id
     
     def get_indicator_by_id(self, indicator_controller: IndicatorsApi):
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
@@ -1005,8 +1035,11 @@ class IndicatorType:
                             self.id, 
                             spatial_unit)
         except (ForbiddenException, ApiException) as e:
-            raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit) 
-        
+            raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit)
+
+
+
+
 class IndicatorCollection:
     indicators: dict[str, IndicatorType]
     intersection_su_features: list
@@ -1119,7 +1152,7 @@ class IndicatorCollection:
         for indicator in self.indicators:
             su_features = []
             for feature in self.indicators[indicator].values:
-                id = str(feature["ID"])
+                id = str(feature.ID)
                 self.indicators[indicator].time_series[id] = feature
                 su_features.append(id)
 

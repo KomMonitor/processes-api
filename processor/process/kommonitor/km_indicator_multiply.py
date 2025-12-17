@@ -139,9 +139,11 @@ class KmIndicatorMultiply(KommonitorProcess):
             for spatial_unit in target_spatial_units:
                 # check for existing allowedRoles for the concatenation of indicator and spatial unit
                 permissions = ti.check_su_allowedRoles(spatial_unit)
+                is_public = ti.check_su_is_public(spatial_unit)
+                owner_id = ti.check_su_owner(spatial_unit)
 
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, permissions)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, permissions, is_public, owner_id)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.

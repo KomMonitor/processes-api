@@ -185,7 +185,7 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.api.SpatialUnitsApi, permissions: str):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.api.SpatialUnitsApi, permissions: str, is_public: bool, owner_id: str):
         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
         try:
             su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
@@ -193,6 +193,8 @@ class KommonitorResult:
             self._su_result = {
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
                 "permissions": permissions,
+                "isPublic": is_public,
+                "ownerId": owner_id
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
@@ -531,8 +533,8 @@ class KommonitorProcess(BasePrefectProcessor):
                         output["resultData"].append(res)
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
-                except: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
-                    logger.error(f"Exception when trying to update indicator as body with http info.")
+                except Exception as e: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
+                    logger.error("Exception when trying to update indicator as body with http info.", exc_info=e)
                     job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
