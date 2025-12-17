@@ -255,6 +255,9 @@ class KmHeadlineIndicator(KommonitorProcess):
                     agg_func = pykmhelper.geomean
                 elif aggregation_method == "MIN":
                     agg_func = pykmhelper.min
+                else:
+                    raise DataManagementException("The aggregation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
+
                          
                 if computation_method == "RANKEDMINMAX":
                     z_score = False
@@ -265,6 +268,8 @@ class KmHeadlineIndicator(KommonitorProcess):
                     z_score = True
                     normal = pykmhelper.zScore_normalization_wholeValueArray       
                     invert = pykmhelper.zScore_normalization_wholeValueArray_inverted
+                else:
+                    raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
                     
                 collection.search_nan_features(all_times)
 

@@ -2270,7 +2270,13 @@ def geomean(populationArray):
         Float: returns the geometric mean value of the submitted array of numeric values. (If there are zero values in the input the output will be zero)
     """
     populationArray = convertPropertyArrayToNumberArray(populationArray)
-    return stats.mstats.gmean(populationArray)
+    value = stats.mstats.gmean(populationArray)
+    
+    if math.isnan(value):
+        throwError("Error during calculation of geometric mean. Perhaps negative values exist in the array.")
+        value = None  
+        
+    return value 
 
 def geomean_fromIdValueDict(indicatorIdValueDictArray):
     """Encapsulates scipy.stats.mstats function 'gmean' to compute the geometric mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
