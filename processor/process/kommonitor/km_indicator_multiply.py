@@ -116,8 +116,8 @@ class KmIndicatorMultiply(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
+            indicators_controller = openapi_client.api.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.api.SpatialUnitsApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
@@ -138,10 +138,10 @@ class KmIndicatorMultiply(KommonitorProcess):
 
             for spatial_unit in target_spatial_units:
                 # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowed_roles = ti.check_su_allowedRoles(spatial_unit)
+                permissions = ti.check_su_allowedRoles(spatial_unit)
 
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowed_roles)
+                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, permissions)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
@@ -209,6 +209,7 @@ class KmIndicatorMultiply(KommonitorProcess):
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
+            logger.error(f"Error while requesting Data Management API: {e}")
             # 4.2 Catch possible errors cleanly
             if e.spatial_unit and bool(job_summary):
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)

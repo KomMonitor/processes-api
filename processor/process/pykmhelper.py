@@ -17,7 +17,8 @@ import datetime
 from logging import Logger
 from enum import Enum
 import openapi_client
-from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, GeorecourcesControllerApi, ApiException
+from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
+from openapi_client import IndicatorOverviewType, ApiException
 from openapi_client.exceptions import ForbiddenException
 from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
@@ -970,12 +971,12 @@ class IndicatorType:
             str: returns the allowedRoles of the indicator and spatial unit
         """
         for su in self.meta.applicable_spatial_units:
-            if su.spatial_unit_id == spatialUnit and len(su.allowed_roles) > 0:
-                return su.allowed_roles
+            if su.spatial_unit_id == spatialUnit and len(su.permissions) > 0:
+                return su.permissions
     
-        return self.meta.allowed_roles
+        return self.meta.permissions
     
-    def get_indicator_by_id(self, indicator_controller: IndicatorsControllerApi):
+    def get_indicator_by_id(self, indicator_controller: IndicatorsApi):
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
@@ -989,7 +990,7 @@ class IndicatorType:
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, self.id, "INDICATOR", e.status)
         
-    def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsControllerApi, spatial_unit: str):
+    def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsApi, spatial_unit: str):
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
@@ -1126,7 +1127,7 @@ class IndicatorCollection:
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
-def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsApi, spatial_unit: str):
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
@@ -1148,7 +1149,7 @@ def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_con
     except (ForbiddenException, ApiException) as e:
         raise DataManagementException(e, spatial_unit, "SPATIAL_UNIT", e.status, spatial_unit) 
         
-def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeorecourcesControllerApi, georesource: str):
+def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeoresourcesApi, georesource: str):
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
@@ -1171,7 +1172,7 @@ def get_all_georesource_features_by_id_without_preload_content(georesource_contr
         raise DataManagementException(e, georesource, "SPATIAL_UNIT", e.status) 
     
 
-def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsApi, spatial_unit: str):
     """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
 
     Args:
