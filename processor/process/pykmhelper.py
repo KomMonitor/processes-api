@@ -1012,7 +1012,7 @@ class IndicatorType:
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
-            indicator_controller (IndicatorsControllerApi): the openapi module which provides the functionality
+            indicator_controller (IndicatorsApi): the openapi module which provides the functionality
 
         Raises:
             DataManagementException: cath the datamanagementapierror correctly
@@ -1026,7 +1026,7 @@ class IndicatorType:
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
-            indicators_controller (IndicatorsControllerApi): _description_
+            indicators_controller (IndicatorsApi): _description_
             spatial_unit (str): the spatial unit id which shall be queried
 
         Raises:
@@ -1176,7 +1176,7 @@ def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_con
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
-        spatial_unit_controller (SpatialUnitsControllerApi): the spatial unit controller from openapi client
+        spatial_unit_controller (SpatialUnitsApi): the spatial unit controller from openapi client
         spatial_unit (str): the spatial unit id
 
     Raises:
@@ -1198,7 +1198,7 @@ def get_all_georesource_features_by_id_without_preload_content(georesource_contr
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
-        georesource_controller (GeorecourcesControllerApi): the georecource controller from openapi client
+        georesource_controller (GeorecourcesApi): the georecource controller from openapi client
         georesource (str): the georesource id
 
     Raises:
@@ -1221,7 +1221,7 @@ def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsApi, spatia
     """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
 
     Args:
-        spatial_unit_controller (SpatialUnitControllerApi): the openapi client for querying spatial unit data
+        spatial_unit_controller (SpatialUnitApi): the openapi client for querying spatial unit data
         spatial_unit (str): the string ID which identifies the spatial unit
 
     Returns:

@@ -138,9 +138,9 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
-            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+            georesources_controller = openapi_client.GeoresourcesApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
