@@ -27,17 +27,27 @@ class IndicatorPropertiesWithoutGeomType(BaseModel):
     """
     IndicatorPropertiesWithoutGeomType
     """ # noqa: E501
-    id: StrictStr = Field(description="the id of the spatial feature")
-    name: StrictStr = Field(description="the name of the spatial feature")
+    ID: StrictStr = Field(description="the id of the spatial feature", alias="ID")
+    NAME: StrictStr = Field(description="the name of the spatial feature", alias="NAME")
     valid_start_date: StrictStr = Field(description="the start date from which on the spatial feature is valid", alias="validStartDate")
-    valid_end_date: StrictStr = Field(description="the end date until the spatial feature is valid - or null if not set", alias="validEndDate")
+    valid_end_date: Optional[StrictStr] = Field(default=None, description="the end date until the spatial feature is valid - or null if not set", alias="validEndDate")
     __properties: ClassVar[List[str]] = ["id", "name", "validStartDate", "validEndDate"]
 
     model_config = ConfigDict(
+        extra='allow',
         populate_by_name=True,
         validate_assignment=True,
         protected_namespaces=(),
     )
+
+    def __getitem__(self, item: str) -> Any:
+        try:
+            return getattr(self, item)
+        except AttributeError:
+            raise KeyError(item)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
 
     def to_str(self) -> str:
@@ -83,12 +93,22 @@ class IndicatorPropertiesWithoutGeomType(BaseModel):
         if not isinstance(obj, dict):
             return cls.model_validate(obj)
 
-        _obj = cls.model_validate({
-            "id": obj.get("id"),
-            "name": obj.get("name"),
-            "validStartDate": obj.get("validStartDate"),
-            "validEndDate": obj.get("validEndDate")
-        })
+        data = {
+            "ID": obj.get("ID"),
+            "NAME": obj.get("NAME"),
+            "valid_start_date": obj.get("validStartDate"),
+            "valid_end_date": obj.get("validEndDate")
+        }
+
+        known_keys = {"ID", "NAME", "validStartDate", "validEndDate"}
+
+        # 3. Add all other keys from the source object that weren't mapped
+        for key, value in obj.items():
+            if key not in known_keys:
+                data[key] = value
+
+        _obj = cls.model_validate(data)
+
         return _obj
 
 
