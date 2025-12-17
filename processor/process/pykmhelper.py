@@ -2550,6 +2550,14 @@ def zScore_byPopulationArray(value, populationArray, computeSampledStandardDevia
         throwError(f"Cannot compute Z-Score. Error: {e}")
            
 def zScore_normalization_wholeValueArray(populationArray):
+    """Calculates the zscore of a submitted array containing numerical values using following formula (z = (x - mean) / stdw). To calculate the standard deviation is calculated using the population standard deviation. 
+
+    Args:
+        populationArray (List): a list of numerical values. If the list contain string values representing a numerical value the value get converted to a float. 
+
+    Returns:
+        list: returns a list of the zscore for all numerical values in the submitted list.
+    """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
     
     meanValue = mean(numberArray)
@@ -2562,6 +2570,14 @@ def zScore_normalization_wholeValueArray(populationArray):
     return zScoreArray
     
 def zScore_normalization_wholeValueArray_inverted(populationArray):
+    """Calculates the inverted zscore of a submitted array containing numerical values using following formula (z = 1 - ((x - mean) / stdw )). To calculate the standard deviation is calculated using the population standard deviation. 
+
+    Args:
+        populationArray (List): a list of numerical values. If the list contain string values representing a numerical value the value get converted to a float. 
+
+    Returns:
+        list: returns a list of the zscore for all numerical values in the submitted list.
+    """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
     
     meanValue = mean(numberArray)
