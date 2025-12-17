@@ -171,12 +171,9 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
             georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)        
             
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
                 job_summary.init_spatial_unit_summary(spatial_unit)
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
                 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 su_feature_collection = pykmhelper.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller, spatial_unit)

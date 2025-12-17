@@ -202,11 +202,8 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
             
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.

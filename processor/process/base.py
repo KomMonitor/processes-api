@@ -242,6 +242,15 @@ class KommonitorResult:
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
 
+    def init_spatial_unit_result_with_indicator(self, spatial_unit_id: str,
+                                 spatial_unit_controller: openapi_client.api.SpatialUnitsApi,
+                                 indicator):
+        # # check for existing permissions, isPublic and owner for the concatenation of indicator and spatial unit
+        permissions = indicator.check_su_allowedRoles(spatial_unit_id)
+        is_public = indicator.check_su_is_public(spatial_unit_id)
+        owner_id = indicator.check_su_owner(spatial_unit_id)
+        return self.init_spatial_unit_result(spatial_unit_id, spatial_unit_controller, permissions, is_public, owner_id)
+
     def complete_spatial_unit_result(self):
         if self._su_result:
             self._values.append(self._su_result)

@@ -4,24 +4,23 @@ import necessary Node Module Dependencies
 
 """
 import copy
-
-from scipy import stats
-import numpy
-import geopandas as gpd
-import geojson
-import json
-import numbers
-import math
-import shapely
 import datetime
-from logging import Logger
+import json
+import math
+import numbers
 from enum import Enum
-import openapi_client
-from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
-from openapi_client import IndicatorOverviewType, ApiException
-from openapi_client.exceptions import ForbiddenException
-from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
+
+import geojson
+import geopandas as gpd
+import numpy
+import shapely
+from openapi_client import IndicatorOverviewType, ApiException
+from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
+from openapi_client.exceptions import ForbiddenException
+from scipy import stats
+
+from .base import KommonitorJobSummary, DataManagementException
 
 # Define custom CONSTANTS used within the script
 

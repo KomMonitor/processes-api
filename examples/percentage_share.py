@@ -20,19 +20,19 @@ import pandas as pd
 # from ..base import DataManagementException
 
 try:
-    from .. import pykmhelper
+    from processor.process import pykmhelper
 except ImportError:
     from processor.process import pykmhelper
 
 try:
-    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 except ImportError:
     from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 
 try:
-    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
-    from ..util import dataio
+    from processor.process.util import dataio
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
         KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name

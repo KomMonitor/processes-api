@@ -137,14 +137,10 @@ class KmIndicatorMultiply(KommonitorProcess):
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                permissions = ti.check_su_allowedRoles(spatial_unit)
-                is_public = ti.check_su_is_public(spatial_unit)
-                owner_id = ti.check_su_owner(spatial_unit)
 
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, permissions, is_public, owner_id)
                 job_summary.init_spatial_unit_summary(spatial_unit)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
