@@ -602,7 +602,8 @@ def isNoDataValue(value):
             return True
         else:
             return False
-    except TypeError:
+    except Exception as e:
+        log(f"It cannot be determined whether the value {value} is a NoData value or not. Error: {e}")
         return True
 
 
@@ -816,7 +817,7 @@ def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, c
     if len(computationFilterOperator) == 0 or len(computationFilterPropertyValue) == 0:
         return valueArray
 
-    filteredArray = []    
+    filteredArray = []
 
     if computationFilterOperator == "Equal":
         filteredArray = filter(lambda x: x == computationFilterPropertyValue, valueArray)
@@ -937,8 +938,10 @@ class IndicatorCalculationType(str, Enum):
 class IndicatorType:
     id: str
     type: IndicatorCalculationType
+    method: Optional[str]
     meta: Optional[IndicatorOverviewType]
     values: Optional[list]
+    lists: Optional[dict]
     bool_missing_timestamp: bool
     missing_timestamps: list
     applicable_su: list
@@ -1012,6 +1015,7 @@ class IndicatorCollection:
     intersection_target_dates: set
     all_target_dates: list
     all_su_features: list
+    nan_features: Optional[dict]
 
     def __init__(self):
         """create a collection which provides more functionality to the indicators
@@ -1125,6 +1129,18 @@ class IndicatorCollection:
             self.indicators[indicator].applicable_su_features = su_features
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
+
+    def search_nan_features(self, times):
+        self.nan_features = {}
+        for indicator_id, indicator_obj in self.indicators.items():
+            for raw_time in times:
+                time_key = getTargetDateWithPropertyPrefix(raw_time)
+                self.nan_features[time_key] = []
+                for feature in self.intersection_su_features:
+                    feature_series = indicator_obj.time_series.get(feature, {})
+                    value = feature_series.get(time_key)
+                    if isNoDataValue(value):
+                        self.nan_features[time_key].append(feature)
 
 def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
@@ -2143,7 +2159,7 @@ def minMaxNormalization_inverted_singleValue(min, max, value):
     normalizedValue = 1 - minMaxNormalization_singleValue(min, max, value)
     return normalizedValue
 
-def minMaxNormalization_inverted_wholeValueArray(populationArray):
+def minMaxNormalization_wholeValueArray_inverted(populationArray):
     """Implements an inverted min max normalization for a whole submitted value array using function 'minMaxNormalization_inverted_singleValue'
 
     Args:
@@ -2528,10 +2544,40 @@ def zScore_byPopulationArray(value, populationArray, computeSampledStandardDevia
     Returns:
         value: returns the zscore of the submitted value.
     """
-    meanPop = mean(populationArray)
-    stdPop = standardDeviation(populationArray, computeSampledStandardDeviation)
+    try:
+        populationArray = convertPropertyArrayToNumberArray(populationArray)
 
-    return (value - meanPop) / stdPop
+        meanPop = mean(populationArray)
+        stdPop = standardDeviation(populationArray, computeSampledStandardDeviation)
+
+        return (float(value) - meanPop) / stdPop
+    except Exception as e:
+        throwError(f"Cannot compute Z-Score. Error: {e}")
+
+def zScore_normalization_wholeValueArray(populationArray):
+    numberArray = convertPropertyArrayToNumberArray(populationArray)
+
+    meanValue = mean(numberArray)
+    std = standardDeviation(numberArray, False)
+
+    zScoreArray = []
+    for value in numberArray:
+        zScoreArray.append(zScore_byMeanAndStdev(value, meanValue, std))
+
+    return zScoreArray
+
+def zScore_normalization_wholeValueArray_inverted(populationArray):
+    numberArray = convertPropertyArrayToNumberArray(populationArray)
+
+    meanValue = mean(numberArray)
+    std = standardDeviation(numberArray, False)
+
+    zScoreArray = []
+    for value in numberArray:
+        zScoreArray.append(1 - zScore_byMeanAndStdev(value, meanValue, std))
+
+    return zScoreArray
+
 
 def formatDateAsString(date: datetime.date):
     """Creates a string describing the date of a submitted datetime.date object.
