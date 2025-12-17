@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,31 +18,31 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional, Union
 from openapi_client.models.common_metadata_type import CommonMetadataType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class SpatialUnitPATCHInputType(BaseModel):
     """
     SpatialUnitPATCHInputType
     """ # noqa: E501
-    allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    dataset_name: StrictStr = Field(description="the name of the spatial unit - its \"spatialUnitLevel\"", alias="datasetName")
     metadata: CommonMetadataType
     next_lower_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
     next_upper_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel"]
+    is_outline_layer: Optional[StrictBool] = Field(default=False, description="if true, then KomMonitor web client map application will offer this spatial unit as outline layer in legend control", alias="isOutlineLayer")
+    outline_color: Optional[StrictStr] = Field(default=None, description="outline color for this layer as hex code", alias="outlineColor")
+    outline_width: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="outline width as stroke width for outline geometry", alias="outlineWidth")
+    outline_dash_array_string: Optional[StrictStr] = Field(default=None, description="string of line stroke dash array for lines of interest (e.g. 20,20; see https://developer.mozilla.org/de/docs/Web/SVG/Attribute/stroke-dasharray)", alias="outlineDashArrayString")
+    __properties: ClassVar[List[str]] = ["datasetName", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "isOutlineLayer", "outlineColor", "outlineWidth", "outlineDashArrayString"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -55,7 +55,7 @@ class SpatialUnitPATCHInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of SpatialUnitPATCHInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -69,10 +69,12 @@ class SpatialUnitPATCHInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of metadata
@@ -81,7 +83,7 @@ class SpatialUnitPATCHInputType(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of SpatialUnitPATCHInputType from a dict"""
         if obj is None:
             return None
@@ -90,10 +92,14 @@ class SpatialUnitPATCHInputType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
+            "datasetName": obj.get("datasetName"),
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "nextLowerHierarchyLevel": obj.get("nextLowerHierarchyLevel"),
-            "nextUpperHierarchyLevel": obj.get("nextUpperHierarchyLevel")
+            "nextUpperHierarchyLevel": obj.get("nextUpperHierarchyLevel"),
+            "isOutlineLayer": obj.get("isOutlineLayer") if obj.get("isOutlineLayer") is not None else False,
+            "outlineColor": obj.get("outlineColor"),
+            "outlineWidth": obj.get("outlineWidth"),
+            "outlineDashArrayString": obj.get("outlineDashArrayString")
         })
         return _obj
 

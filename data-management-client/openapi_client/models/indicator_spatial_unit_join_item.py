@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,30 +18,29 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.permission_level_type import PermissionLevelType
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorSpatialUnitJoinItem(BaseModel):
     """
     IndicatorSpatialUnitJoinItem
     """ # noqa: E501
-    allowed_roles: Optional[List[StrictStr]] = Field(default=None, description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    permissions: Optional[List[StrictStr]] = Field(default=None, description="list of permissions on this entity")
+    owner_id: Optional[StrictStr] = Field(default=None, description="identifier of the owning group", alias="ownerId")
     spatial_unit_id: StrictStr = Field(description="ID of the applicable spatial unit", alias="spatialUnitId")
     spatial_unit_name: StrictStr = Field(description="name of the applicable spatial unit", alias="spatialUnitName")
-    user_permissions: Optional[List[StrictStr]] = Field(default=None, description="List of permissions that are effective on this dataset for the current user", alias="userPermissions")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "spatialUnitId", "spatialUnitName", "userPermissions"]
+    user_permissions: Optional[List[PermissionLevelType]] = Field(default=None, description="list of permissions that are effective on this dataset for the current user", alias="userPermissions")
+    is_public: Optional[StrictBool] = Field(default=None, description="flag whether the resource is publicly accessible", alias="isPublic")
+    __properties: ClassVar[List[str]] = ["permissions", "ownerId", "spatialUnitId", "spatialUnitName", "userPermissions", "isPublic"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -54,7 +53,7 @@ class IndicatorSpatialUnitJoinItem(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorSpatialUnitJoinItem from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -68,16 +67,18 @@ class IndicatorSpatialUnitJoinItem(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorSpatialUnitJoinItem from a dict"""
         if obj is None:
             return None
@@ -86,10 +87,12 @@ class IndicatorSpatialUnitJoinItem(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
+            "permissions": obj.get("permissions"),
+            "ownerId": obj.get("ownerId"),
             "spatialUnitId": obj.get("spatialUnitId"),
             "spatialUnitName": obj.get("spatialUnitName"),
-            "userPermissions": obj.get("userPermissions")
+            "userPermissions": obj.get("userPermissions"),
+            "isPublic": obj.get("isPublic")
         })
         return _obj
 

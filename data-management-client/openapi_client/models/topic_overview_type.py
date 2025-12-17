@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,14 +18,12 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr, field_validator
-from pydantic import Field
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.topic_resource_enum import TopicResourceEnum
+from openapi_client.models.topic_type_enum import TopicTypeEnum
+from typing import Optional, Set
+from typing_extensions import Self
 
 class TopicOverviewType(BaseModel):
     """
@@ -35,32 +33,16 @@ class TopicOverviewType(BaseModel):
     topic_description: StrictStr = Field(description="short description of the topic", alias="topicDescription")
     topic_id: StrictStr = Field(description="the identifier of the topic", alias="topicId")
     topic_name: StrictStr = Field(description="the topic name", alias="topicName")
-    topic_resource: Optional[StrictStr] = Field(default=None, description="topic resource indicating if the topic object corresponds to an indicator or to a georesource", alias="topicResource")
-    topic_type: StrictStr = Field(description="topic type indicating if the topic object is a subtopic or a main topic - only topics of type 'sub' shall be subTopics of topics with type 'main'", alias="topicType")
-    __properties: ClassVar[List[str]] = ["subTopics", "topicDescription", "topicId", "topicName", "topicResource", "topicType"]
+    topic_resource: Optional[TopicResourceEnum] = Field(default=None, alias="topicResource")
+    topic_type: TopicTypeEnum = Field(alias="topicType")
+    display_order: StrictInt = Field(description="an order number to control display order in clients", alias="displayOrder")
+    __properties: ClassVar[List[str]] = ["subTopics", "topicDescription", "topicId", "topicName", "topicResource", "topicType", "displayOrder"]
 
-    @field_validator('topic_resource')
-    def topic_resource_validate_enum(cls, value):
-        """Validates the enum"""
-        if value is None:
-            return value
-
-        if value not in ('indicator', 'georesource'):
-            raise ValueError("must be one of enum values ('indicator', 'georesource')")
-        return value
-
-    @field_validator('topic_type')
-    def topic_type_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in ('main', 'sub'):
-            raise ValueError("must be one of enum values ('main', 'sub')")
-        return value
-
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -73,7 +55,7 @@ class TopicOverviewType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of TopicOverviewType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -87,23 +69,25 @@ class TopicOverviewType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of each item in sub_topics (list)
         _items = []
         if self.sub_topics:
-            for _item in self.sub_topics:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_sub_topics in self.sub_topics:
+                if _item_sub_topics:
+                    _items.append(_item_sub_topics.to_dict())
             _dict['subTopics'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of TopicOverviewType from a dict"""
         if obj is None:
             return None
@@ -112,12 +96,13 @@ class TopicOverviewType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "subTopics": [TopicOverviewType.from_dict(_item) for _item in obj.get("subTopics")] if obj.get("subTopics") is not None else None,
+            "subTopics": [TopicOverviewType.from_dict(_item) for _item in obj["subTopics"]] if obj.get("subTopics") is not None else None,
             "topicDescription": obj.get("topicDescription"),
             "topicId": obj.get("topicId"),
             "topicName": obj.get("topicName"),
             "topicResource": obj.get("topicResource"),
-            "topicType": obj.get("topicType")
+            "topicType": obj.get("topicType"),
+            "displayOrder": obj.get("displayOrder")
         })
         return _obj
 

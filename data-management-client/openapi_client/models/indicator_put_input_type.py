@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,32 +18,28 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
-from openapi_client.models.default_classification_mapping_type import DefaultClassificationMappingType
-from openapi_client.models.indicator_put_input_type_indicator_values import IndicatorPUTInputTypeIndicatorValues
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
+from typing import Any, ClassVar, Dict, List
+from openapi_client.models.indicator_post_input_type_indicator_values import IndicatorPOSTInputTypeIndicatorValues
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorPUTInputType(BaseModel):
     """
     IndicatorPUTInputType
     """ # noqa: E501
-    allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    permissions: List[StrictStr] = Field(description="list of permissions on this entity")
     applicable_spatial_unit: StrictStr = Field(alias="applicableSpatialUnit")
-    default_classification_mapping: Optional[DefaultClassificationMappingType] = Field(default=None, alias="defaultClassificationMapping")
-    indicator_values: List[IndicatorPUTInputTypeIndicatorValues] = Field(description="an array of entries containing indicator values and mapping to spatial features via identifiers", alias="indicatorValues")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "applicableSpatialUnit", "defaultClassificationMapping", "indicatorValues"]
+    indicator_values: List[IndicatorPOSTInputTypeIndicatorValues] = Field(description="an array of entries containing indicator values and mapping to spatial features via identifiers", alias="indicatorValues")
+    is_public: StrictBool = Field(description="flag whether the resource is publicly accessible", alias="isPublic")
+    owner_id: StrictStr = Field(description="identifier of the owning group", alias="ownerId")
+    __properties: ClassVar[List[str]] = ["permissions", "applicableSpatialUnit", "indicatorValues", "isPublic", "ownerId"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -56,7 +52,7 @@ class IndicatorPUTInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorPUTInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -70,26 +66,25 @@ class IndicatorPUTInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of default_classification_mapping
-        if self.default_classification_mapping:
-            _dict['defaultClassificationMapping'] = self.default_classification_mapping.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in indicator_values (list)
         _items = []
         if self.indicator_values:
-            for _item in self.indicator_values:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_indicator_values in self.indicator_values:
+                if _item_indicator_values:
+                    _items.append(_item_indicator_values.to_dict())
             _dict['indicatorValues'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorPUTInputType from a dict"""
         if obj is None:
             return None
@@ -98,10 +93,11 @@ class IndicatorPUTInputType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
+            "permissions": obj.get("permissions"),
             "applicableSpatialUnit": obj.get("applicableSpatialUnit"),
-            "defaultClassificationMapping": DefaultClassificationMappingType.from_dict(obj.get("defaultClassificationMapping")) if obj.get("defaultClassificationMapping") is not None else None,
-            "indicatorValues": [IndicatorPUTInputTypeIndicatorValues.from_dict(_item) for _item in obj.get("indicatorValues")] if obj.get("indicatorValues") is not None else None
+            "indicatorValues": [IndicatorPOSTInputTypeIndicatorValues.from_dict(_item) for _item in obj["indicatorValues"]] if obj.get("indicatorValues") is not None else None,
+            "isPublic": obj.get("isPublic"),
+            "ownerId": obj.get("ownerId")
         })
         return _obj
 

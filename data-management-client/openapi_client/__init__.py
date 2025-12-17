@@ -5,7 +5,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -17,66 +17,184 @@
 
 __version__ = "1.0.0"
 
+# Define package exports
+__all__ = [
+    "AccessControlApi",
+    "DatabasePublicApi",
+    "GeoresourcesApi",
+    "GeoresourcesPublicApi",
+    "IndicatorsApi",
+    "IndicatorsPublicApi",
+    "ProcessScriptsApi",
+    "ProcessScriptsPublicApi",
+    "SpatialUnitsApi",
+    "SpatialUnitsPublicApi",
+    "TopicsApi",
+    "TopicsPublicApi",
+    "UserInfoApi",
+    "ApiResponse",
+    "ApiClient",
+    "Configuration",
+    "OpenApiException",
+    "ApiTypeError",
+    "ApiValueError",
+    "ApiKeyError",
+    "ApiAttributeError",
+    "ApiException",
+    "AdminRoleType",
+    "ColorType",
+    "CommonMetadataType",
+    "CreationTypeEnum",
+    "DefaultClassificationMappingItemType",
+    "DefaultClassificationMappingType",
+    "GeoresourceOverviewType",
+    "GeoresourcePATCHInputType",
+    "GeoresourcePOSTInputType",
+    "GeoresourcePUTInputType",
+    "GeoresourceReferenceType",
+    "GroupAdminRolesPUTInputType",
+    "GroupAdminRolesType",
+    "IndicatorMetadataPATCHInputType",
+    "IndicatorOverviewType",
+    "IndicatorPATCHDisplayOrderInputType",
+    "IndicatorPOSTInputType",
+    "IndicatorPOSTInputTypeIndicatorValues",
+    "IndicatorPOSTInputTypeRefrencesToGeoresources",
+    "IndicatorPOSTInputTypeRefrencesToOtherIndicators",
+    "IndicatorPOSTInputTypeValueMapping",
+    "IndicatorPUTInputType",
+    "IndicatorPropertiesWithoutGeomType",
+    "IndicatorReferenceType",
+    "IndicatorSpatialUnitJoinItem",
+    "IndicatorTypeEnum",
+    "LastModificationOverviewType",
+    "OgcServicesType",
+    "OrganizationalUnitInputType",
+    "OrganizationalUnitOverviewType",
+    "OrganizationalUnitPermissionOverviewElementType",
+    "OrganizationalUnitPermissionOverviewSpatialUnitElementType",
+    "OrganizationalUnitPermissionOverviewType",
+    "OrganizationalUnitPermissionOverviewTypePermissions",
+    "OrganizationalUnitRoleAuthorityType",
+    "OrganizationalUnitRoleDelegateType",
+    "OwnerInputType",
+    "PeriodOfValidityType",
+    "PermissionLevelInputType",
+    "PermissionLevelType",
+    "PermissionOverviewType",
+    "PermissionResourceType",
+    "PoiMarkerStyleEnum",
+    "ProcessInputType",
+    "ProcessScriptOverviewType",
+    "ProcessScriptPOSTInputType",
+    "ProcessScriptPUTInputType",
+    "RegionalReferenceValueType",
+    "ResourceFilterType",
+    "ResourceType",
+    "SpatialUnitOverviewType",
+    "SpatialUnitPATCHInputType",
+    "SpatialUnitPOSTInputType",
+    "SpatialUnitPUTInputType",
+    "TopicDisplayOrderInputType",
+    "TopicDisplayOrderModeInputType",
+    "TopicDisplayOrderModeOverviewType",
+    "TopicInputType",
+    "TopicOrderModeEnum",
+    "TopicOverviewType",
+    "TopicResourceEnum",
+    "TopicTypeEnum",
+    "UserInfoInputType",
+    "UserInfoOverviewType",
+]
+
 # import apis into sdk package
-from openapi_client.api.georecources_controller_api import GeorecourcesControllerApi
-from openapi_client.api.georecources_public_controller_api import GeorecourcesPublicControllerApi
-from openapi_client.api.home_controller_api import HomeControllerApi
-from openapi_client.api.indicators_controller_api import IndicatorsControllerApi
-from openapi_client.api.indicators_public_controller_api import IndicatorsPublicControllerApi
-from openapi_client.api.roles_controller_api import RolesControllerApi
-from openapi_client.api.script_controller_api import ScriptControllerApi
-from openapi_client.api.script_public_controller_api import ScriptPublicControllerApi
-from openapi_client.api.spatial_units_controller_api import SpatialUnitsControllerApi
-from openapi_client.api.spatial_units_public_controller_api import SpatialUnitsPublicControllerApi
-from openapi_client.api.topics_controller_api import TopicsControllerApi
-from openapi_client.api.topics_public_controller_api import TopicsPublicControllerApi
+from openapi_client.api.access_control_api import AccessControlApi as AccessControlApi
+from openapi_client.api.database_public_api import DatabasePublicApi as DatabasePublicApi
+from openapi_client.api.georesources_api import GeoresourcesApi as GeoresourcesApi
+from openapi_client.api.georesources_public_api import GeoresourcesPublicApi as GeoresourcesPublicApi
+from openapi_client.api.indicators_api import IndicatorsApi as IndicatorsApi
+from openapi_client.api.indicators_public_api import IndicatorsPublicApi as IndicatorsPublicApi
+from openapi_client.api.process_scripts_api import ProcessScriptsApi as ProcessScriptsApi
+from openapi_client.api.process_scripts_public_api import ProcessScriptsPublicApi as ProcessScriptsPublicApi
+from openapi_client.api.spatial_units_api import SpatialUnitsApi as SpatialUnitsApi
+from openapi_client.api.spatial_units_public_api import SpatialUnitsPublicApi as SpatialUnitsPublicApi
+from openapi_client.api.topics_api import TopicsApi as TopicsApi
+from openapi_client.api.topics_public_api import TopicsPublicApi as TopicsPublicApi
+from openapi_client.api.user_info_api import UserInfoApi as UserInfoApi
 
 # import ApiClient
-from openapi_client.api_response import ApiResponse
-from openapi_client.api_client import ApiClient
-from openapi_client.configuration import Configuration
-from openapi_client.exceptions import OpenApiException
-from openapi_client.exceptions import ApiTypeError
-from openapi_client.exceptions import ApiValueError
-from openapi_client.exceptions import ApiKeyError
-from openapi_client.exceptions import ApiAttributeError
-from openapi_client.exceptions import ApiException
+from openapi_client.api_response import ApiResponse as ApiResponse
+from openapi_client.api_client import ApiClient as ApiClient
+from openapi_client.configuration import Configuration as Configuration
+from openapi_client.exceptions import OpenApiException as OpenApiException
+from openapi_client.exceptions import ApiTypeError as ApiTypeError
+from openapi_client.exceptions import ApiValueError as ApiValueError
+from openapi_client.exceptions import ApiKeyError as ApiKeyError
+from openapi_client.exceptions import ApiAttributeError as ApiAttributeError
+from openapi_client.exceptions import ApiException as ApiException
 
 # import models into sdk package
-from openapi_client.models.common_metadata_type import CommonMetadataType
-from openapi_client.models.default_classification_mapping_item_type import DefaultClassificationMappingItemType
-from openapi_client.models.default_classification_mapping_type import DefaultClassificationMappingType
-from openapi_client.models.georesource_overview_type import GeoresourceOverviewType
-from openapi_client.models.georesource_patch_input_type import GeoresourcePATCHInputType
-from openapi_client.models.georesource_post_input_type import GeoresourcePOSTInputType
-from openapi_client.models.georesource_put_input_type import GeoresourcePUTInputType
-from openapi_client.models.georesource_reference_type import GeoresourceReferenceType
-from openapi_client.models.indicator_metadata_patch_input_type import IndicatorMetadataPATCHInputType
-from openapi_client.models.indicator_overview_type import IndicatorOverviewType
-from openapi_client.models.indicator_patch_display_order_input_type import IndicatorPATCHDisplayOrderInputType
-from openapi_client.models.indicator_patch_input_type import IndicatorPATCHInputType
-from openapi_client.models.indicator_post_input_type import IndicatorPOSTInputType
-from openapi_client.models.indicator_post_input_type_indicator_values import IndicatorPOSTInputTypeIndicatorValues
-from openapi_client.models.indicator_post_input_type_refrences_to_georesources import IndicatorPOSTInputTypeRefrencesToGeoresources
-from openapi_client.models.indicator_post_input_type_refrences_to_other_indicators import IndicatorPOSTInputTypeRefrencesToOtherIndicators
-from openapi_client.models.indicator_post_input_type_value_mapping import IndicatorPOSTInputTypeValueMapping
-from openapi_client.models.indicator_put_input_type import IndicatorPUTInputType
-from openapi_client.models.indicator_put_input_type_indicator_values import IndicatorPUTInputTypeIndicatorValues
-from openapi_client.models.indicator_put_input_type_value_mapping import IndicatorPUTInputTypeValueMapping
-from openapi_client.models.indicator_reference_type import IndicatorReferenceType
-from openapi_client.models.indicator_spatial_unit_join_item import IndicatorSpatialUnitJoinItem
-from openapi_client.models.ogc_services_type import OgcServicesType
-from openapi_client.models.period_of_validity_type import PeriodOfValidityType
-from openapi_client.models.process_input_type import ProcessInputType
-from openapi_client.models.process_script_overview_type import ProcessScriptOverviewType
-from openapi_client.models.process_script_post_input_type import ProcessScriptPOSTInputType
-from openapi_client.models.process_script_put_input_type import ProcessScriptPUTInputType
-from openapi_client.models.response_entity import ResponseEntity
-from openapi_client.models.role_input_type import RoleInputType
-from openapi_client.models.role_overview_type import RoleOverviewType
-from openapi_client.models.spatial_unit_overview_type import SpatialUnitOverviewType
-from openapi_client.models.spatial_unit_patch_input_type import SpatialUnitPATCHInputType
-from openapi_client.models.spatial_unit_post_input_type import SpatialUnitPOSTInputType
-from openapi_client.models.spatial_unit_put_input_type import SpatialUnitPUTInputType
-from openapi_client.models.topic_input_type import TopicInputType
-from openapi_client.models.topic_overview_type import TopicOverviewType
+from openapi_client.models.admin_role_type import AdminRoleType as AdminRoleType
+from openapi_client.models.color_type import ColorType as ColorType
+from openapi_client.models.common_metadata_type import CommonMetadataType as CommonMetadataType
+from openapi_client.models.creation_type_enum import CreationTypeEnum as CreationTypeEnum
+from openapi_client.models.default_classification_mapping_item_type import DefaultClassificationMappingItemType as DefaultClassificationMappingItemType
+from openapi_client.models.default_classification_mapping_type import DefaultClassificationMappingType as DefaultClassificationMappingType
+from openapi_client.models.georesource_overview_type import GeoresourceOverviewType as GeoresourceOverviewType
+from openapi_client.models.georesource_patch_input_type import GeoresourcePATCHInputType as GeoresourcePATCHInputType
+from openapi_client.models.georesource_post_input_type import GeoresourcePOSTInputType as GeoresourcePOSTInputType
+from openapi_client.models.georesource_put_input_type import GeoresourcePUTInputType as GeoresourcePUTInputType
+from openapi_client.models.georesource_reference_type import GeoresourceReferenceType as GeoresourceReferenceType
+from openapi_client.models.group_admin_roles_put_input_type import GroupAdminRolesPUTInputType as GroupAdminRolesPUTInputType
+from openapi_client.models.group_admin_roles_type import GroupAdminRolesType as GroupAdminRolesType
+from openapi_client.models.indicator_metadata_patch_input_type import IndicatorMetadataPATCHInputType as IndicatorMetadataPATCHInputType
+from openapi_client.models.indicator_overview_type import IndicatorOverviewType as IndicatorOverviewType
+from openapi_client.models.indicator_patch_display_order_input_type import IndicatorPATCHDisplayOrderInputType as IndicatorPATCHDisplayOrderInputType
+from openapi_client.models.indicator_post_input_type import IndicatorPOSTInputType as IndicatorPOSTInputType
+from openapi_client.models.indicator_post_input_type_indicator_values import IndicatorPOSTInputTypeIndicatorValues as IndicatorPOSTInputTypeIndicatorValues
+from openapi_client.models.indicator_post_input_type_refrences_to_georesources import IndicatorPOSTInputTypeRefrencesToGeoresources as IndicatorPOSTInputTypeRefrencesToGeoresources
+from openapi_client.models.indicator_post_input_type_refrences_to_other_indicators import IndicatorPOSTInputTypeRefrencesToOtherIndicators as IndicatorPOSTInputTypeRefrencesToOtherIndicators
+from openapi_client.models.indicator_post_input_type_value_mapping import IndicatorPOSTInputTypeValueMapping as IndicatorPOSTInputTypeValueMapping
+from openapi_client.models.indicator_put_input_type import IndicatorPUTInputType as IndicatorPUTInputType
+from openapi_client.models.indicator_properties_without_geom_type import IndicatorPropertiesWithoutGeomType as IndicatorPropertiesWithoutGeomType
+from openapi_client.models.indicator_reference_type import IndicatorReferenceType as IndicatorReferenceType
+from openapi_client.models.indicator_spatial_unit_join_item import IndicatorSpatialUnitJoinItem as IndicatorSpatialUnitJoinItem
+from openapi_client.models.indicator_type_enum import IndicatorTypeEnum as IndicatorTypeEnum
+from openapi_client.models.last_modification_overview_type import LastModificationOverviewType as LastModificationOverviewType
+from openapi_client.models.ogc_services_type import OgcServicesType as OgcServicesType
+from openapi_client.models.organizational_unit_input_type import OrganizationalUnitInputType as OrganizationalUnitInputType
+from openapi_client.models.organizational_unit_overview_type import OrganizationalUnitOverviewType as OrganizationalUnitOverviewType
+from openapi_client.models.organizational_unit_permission_overview_element_type import OrganizationalUnitPermissionOverviewElementType as OrganizationalUnitPermissionOverviewElementType
+from openapi_client.models.organizational_unit_permission_overview_spatial_unit_element_type import OrganizationalUnitPermissionOverviewSpatialUnitElementType as OrganizationalUnitPermissionOverviewSpatialUnitElementType
+from openapi_client.models.organizational_unit_permission_overview_type import OrganizationalUnitPermissionOverviewType as OrganizationalUnitPermissionOverviewType
+from openapi_client.models.organizational_unit_permission_overview_type_permissions import OrganizationalUnitPermissionOverviewTypePermissions as OrganizationalUnitPermissionOverviewTypePermissions
+from openapi_client.models.organizational_unit_role_authority_type import OrganizationalUnitRoleAuthorityType as OrganizationalUnitRoleAuthorityType
+from openapi_client.models.organizational_unit_role_delegate_type import OrganizationalUnitRoleDelegateType as OrganizationalUnitRoleDelegateType
+from openapi_client.models.owner_input_type import OwnerInputType as OwnerInputType
+from openapi_client.models.period_of_validity_type import PeriodOfValidityType as PeriodOfValidityType
+from openapi_client.models.permission_level_input_type import PermissionLevelInputType as PermissionLevelInputType
+from openapi_client.models.permission_level_type import PermissionLevelType as PermissionLevelType
+from openapi_client.models.permission_overview_type import PermissionOverviewType as PermissionOverviewType
+from openapi_client.models.permission_resource_type import PermissionResourceType as PermissionResourceType
+from openapi_client.models.poi_marker_style_enum import PoiMarkerStyleEnum as PoiMarkerStyleEnum
+from openapi_client.models.process_input_type import ProcessInputType as ProcessInputType
+from openapi_client.models.process_script_overview_type import ProcessScriptOverviewType as ProcessScriptOverviewType
+from openapi_client.models.process_script_post_input_type import ProcessScriptPOSTInputType as ProcessScriptPOSTInputType
+from openapi_client.models.process_script_put_input_type import ProcessScriptPUTInputType as ProcessScriptPUTInputType
+from openapi_client.models.regional_reference_value_type import RegionalReferenceValueType as RegionalReferenceValueType
+from openapi_client.models.resource_filter_type import ResourceFilterType as ResourceFilterType
+from openapi_client.models.resource_type import ResourceType as ResourceType
+from openapi_client.models.spatial_unit_overview_type import SpatialUnitOverviewType as SpatialUnitOverviewType
+from openapi_client.models.spatial_unit_patch_input_type import SpatialUnitPATCHInputType as SpatialUnitPATCHInputType
+from openapi_client.models.spatial_unit_post_input_type import SpatialUnitPOSTInputType as SpatialUnitPOSTInputType
+from openapi_client.models.spatial_unit_put_input_type import SpatialUnitPUTInputType as SpatialUnitPUTInputType
+from openapi_client.models.topic_display_order_input_type import TopicDisplayOrderInputType as TopicDisplayOrderInputType
+from openapi_client.models.topic_display_order_mode_input_type import TopicDisplayOrderModeInputType as TopicDisplayOrderModeInputType
+from openapi_client.models.topic_display_order_mode_overview_type import TopicDisplayOrderModeOverviewType as TopicDisplayOrderModeOverviewType
+from openapi_client.models.topic_input_type import TopicInputType as TopicInputType
+from openapi_client.models.topic_order_mode_enum import TopicOrderModeEnum as TopicOrderModeEnum
+from openapi_client.models.topic_overview_type import TopicOverviewType as TopicOverviewType
+from openapi_client.models.topic_resource_enum import TopicResourceEnum as TopicResourceEnum
+from openapi_client.models.topic_type_enum import TopicTypeEnum as TopicTypeEnum
+from openapi_client.models.user_info_input_type import UserInfoInputType as UserInfoInputType
+from openapi_client.models.user_info_overview_type import UserInfoOverviewType as UserInfoOverviewType

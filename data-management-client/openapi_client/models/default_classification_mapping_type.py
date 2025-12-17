@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,29 +18,35 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
+from typing import Any, ClassVar, Dict, List, Union
+from typing_extensions import Annotated
 from openapi_client.models.default_classification_mapping_item_type import DefaultClassificationMappingItemType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class DefaultClassificationMappingType(BaseModel):
     """
     DefaultClassificationMappingType
     """ # noqa: E501
-    color_brewer_scheme_name: StrictStr = Field(description="the name of the colorBrewer color scheme jused to define the colors for classification (see project http://colorbrewer2.org/#type=sequential&scheme=BuGn&n=3 for colorSchemes). Set to 'INDIVIDUAL' if colors are set arbitrarily.", alias="colorBrewerSchemeName")
-    items: List[DefaultClassificationMappingItemType] = Field(description="array of classification mapping items. The order of the items corresponds to indicator value intervals from low to high. The number of items represents the number of classes. In combination they represent the default classification and mapping to custom rating of the indicator values")
-    __properties: ClassVar[List[str]] = ["colorBrewerSchemeName", "items"]
+    color_brewer_scheme_name: StrictStr = Field(description="the name of the colorBrewer color scheme used to define the colors for classification (see project http://colorbrewer2.org/#type=sequential&scheme=BuGn&n=3 for colorSchemes). Set to 'INDIVIDUAL' if colors are set arbitrarily.", alias="colorBrewerSchemeName")
+    num_classes: Union[Annotated[float, Field(le=9, strict=True, ge=1)], Annotated[int, Field(le=9, strict=True, ge=1)]] = Field(description="the number of classes", alias="numClasses")
+    classification_method: StrictStr = Field(description="the classification method as enumeration", alias="classificationMethod")
+    items: List[DefaultClassificationMappingItemType] = Field(description="array of classification mapping items. each item holds the break values for a certain spatial unit. not all spatial units of a certain indicator must be set.")
+    __properties: ClassVar[List[str]] = ["colorBrewerSchemeName", "numClasses", "classificationMethod", "items"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    @field_validator('classification_method')
+    def classification_method_validate_enum(cls, value):
+        """Validates the enum"""
+        if value not in set(['REGIONAL_DEFAULT', 'JENKS', 'EQUAL_INTERVAL', 'QUANTILE']):
+            raise ValueError("must be one of enum values ('REGIONAL_DEFAULT', 'JENKS', 'EQUAL_INTERVAL', 'QUANTILE')")
+        return value
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -53,7 +59,7 @@ class DefaultClassificationMappingType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of DefaultClassificationMappingType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -67,23 +73,25 @@ class DefaultClassificationMappingType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of each item in items (list)
         _items = []
         if self.items:
-            for _item in self.items:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_items in self.items:
+                if _item_items:
+                    _items.append(_item_items.to_dict())
             _dict['items'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of DefaultClassificationMappingType from a dict"""
         if obj is None:
             return None
@@ -93,7 +101,9 @@ class DefaultClassificationMappingType(BaseModel):
 
         _obj = cls.model_validate({
             "colorBrewerSchemeName": obj.get("colorBrewerSchemeName"),
-            "items": [DefaultClassificationMappingItemType.from_dict(_item) for _item in obj.get("items")] if obj.get("items") is not None else None
+            "numClasses": obj.get("numClasses"),
+            "classificationMethod": obj.get("classificationMethod"),
+            "items": [DefaultClassificationMappingItemType.from_dict(_item) for _item in obj["items"]] if obj.get("items") is not None else None
         })
         return _obj
 

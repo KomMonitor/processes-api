@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,73 +18,60 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional, Union
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator
-from pydantic import Field
 from openapi_client.models.common_metadata_type import CommonMetadataType
+from openapi_client.models.creation_type_enum import CreationTypeEnum
 from openapi_client.models.default_classification_mapping_type import DefaultClassificationMappingType
 from openapi_client.models.georesource_reference_type import GeoresourceReferenceType
 from openapi_client.models.indicator_reference_type import IndicatorReferenceType
 from openapi_client.models.indicator_spatial_unit_join_item import IndicatorSpatialUnitJoinItem
+from openapi_client.models.indicator_type_enum import IndicatorTypeEnum
 from openapi_client.models.ogc_services_type import OgcServicesType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.permission_level_type import PermissionLevelType
+from openapi_client.models.regional_reference_value_type import RegionalReferenceValueType
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorOverviewType(BaseModel):
     """
     IndicatorOverviewType
     """ # noqa: E501
-    abbreviation: Optional[StrictStr] = Field(description="abbreviated mark of the indicator")
-    allowed_roles: Optional[List[StrictStr]] = Field(default=None, description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    abbreviation: Optional[StrictStr] = Field(default=None, description="abbreviated mark of the indicator")
+    permissions: Optional[List[StrictStr]] = Field(default=None, description="list of permissions on this entity")
     applicable_dates: List[StrictStr] = Field(description="array of applicable dates (year and month and day as YEAR-MONTH-DAY) according to ISO 8601 (e.g. 2018-01-30)", alias="applicableDates")
     applicable_spatial_units: List[IndicatorSpatialUnitJoinItem] = Field(description="array of spatial unit levels for which the dataset is applicable", alias="applicableSpatialUnits")
-    characteristic_value: Optional[StrictStr] = Field(description="the distuingishing characteristic value of the indicator", alias="characteristicValue")
-    creation_type: StrictStr = Field(description="indicates if the data is simply inserted (INSERTION), computed by an automated script (COMPUTATION) or automatically aggregated by a script (AGGREGATION)", alias="creationType")
+    characteristic_value: Optional[StrictStr] = Field(default=None, description="the distuingishing characteristic value of the indicator", alias="characteristicValue")
+    creation_type: CreationTypeEnum = Field(alias="creationType")
     default_classification_mapping: Optional[DefaultClassificationMappingType] = Field(default=None, alias="defaultClassificationMapping")
+    regional_reference_values: List[RegionalReferenceValueType] = Field(description="list of optional regional reference values (i.e. regional sum, average, spatiallyUnassignable)", alias="regionalReferenceValues")
+    display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")
     indicator_id: StrictStr = Field(description="unique identifier of this resource", alias="indicatorId")
     indicator_name: StrictStr = Field(description="name of the indicator", alias="indicatorName")
-    indicator_type: Optional[StrictStr] = Field(default=None, description="indicates whether the indicator is a status indicator (values represent the extent of the watched phenomenon for a certain point in time) or a dynamic indicator (values represent the change of extent of the watched phenomenon within a certain period of time)", alias="indicatorType")
+    indicator_type: Optional[IndicatorTypeEnum] = Field(default=None, alias="indicatorType")
     interpretation: StrictStr = Field(description="interpretation of the indicator values")
     is_headline_indicator: StrictBool = Field(description="boolean value indicating if the indicator is a headline indicator", alias="isHeadlineIndicator")
     lowest_spatial_unit_for_computation: Optional[StrictStr] = Field(default=None, description="identifier/name of the lowest spatial unit for which the indicator can be computed and thus is available (only necessary for computable indicators)", alias="lowestSpatialUnitForComputation")
     metadata: CommonMetadataType
     ogc_services: Optional[List[OgcServicesType]] = Field(default=None, description="list of available OGC services for that indicator for different spatial units", alias="ogcServices")
-    process_description: Optional[StrictStr] = Field(description="description about how the indicator was computed", alias="processDescription")
+    owner_id: StrictStr = Field(description="identifier of the owning group", alias="ownerId")
+    process_description: Optional[StrictStr] = Field(default=None, description="description about how the indicator was computed", alias="processDescription")
+    precision: Optional[StrictInt] = Field(default=None, description="Defines the number of decimal places for indicator values. If null, there is no predefined precision for this indicator.")
     reference_date_note: Optional[StrictStr] = Field(default=None, description="an optional note on the reference date of the indicator", alias="referenceDateNote")
-    display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")
     referenced_georesources: Optional[List[GeoresourceReferenceType]] = Field(default=None, description="list of references to georesources", alias="referencedGeoresources")
     referenced_indicators: Optional[List[IndicatorReferenceType]] = Field(default=None, description="list of references to other indicators", alias="referencedIndicators")
     tags: List[StrictStr] = Field(description="list of tag labels for the indicator")
     topic_reference: StrictStr = Field(description="id of the last topic hierarchy entity ", alias="topicReference")
     unit: StrictStr = Field(description="unit of the indicator values")
-    user_permissions: Optional[List[StrictStr]] = Field(default=None, description="List of permissions that are effective on this dataset for the current user", alias="userPermissions")
-    __properties: ClassVar[List[str]] = ["abbreviation", "allowedRoles", "applicableDates", "applicableSpatialUnits", "characteristicValue", "creationType", "defaultClassificationMapping", "indicatorId", "indicatorName", "indicatorType", "interpretation", "isHeadlineIndicator", "lowestSpatialUnitForComputation", "metadata", "ogcServices", "processDescription", "referenceDateNote", "displayOrder", "referencedGeoresources", "referencedIndicators", "tags", "topicReference", "unit", "userPermissions"]
+    user_permissions: Optional[List[PermissionLevelType]] = Field(default=None, description="list of permissions that are effective on this dataset for the current user", alias="userPermissions")
+    is_public: StrictBool = Field(description="flag whether the resource is publicly accessible", alias="isPublic")
+    __properties: ClassVar[List[str]] = ["abbreviation", "permissions", "applicableDates", "applicableSpatialUnits", "characteristicValue", "creationType", "defaultClassificationMapping", "regionalReferenceValues", "displayOrder", "indicatorId", "indicatorName", "indicatorType", "interpretation", "isHeadlineIndicator", "lowestSpatialUnitForComputation", "metadata", "ogcServices", "ownerId", "processDescription", "precision", "referenceDateNote", "referencedGeoresources", "referencedIndicators", "tags", "topicReference", "unit", "userPermissions", "isPublic"]
 
-    @field_validator('creation_type')
-    def creation_type_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in ('INSERTION', 'COMPUTATION', 'AGGREGATION'):
-            raise ValueError("must be one of enum values ('INSERTION', 'COMPUTATION', 'AGGREGATION')")
-        return value
-
-    @field_validator('indicator_type')
-    def indicator_type_validate_enum(cls, value):
-        """Validates the enum"""
-        if value is None:
-            return value
-
-        if value not in ('STATUS_ABSOLUTE', 'DYNAMIC_ABSOLUTE', 'STATUS_RELATIVE', 'DYNAMIC_RELATIVE', 'STATUS_STANDARDIZED', 'DYNAMIC_STANDARDIZED'):
-            raise ValueError("must be one of enum values ('STATUS_ABSOLUTE', 'DYNAMIC_ABSOLUTE', 'STATUS_RELATIVE', 'DYNAMIC_RELATIVE', 'STATUS_STANDARDIZED', 'DYNAMIC_STANDARDIZED')")
-        return value
-
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -97,7 +84,7 @@ class IndicatorOverviewType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorOverviewType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -111,50 +98,59 @@ class IndicatorOverviewType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of each item in applicable_spatial_units (list)
         _items = []
         if self.applicable_spatial_units:
-            for _item in self.applicable_spatial_units:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_applicable_spatial_units in self.applicable_spatial_units:
+                if _item_applicable_spatial_units:
+                    _items.append(_item_applicable_spatial_units.to_dict())
             _dict['applicableSpatialUnits'] = _items
         # override the default output from pydantic by calling `to_dict()` of default_classification_mapping
         if self.default_classification_mapping:
             _dict['defaultClassificationMapping'] = self.default_classification_mapping.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in regional_reference_values (list)
+        _items = []
+        if self.regional_reference_values:
+            for _item_regional_reference_values in self.regional_reference_values:
+                if _item_regional_reference_values:
+                    _items.append(_item_regional_reference_values.to_dict())
+            _dict['regionalReferenceValues'] = _items
         # override the default output from pydantic by calling `to_dict()` of metadata
         if self.metadata:
             _dict['metadata'] = self.metadata.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in ogc_services (list)
         _items = []
         if self.ogc_services:
-            for _item in self.ogc_services:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_ogc_services in self.ogc_services:
+                if _item_ogc_services:
+                    _items.append(_item_ogc_services.to_dict())
             _dict['ogcServices'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in referenced_georesources (list)
         _items = []
         if self.referenced_georesources:
-            for _item in self.referenced_georesources:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_referenced_georesources in self.referenced_georesources:
+                if _item_referenced_georesources:
+                    _items.append(_item_referenced_georesources.to_dict())
             _dict['referencedGeoresources'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in referenced_indicators (list)
         _items = []
         if self.referenced_indicators:
-            for _item in self.referenced_indicators:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_referenced_indicators in self.referenced_indicators:
+                if _item_referenced_indicators:
+                    _items.append(_item_referenced_indicators.to_dict())
             _dict['referencedIndicators'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorOverviewType from a dict"""
         if obj is None:
             return None
@@ -164,29 +160,33 @@ class IndicatorOverviewType(BaseModel):
 
         _obj = cls.model_validate({
             "abbreviation": obj.get("abbreviation"),
-            "allowedRoles": obj.get("allowedRoles"),
+            "permissions": obj.get("permissions"),
             "applicableDates": obj.get("applicableDates"),
-            "applicableSpatialUnits": [IndicatorSpatialUnitJoinItem.from_dict(_item) for _item in obj.get("applicableSpatialUnits")] if obj.get("applicableSpatialUnits") is not None else None,
+            "applicableSpatialUnits": [IndicatorSpatialUnitJoinItem.from_dict(_item) for _item in obj["applicableSpatialUnits"]] if obj.get("applicableSpatialUnits") is not None else None,
             "characteristicValue": obj.get("characteristicValue"),
             "creationType": obj.get("creationType"),
-            "defaultClassificationMapping": DefaultClassificationMappingType.from_dict(obj.get("defaultClassificationMapping")) if obj.get("defaultClassificationMapping") is not None else None,
+            "defaultClassificationMapping": DefaultClassificationMappingType.from_dict(obj["defaultClassificationMapping"]) if obj.get("defaultClassificationMapping") is not None else None,
+            "regionalReferenceValues": [RegionalReferenceValueType.from_dict(_item) for _item in obj["regionalReferenceValues"]] if obj.get("regionalReferenceValues") is not None else None,
+            "displayOrder": obj.get("displayOrder"),
             "indicatorId": obj.get("indicatorId"),
             "indicatorName": obj.get("indicatorName"),
             "indicatorType": obj.get("indicatorType"),
             "interpretation": obj.get("interpretation"),
             "isHeadlineIndicator": obj.get("isHeadlineIndicator"),
             "lowestSpatialUnitForComputation": obj.get("lowestSpatialUnitForComputation"),
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
-            "ogcServices": [OgcServicesType.from_dict(_item) for _item in obj.get("ogcServices")] if obj.get("ogcServices") is not None else None,
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "ogcServices": [OgcServicesType.from_dict(_item) for _item in obj["ogcServices"]] if obj.get("ogcServices") is not None else None,
+            "ownerId": obj.get("ownerId"),
             "processDescription": obj.get("processDescription"),
+            "precision": obj.get("precision"),
             "referenceDateNote": obj.get("referenceDateNote"),
-            "displayOrder": obj.get("displayOrder"),
-            "referencedGeoresources": [GeoresourceReferenceType.from_dict(_item) for _item in obj.get("referencedGeoresources")] if obj.get("referencedGeoresources") is not None else None,
-            "referencedIndicators": [IndicatorReferenceType.from_dict(_item) for _item in obj.get("referencedIndicators")] if obj.get("referencedIndicators") is not None else None,
+            "referencedGeoresources": [GeoresourceReferenceType.from_dict(_item) for _item in obj["referencedGeoresources"]] if obj.get("referencedGeoresources") is not None else None,
+            "referencedIndicators": [IndicatorReferenceType.from_dict(_item) for _item in obj["referencedIndicators"]] if obj.get("referencedIndicators") is not None else None,
             "tags": obj.get("tags"),
             "topicReference": obj.get("topicReference"),
             "unit": obj.get("unit"),
-            "userPermissions": obj.get("userPermissions")
+            "userPermissions": obj.get("userPermissions"),
+            "isPublic": obj.get("isPublic")
         })
         return _obj
 

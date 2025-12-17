@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,28 +18,24 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr
+from typing import Any, ClassVar, Dict, List, Union
+from typing import Optional, Set
+from typing_extensions import Self
 
 class DefaultClassificationMappingItemType(BaseModel):
     """
     DefaultClassificationMappingItemType
     """ # noqa: E501
-    default_color_as_hex: Optional[StrictStr] = Field(description="the default color for the specified value interval as hex string inclusive leading #, i.e. '#ffffff'", alias="defaultColorAsHex")
-    default_custom_rating: Optional[StrictStr] = Field(description="the default custom rating string for the specified value interval, i.e. 'very high'/'very low' or 'good'/'bad'", alias="defaultCustomRating")
-    __properties: ClassVar[List[str]] = ["defaultColorAsHex", "defaultCustomRating"]
+    spatial_unit_id: StrictStr = Field(description="spatial unit id for manual classification", alias="spatialUnitId")
+    breaks: List[Union[StrictFloat, StrictInt]] = Field(description="array of numeric break values")
+    __properties: ClassVar[List[str]] = ["spatialUnitId", "breaks"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -52,7 +48,7 @@ class DefaultClassificationMappingItemType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of DefaultClassificationMappingItemType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -66,16 +62,18 @@ class DefaultClassificationMappingItemType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of DefaultClassificationMappingItemType from a dict"""
         if obj is None:
             return None
@@ -84,8 +82,8 @@ class DefaultClassificationMappingItemType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "defaultColorAsHex": obj.get("defaultColorAsHex"),
-            "defaultCustomRating": obj.get("defaultCustomRating")
+            "spatialUnitId": obj.get("spatialUnitId"),
+            "breaks": obj.get("breaks")
         })
         return _obj
 

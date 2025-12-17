@@ -228,14 +228,16 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowed_roles: str):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.api.SpatialUnitsApi, permissions: str, is_public: bool, owner_id: str):
         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
         try:
             su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
             self._su_result = {
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
-                "allowedRoles": allowed_roles,
+                "permissions": permissions,
+                "isPublic": is_public,
+                "ownerId": owner_id
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
@@ -378,7 +380,7 @@ class KommonitorJobSummary:
                 su_summary["integratedTargetDates"] = []
 
 
-def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerApi, indicator_id: str,
+def fetch_indicator_timeseries(controller: openapi_client.api.IndicatorsApi, indicator_id: str,
                                spatial_unit_id: str, job_summary: KommonitorJobSummary, logger: logging.Logger):
     try:
         su_metadata = controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(indicator_id, spatial_unit_id)
@@ -389,7 +391,7 @@ def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerAp
         return None
 
 
-def fetch_spatial_unit_metadata(controller: openapi_client.SpatialUnitsControllerApi, spatial_unit_id: str,
+def fetch_spatial_unit_metadata(controller: openapi_client.api.SpatialUnitsApi, spatial_unit_id: str,
                                 job_summary: KommonitorJobSummary, logger: logging.Logger):
     try:
         su_metadata = controller.get_spatial_units_by_id(spatial_unit_id)
@@ -562,7 +564,7 @@ class KommonitorProcess(BasePrefectProcessor):
             }
             indicator_id = inputs["target_indicator_id"]
             for res in result.values:
-                indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
+                indicators_controller = openapi_client.api.IndicatorsApi(dmc)
                 # res["allowedRoles"] = []
                 print(res)
                 try:
@@ -574,8 +576,8 @@ class KommonitorProcess(BasePrefectProcessor):
                         output["resultData"].append(res)
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
-                except: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
-                    logger.error(f"Exception when trying to update indicator as body with http info.")
+                except Exception as e: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
+                    logger.error("Exception when trying to update indicator as body with http info.", exc_info=e)
                     job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
