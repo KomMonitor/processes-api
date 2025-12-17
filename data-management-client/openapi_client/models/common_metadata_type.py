@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -19,13 +19,10 @@ import re  # noqa: F401
 import json
 
 from datetime import date
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr, field_validator
 from typing import Any, ClassVar, Dict, List, Optional, Union
-from pydantic import BaseModel, StrictFloat, StrictInt, StrictStr, field_validator
-from pydantic import Field
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class CommonMetadataType(BaseModel):
     """
@@ -38,22 +35,22 @@ class CommonMetadataType(BaseModel):
     last_update: Optional[date] = Field(default=None, description="a timestamp representing the lastUpdate according to ISO 8601 (e.g. 2018-01-30)", alias="lastUpdate")
     literature: Optional[StrictStr] = Field(default=None, description="an optional hint to literature about the dataset (e.g. URL or book/article name)")
     note: Optional[StrictStr] = Field(default=None, description="an optional note with background information about the dataset")
-    srid_epsg: Optional[Union[StrictFloat, StrictInt]] = Field(description="the coordinate reference system of the dataset as EPSG code", alias="sridEPSG")
+    srid_epsg: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="the coordinate reference system of the dataset as EPSG code", alias="sridEPSG")
     update_interval: StrictStr = Field(alias="updateInterval")
     __properties: ClassVar[List[str]] = ["contact", "databasis", "datasource", "description", "lastUpdate", "literature", "note", "sridEPSG", "updateInterval"]
 
     @field_validator('update_interval')
     def update_interval_validate_enum(cls, value):
         """Validates the enum"""
-        if value not in ('ARBITRARY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'DAILY', 'WEEKLY'):
+        if value not in set(['ARBITRARY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'DAILY', 'WEEKLY']):
             raise ValueError("must be one of enum values ('ARBITRARY', 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'DAILY', 'WEEKLY')")
         return value
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -66,7 +63,7 @@ class CommonMetadataType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of CommonMetadataType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -80,16 +77,18 @@ class CommonMetadataType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of CommonMetadataType from a dict"""
         if obj is None:
             return None

@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,30 +18,26 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List
-from pydantic import BaseModel, StrictBool, StrictStr
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional
 from openapi_client.models.period_of_validity_type import PeriodOfValidityType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class SpatialUnitPUTInputType(BaseModel):
     """
     SpatialUnitPUTInputType
     """ # noqa: E501
     geo_json_string: StrictStr = Field(description="a valid GeoJSON string containing the features consisting of a geometry and a unique identifier as property 'uuid'", alias="geoJsonString")
+    is_partial_update: Optional[StrictBool] = Field(default=None, description="if set to TRUE, then a partial upload of geometries is possible. Missing features that are already in the database will then not be deleted", alias="isPartialUpdate")
     period_of_validity: PeriodOfValidityType = Field(alias="periodOfValidity")
-    is_partial_update: StrictBool = Field(description="if set to TRUE, then a partial upload of geometries is possible. Missing features that are already in the database will then not be deleted", alias="isPartialUpdate")
-    __properties: ClassVar[List[str]] = ["geoJsonString", "periodOfValidity", "isPartialUpdate"]
+    __properties: ClassVar[List[str]] = ["geoJsonString", "isPartialUpdate", "periodOfValidity"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -54,7 +50,7 @@ class SpatialUnitPUTInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of SpatialUnitPUTInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -68,10 +64,12 @@ class SpatialUnitPUTInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of period_of_validity
@@ -80,7 +78,7 @@ class SpatialUnitPUTInputType(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of SpatialUnitPUTInputType from a dict"""
         if obj is None:
             return None
@@ -90,8 +88,8 @@ class SpatialUnitPUTInputType(BaseModel):
 
         _obj = cls.model_validate({
             "geoJsonString": obj.get("geoJsonString"),
-            "periodOfValidity": PeriodOfValidityType.from_dict(obj.get("periodOfValidity")) if obj.get("periodOfValidity") is not None else None,
-            "isPartialUpdate": obj.get("isPartialUpdate")
+            "isPartialUpdate": obj.get("isPartialUpdate"),
+            "periodOfValidity": PeriodOfValidityType.from_dict(obj["periodOfValidity"]) if obj.get("periodOfValidity") is not None else None
         })
         return _obj
 

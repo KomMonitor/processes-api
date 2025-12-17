@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,15 +18,11 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
 from openapi_client.models.indicator_post_input_type_value_mapping import IndicatorPOSTInputTypeValueMapping
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorPOSTInputTypeIndicatorValues(BaseModel):
     """
@@ -36,11 +32,11 @@ class IndicatorPOSTInputTypeIndicatorValues(BaseModel):
     value_mapping: Optional[List[IndicatorPOSTInputTypeValueMapping]] = Field(default=None, description="an array of entries mapping an indicator value to a timestamp as mapping key", alias="valueMapping")
     __properties: ClassVar[List[str]] = ["spatialReferenceKey", "valueMapping"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -53,7 +49,7 @@ class IndicatorPOSTInputTypeIndicatorValues(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorPOSTInputTypeIndicatorValues from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -67,23 +63,25 @@ class IndicatorPOSTInputTypeIndicatorValues(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of each item in value_mapping (list)
         _items = []
         if self.value_mapping:
-            for _item in self.value_mapping:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_value_mapping in self.value_mapping:
+                if _item_value_mapping:
+                    _items.append(_item_value_mapping.to_dict())
             _dict['valueMapping'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorPOSTInputTypeIndicatorValues from a dict"""
         if obj is None:
             return None
@@ -93,7 +91,7 @@ class IndicatorPOSTInputTypeIndicatorValues(BaseModel):
 
         _obj = cls.model_validate({
             "spatialReferenceKey": obj.get("spatialReferenceKey"),
-            "valueMapping": [IndicatorPOSTInputTypeValueMapping.from_dict(_item) for _item in obj.get("valueMapping")] if obj.get("valueMapping") is not None else None
+            "valueMapping": [IndicatorPOSTInputTypeValueMapping.from_dict(_item) for _item in obj["valueMapping"]] if obj.get("valueMapping") is not None else None
         })
         return _obj
 

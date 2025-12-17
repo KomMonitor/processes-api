@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,36 +18,38 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional, Union
 from openapi_client.models.common_metadata_type import CommonMetadataType
 from openapi_client.models.period_of_validity_type import PeriodOfValidityType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class SpatialUnitPOSTInputType(BaseModel):
     """
     SpatialUnitPOSTInputType
     """ # noqa: E501
-    allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    permissions: List[StrictStr] = Field(description="list of permissions on this entity")
     geo_json_string: StrictStr = Field(description="a valid GeoJSON string containing the features consisting of a geometry and a unique identifier as property 'uuid'", alias="geoJsonString")
-    json_schema: StrictStr = Field(description="a JSON schema as string that defines the data model for this dataset. It can be used to validate the geoJsonString property.", alias="jsonSchema")
+    json_schema: Optional[StrictStr] = Field(default=None, description="a JSON schema as string that defines the data model for this dataset. It can be used to validate the geoJsonString property.", alias="jsonSchema")
     metadata: CommonMetadataType
-    next_lower_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
-    next_upper_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
+    next_lower_hierarchy_level: Optional[StrictStr] = Field(default=None, description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
+    next_upper_hierarchy_level: Optional[StrictStr] = Field(default=None, description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
     period_of_validity: PeriodOfValidityType = Field(alias="periodOfValidity")
     spatial_unit_level: StrictStr = Field(description="the name and identifier of the spatial unit level the features apply to", alias="spatialUnitLevel")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "geoJsonString", "jsonSchema", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "periodOfValidity", "spatialUnitLevel"]
+    is_outline_layer: Optional[StrictBool] = Field(default=False, description="if true, then KomMonitor web client map application will offer this spatial unit as outline layer in legend control", alias="isOutlineLayer")
+    outline_color: Optional[StrictStr] = Field(default=None, description="outline color for this layer as hex code", alias="outlineColor")
+    outline_width: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="outline width as stroke width for outline geometry", alias="outlineWidth")
+    outline_dash_array_string: Optional[StrictStr] = Field(default=None, description="string of line stroke dash array for lines of interest (e.g. 20,20; see https://developer.mozilla.org/de/docs/Web/SVG/Attribute/stroke-dasharray)", alias="outlineDashArrayString")
+    owner_id: Optional[StrictStr] = Field(default=None, description="identifier of the owning group", alias="ownerId")
+    is_public: StrictBool = Field(description="flag whether the resource is publicly accessible", alias="isPublic")
+    __properties: ClassVar[List[str]] = ["permissions", "geoJsonString", "jsonSchema", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "periodOfValidity", "spatialUnitLevel", "isOutlineLayer", "outlineColor", "outlineWidth", "outlineDashArrayString", "ownerId", "isPublic"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -60,7 +62,7 @@ class SpatialUnitPOSTInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of SpatialUnitPOSTInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -74,10 +76,12 @@ class SpatialUnitPOSTInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of metadata
@@ -89,7 +93,7 @@ class SpatialUnitPOSTInputType(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of SpatialUnitPOSTInputType from a dict"""
         if obj is None:
             return None
@@ -98,14 +102,20 @@ class SpatialUnitPOSTInputType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
+            "permissions": obj.get("permissions"),
             "geoJsonString": obj.get("geoJsonString"),
             "jsonSchema": obj.get("jsonSchema"),
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "nextLowerHierarchyLevel": obj.get("nextLowerHierarchyLevel"),
             "nextUpperHierarchyLevel": obj.get("nextUpperHierarchyLevel"),
-            "periodOfValidity": PeriodOfValidityType.from_dict(obj.get("periodOfValidity")) if obj.get("periodOfValidity") is not None else None,
-            "spatialUnitLevel": obj.get("spatialUnitLevel")
+            "periodOfValidity": PeriodOfValidityType.from_dict(obj["periodOfValidity"]) if obj.get("periodOfValidity") is not None else None,
+            "spatialUnitLevel": obj.get("spatialUnitLevel"),
+            "isOutlineLayer": obj.get("isOutlineLayer") if obj.get("isOutlineLayer") is not None else False,
+            "outlineColor": obj.get("outlineColor"),
+            "outlineWidth": obj.get("outlineWidth"),
+            "outlineDashArrayString": obj.get("outlineDashArrayString"),
+            "ownerId": obj.get("ownerId"),
+            "isPublic": obj.get("isPublic")
         })
         return _obj
 

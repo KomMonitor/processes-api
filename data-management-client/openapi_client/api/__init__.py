@@ -1,16 +1,17 @@
 # flake8: noqa
 
 # import apis into api package
-from openapi_client.api.georecources_controller_api import GeorecourcesControllerApi
-from openapi_client.api.georecources_public_controller_api import GeorecourcesPublicControllerApi
-from openapi_client.api.home_controller_api import HomeControllerApi
-from openapi_client.api.indicators_controller_api import IndicatorsControllerApi
-from openapi_client.api.indicators_public_controller_api import IndicatorsPublicControllerApi
-from openapi_client.api.roles_controller_api import RolesControllerApi
-from openapi_client.api.script_controller_api import ScriptControllerApi
-from openapi_client.api.script_public_controller_api import ScriptPublicControllerApi
-from openapi_client.api.spatial_units_controller_api import SpatialUnitsControllerApi
-from openapi_client.api.spatial_units_public_controller_api import SpatialUnitsPublicControllerApi
-from openapi_client.api.topics_controller_api import TopicsControllerApi
-from openapi_client.api.topics_public_controller_api import TopicsPublicControllerApi
+from openapi_client.api.access_control_api import AccessControlApi
+from openapi_client.api.database_public_api import DatabasePublicApi
+from openapi_client.api.georesources_api import GeoresourcesApi
+from openapi_client.api.georesources_public_api import GeoresourcesPublicApi
+from openapi_client.api.indicators_api import IndicatorsApi
+from openapi_client.api.indicators_public_api import IndicatorsPublicApi
+from openapi_client.api.process_scripts_api import ProcessScriptsApi
+from openapi_client.api.process_scripts_public_api import ProcessScriptsPublicApi
+from openapi_client.api.spatial_units_api import SpatialUnitsApi
+from openapi_client.api.spatial_units_public_api import SpatialUnitsPublicApi
+from openapi_client.api.topics_api import TopicsApi
+from openapi_client.api.topics_public_api import TopicsPublicApi
+from openapi_client.api.user_info_api import UserInfoApi
 

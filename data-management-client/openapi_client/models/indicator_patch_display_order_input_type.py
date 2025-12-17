@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,28 +18,24 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Union
-from pydantic import BaseModel, StrictFloat, StrictInt, StrictStr
-from pydantic import Field
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorPATCHDisplayOrderInputType(BaseModel):
     """
     IndicatorPATCHDisplayOrderInputType
     """ # noqa: E501
+    display_order: Union[StrictFloat, StrictInt] = Field(description="the new display order value", alias="displayOrder")
     indicator_id: StrictStr = Field(description="unique ID of the associated indicator", alias="indicatorId")
-    display_order: Union[StrictFloat, StrictInt] = Field(description="the new displayOrder value", alias="displayOrder")
-    __properties: ClassVar[List[str]] = ["indicatorId", "displayOrder"]
+    __properties: ClassVar[List[str]] = ["displayOrder", "indicatorId"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -52,7 +48,7 @@ class IndicatorPATCHDisplayOrderInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorPATCHDisplayOrderInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -66,16 +62,18 @@ class IndicatorPATCHDisplayOrderInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorPATCHDisplayOrderInputType from a dict"""
         if obj is None:
             return None
@@ -84,8 +82,8 @@ class IndicatorPATCHDisplayOrderInputType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "indicatorId": obj.get("indicatorId"),
-            "displayOrder": obj.get("displayOrder")
+            "displayOrder": obj.get("displayOrder"),
+            "indicatorId": obj.get("indicatorId")
         })
         return _obj
 
