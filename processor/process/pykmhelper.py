@@ -2305,7 +2305,13 @@ def geomean(populationArray):
         Float: returns the geometric mean value of the submitted array of numeric values. (If there are zero values in the input the output will be zero)
     """
     populationArray = convertPropertyArrayToNumberArray(populationArray)
-    return stats.mstats.gmean(populationArray)
+    value = stats.mstats.gmean(populationArray)
+    
+    if math.isnan(value):
+        throwError("Error during calculation of geometric mean. Perhaps negative values exist in the array.")
+        value = None  
+        
+    return value 
 
 def geomean_fromIdValueDict(indicatorIdValueDictArray):
     """Encapsulates scipy.stats.mstats function 'gmean' to compute the geometric mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
@@ -2585,6 +2591,14 @@ def zScore_byPopulationArray(value, populationArray, computeSampledStandardDevia
         throwError(f"Cannot compute Z-Score. Error: {e}")
 
 def zScore_normalization_wholeValueArray(populationArray):
+    """Calculates the zscore of a submitted array containing numerical values using following formula (z = (x - mean) / stdw). To calculate the standard deviation is calculated using the population standard deviation. 
+
+    Args:
+        populationArray (List): a list of numerical values. If the list contain string values representing a numerical value the value get converted to a float. 
+
+    Returns:
+        list: returns a list of the zscore for all numerical values in the submitted list.
+    """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
 
     meanValue = mean(numberArray)
@@ -2597,6 +2611,14 @@ def zScore_normalization_wholeValueArray(populationArray):
     return zScoreArray
 
 def zScore_normalization_wholeValueArray_inverted(populationArray):
+    """Calculates the inverted zscore of a submitted array containing numerical values using following formula (z = 1 - ((x - mean) / stdw )). To calculate the standard deviation is calculated using the population standard deviation. 
+
+    Args:
+        populationArray (List): a list of numerical values. If the list contain string values representing a numerical value the value get converted to a float. 
+
+    Returns:
+        list: returns a list of the zscore for all numerical values in the submitted list.
+    """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
 
     meanValue = mean(numberArray)
