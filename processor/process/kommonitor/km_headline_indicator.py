@@ -301,8 +301,10 @@ class KmHeadlineIndicator(KommonitorProcess):
                     for targetTime in all_times:
                         try:
                             time_key = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            if feature in collection.nan_features[time_key]:
+                            if feature in collection.nan_features[time_key] and i > 0:
                                 y += 1
+                                raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
+                            elif feature in collection.nan_features[time_key]:
                                 raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
 
                             try:
