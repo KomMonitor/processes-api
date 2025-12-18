@@ -593,7 +593,7 @@ def isNoDataValue(value):
     Returns:
         bool: returns 'True' if the value is a NoData Value (i. e. 'None', 'NaN')
     """
-    try: 
+    try:
         if value == None or value == "":
             return True
         if isinstance(value, str) and value != "":
@@ -1165,7 +1165,8 @@ class IndicatorCollection:
         for indicator_id, indicator_obj in self.indicators.items():
             for raw_time in times:
                 time_key = getTargetDateWithPropertyPrefix(raw_time)
-                self.nan_features[time_key] = []
+                if not time_key in self.nan_features:
+                    self.nan_features[time_key] = []
                 for feature in self.intersection_su_features:
                     feature_series = indicator_obj.time_series.get(feature, {})
                     value = feature_series[time_key]

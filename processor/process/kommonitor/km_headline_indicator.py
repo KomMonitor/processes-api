@@ -293,7 +293,6 @@ class KmHeadlineIndicator(KommonitorProcess):
                             
                         indicator_obj.lists[time_key] = normalized
 
-
                 # iterate over all features and append the indicator
                 y = 0
                 indicator_values = []
