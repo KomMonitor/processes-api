@@ -209,8 +209,7 @@ class KmHeadlineIndicator(KommonitorProcess):
             # ti.meta = indicators_controller.get_indicator_by_id(
             #    target_id)
             ti.get_indicator_by_id(indicators_controller)
-            
-            print(ti.meta)
+
             for indicator in collection.indicators:
                 collection.indicators[indicator].get_indicator_by_id(indicators_controller)
                     
@@ -283,7 +282,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                         for feature in collection.intersection_su_features:
                             if not feature in collection.nan_features[time_key]:
                                 feature_series = indicator_obj.time_series.get(feature, {})
-                                value = feature_series.get(time_key)
+                                value = feature_series[time_key]
                                 indicator_obj.lists[time_key].append(value)
 
                         if not z_score:

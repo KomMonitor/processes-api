@@ -1168,7 +1168,7 @@ class IndicatorCollection:
                 self.nan_features[time_key] = []
                 for feature in self.intersection_su_features:
                     feature_series = indicator_obj.time_series.get(feature, {})
-                    value = feature_series.get(time_key)
+                    value = feature_series[time_key]
                     if isNoDataValue(value):
                         self.nan_features[time_key].append(feature)
 
