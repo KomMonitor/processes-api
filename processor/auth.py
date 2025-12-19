@@ -12,7 +12,7 @@ KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
-KC_URL_PROTOCOL = os.getenv('KC_PROTOCOL', "https")
+KC_URL_PROTOCOL = os.getenv('KC_URL_PROTOCOL', "https")
 
 
 class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
