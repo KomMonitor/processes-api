@@ -34,6 +34,7 @@ KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
 KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_TARGET_CLIENT_ID = os.getenv('KC_TARGET_CLIENT_ID', "kommonitor-data-management")
 KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
+KC_URL_PROTOCOL = os.getenv('KC_PROTOCOL', "https")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
@@ -54,7 +55,7 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
 
         logger.info(f"Requesting token for user with ID: {execute_request.properties.get('user_id', '')}")
 
-        http = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+        http = f"{KC_URL_PROTOCOL}://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
         a = requests.post(http, data=payload)
         a = a.json()
         token = a['access_token']

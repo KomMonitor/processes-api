@@ -81,17 +81,18 @@ pip install .
 
 The application is packaged as an executable `app.py` script. Configuration is based on the following environment variables which should be set accordingly prior to starting:
 
-| name                           | description                                          |
-|--------------------------------|------------------------------------------------------|
-| KC_CLIENT_ID                   | Identifier of pygeopai client in Keycloak            |
-| KC_CLIENT_SECRET               | Secret of pygeopai client in Keycloak                |
-| KC_TARGET_CLIENT_ID            | Identifier of Data Management API client in Keycloak |
-| KC_HOSTNAME                    | Hostname of Keycloak Server (e.g. `keycloak:8080`)   |
-| KC_HOSTNAME_PATH               | Subpath of Keycloak Hostname (e.g. `/keycloak`)      |
-| KC_REALM_NAME                  | Name of the Keycloak realm                           |
-| KOMMONITOR_DATA_MANAGEMENT_URL | URL of the KomMonitor Data Management API            |
-| PROCESS_RESULTS_DIR            | Directory to store process results                   |
-| PREFECT_API_URL                | URL of the Prefect server                            |
+| name                           | description                                                     |
+|--------------------------------|-----------------------------------------------------------------|
+| KC_CLIENT_ID                   | Identifier of pygeopai client in Keycloak                       |
+| KC_CLIENT_SECRET               | Secret of pygeopai client in Keycloak                           |
+| KC_TARGET_CLIENT_ID            | Identifier of Data Management API client in Keycloak            |
+| KC_HOSTNAME                    | Hostname of Keycloak Server (e.g. `keycloak:8080`)              |
+| KC_HOSTNAME_PATH               | Subpath of Keycloak Hostname (e.g. `/keycloak`)                 |
+| KC_URL_PROTOCOL                | Whether to use 'http' (only for development purpose) or 'https' |
+| KC_REALM_NAME                  | Name of the Keycloak realm                                      |
+| KOMMONITOR_DATA_MANAGEMENT_URL | URL of the KomMonitor Data Management API                       |
+| PROCESS_RESULTS_DIR            | Directory to store process results                              |
+| PREFECT_API_URL                | URL of the Prefect server                                       |
 
 After these variables are set run the app via
 ```commandline
