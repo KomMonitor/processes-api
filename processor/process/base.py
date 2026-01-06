@@ -198,7 +198,7 @@ class ExecutionMode(str, Enum):
     ALL = "ALL"
     DATES = "DATES"
 
-class Popularity(str, Enum):
+class Polarity(str, Enum):
     NORMAL = "NORMAL"
     INVERT = "INVERT"
 

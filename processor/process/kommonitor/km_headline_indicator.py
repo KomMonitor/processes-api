@@ -14,10 +14,10 @@ from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOTyp
 # from ..base import DataManagementException
 try:
     from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Polarity
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Polarity
 
 try:
     from .. import pykmhelper
@@ -69,7 +69,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                         "inputBoxes": [
                            {
                                 "id": "computation_ids",
-                                "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Popularität",
+                                "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Polarität",
                                 "description": "",
                                 "contents": [
                                     "computation_ids"
@@ -100,20 +100,20 @@ class KmIndicatorHeadline(KommonitorProcess):
             "computation_ids": ProcessInput(
                 id="COMPUTATION_IDS",
                 title="für die Berechnung erforderliche Basisindikatoren",
-                description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Popularitätseinstellung.",
+                description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Polaritätseinstellung.",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.ARRAY,
                     items=ProcessIOSchema(
                         type_=ProcessIOType.OBJECT,
                         properties={
                             "ID": ProcessIOSchema(type_=ProcessIOType.STRING, title="Indikator-ID"),
-                            "POPULARITY": ProcessIOSchema(
+                            "POLARITY": ProcessIOSchema(
                                 type_=ProcessIOType.STRING,
-                                title="Popularität für die Normierung (normal oder invers)",
-                                enum=[Popularity.INVERT, Popularity.NORMAL]
+                                title="Polarität für die Normierung (normal oder invers)",
+                                enum=[Polarity.INVERT, Polarity.NORMAL]
                             )
                         },
-                        required=["ID", "POPULARITY"]
+                        required=["ID", "POLARITY"]
                     )
                 )
             ),
@@ -203,7 +203,7 @@ class KmIndicatorHeadline(KommonitorProcess):
             collection = IndicatorCollection()
             for indicator in computation_ids:
                 collection.add_indicator(IndicatorType(indicator["ID"], IndicatorCalculationType.COMPUTATION_INDICATOR))
-                collection.indicators[indicator["ID"]].method = indicator["POPULARITY"]
+                collection.indicators[indicator["ID"]].method = indicator["POLARITY"]
                 
             # query indicator metadate to check for errors occured
             # ti.meta = indicators_controller.get_indicator_by_id(
