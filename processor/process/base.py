@@ -236,10 +236,7 @@ class KommonitorResult:
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
                 "permissions": permissions,
                 "isPublic": is_public,
-                "ownerId": owner_id,
-                "values": {
-                    "applicableSpatialUnit": su_meta.spatial_unit_level,                    
-                },
+                "ownerId": owner_id,                
                 "spatial_unit_id": spatial_unit_id
             }
         except (ForbiddenException, ApiException) as e:
@@ -260,7 +257,7 @@ class KommonitorResult:
         self._su_result = None
 
     def add_indicator_values(self, values: list):
-        self._su_result["values"]["indicatorValues"] = values
+        self._su_result["indicatorValues"] = values
 
 
 class KommonitorJobSummary:
@@ -585,7 +582,7 @@ class KommonitorProcess(BasePrefectProcessor):
                         indicator_data=res #["values"]
                     )
                     if resp.status_code == 200:
-                        output["resultData"].append(res["values"])
+                        output["resultData"].append(res["indicatorValues"])
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
                 except Exception as e: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
