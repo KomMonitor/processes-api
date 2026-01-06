@@ -34,16 +34,16 @@ except ImportError:
 # this name should be set for @flow(name='<processName>') and within detailed_process_description as 
 # additional_parameters.parameters[0].value[0].apiName
 # this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
-processName = "km_headline_indicator"
+processName = "km_indicator_headline"
 
 @flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(KmHeadlineIndicator.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmIndicatorHeadline.run, job_id, execution_request)
 
-class KmHeadlineIndicator(KommonitorProcess):
+class KmIndicatorHeadline(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
