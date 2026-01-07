@@ -198,7 +198,7 @@ class ExecutionMode(str, Enum):
     ALL = "ALL"
     DATES = "DATES"
 
-class Popularity(str, Enum):
+class Polarity(str, Enum):
     NORMAL = "NORMAL"
     INVERT = "INVERT"
 
@@ -236,7 +236,8 @@ class KommonitorResult:
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
                 "permissions": permissions,
                 "isPublic": is_public,
-                "ownerId": owner_id
+                "ownerId": owner_id,                
+                "spatial_unit_id": spatial_unit_id
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
@@ -578,10 +579,10 @@ class KommonitorProcess(BasePrefectProcessor):
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(
                         indicator_id=indicator_id,
-                        indicator_data=res
+                        indicator_data=res #["values"]
                     )
                     if resp.status_code == 200:
-                        output["resultData"].append(res)
+                        output["resultData"].append(res["indicatorValues"])
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
                 except Exception as e: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
