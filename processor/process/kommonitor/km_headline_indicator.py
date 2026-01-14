@@ -63,21 +63,19 @@ class KmIndicatorHeadline(KommonitorProcess):
                     value=[{
                         "longTitle": "Leitindikator - verkettete Berechnung",
                         "apiName": processName,
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "dynamicLegend": "<b>Leitindikatoren-Berechnung</b><br/><br/>Berechnung durch Verkettung der Schritte <b>Normalisierungsfunktion <i>Norm<sub>1</sub></i></b>, und <b>Aggregationsfunktion <i>Aggr<sub>1</sub></i></b> für alle Basisindkatoren.    <br/><br/> <b>Eingangsdaten und Polarität</b> <br/>${list_baseIndicators_withPolarity} <br/><br/> <b>Normalisierungsfunktion <i>Norm<sub>1</sub></i></b> <br/> <i> ${computation_method} </i> <br/><br/> <b>Aggregationsfunktion <i>Aggr<sub>1</sub></i></b> <br/> <i> ${aggregation_method} </i>",
                         "inputBoxes": [
                            {
-                                "id": "computation_ids",
+                                "id": "computation_ids_with_polarity",
                                 "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Polarität",
                                 "description": "",
                                 "contents": [
-                                    "computation_ids"
+                                    "computation_ids_with_polarity"
                                 ]
                            },
                            {
                                 "id": "computation_method",
-                                "title": "Art der Normierung (Min/Max oder Z-Wert)",
+                                "title": "Art der Normalisierung (Ranked Min/Max oder Z-Wert)",
                                 "description": "",
                                 "contents": [
                                     "computation_method"
@@ -97,8 +95,8 @@ class KmIndicatorHeadline(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "computation_ids": ProcessInput(
-                id="COMPUTATION_IDS",
+            "computation_ids_with_polarity": ProcessInput(
+                id="computation_ids_with_polarity",
                 title="für die Berechnung erforderliche Basisindikatoren",
                 description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Polaritätseinstellung.",
                 schema_=ProcessIOSchema(
@@ -109,7 +107,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                             "ID": ProcessIOSchema(type_=ProcessIOType.STRING, title="Indikator-ID"),
                             "POLARITY": ProcessIOSchema(
                                 type_=ProcessIOType.STRING,
-                                title="Polarität für die Normierung (normal oder invers)",
+                                title="Polarität für die Normalisierung (normal oder invers)",
                                 enum=[Polarity.INVERT, Polarity.NORMAL]
                             )
                         },
@@ -152,11 +150,11 @@ class KmIndicatorHeadline(KommonitorProcess):
                     enum=[
                         {
                             "apiName": "RANKEDMINMAX",
-                            "displayName": "normal ([value - min] / [max - min])",
+                            "displayName": "Ranked Min/Max [(value - min) / (max - min)]",
                         },
                         {
                             "apiName": "ZSCORE",
-                            "displayName": "z = (x - mean) / stdev",
+                            "displayName": "Z-Score [z = (x - mean) / stdev]",
                         }
                     ],                    
                     default={
@@ -184,7 +182,7 @@ class KmIndicatorHeadline(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        computation_ids = inputs["computation_ids"]
+        computation_ids_with_polarity = inputs["computation_ids_with_polarity"]
         aggregation_method = inputs["aggregation_method"]
         computation_method = inputs["computation_method"]
         
@@ -201,7 +199,7 @@ class KmIndicatorHeadline(KommonitorProcess):
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
             
             collection = IndicatorCollection()
-            for indicator in computation_ids:
+            for indicator in computation_ids_with_polarity:
                 collection.add_indicator(IndicatorType(indicator["ID"], IndicatorCalculationType.COMPUTATION_INDICATOR))
                 collection.indicators[indicator["ID"]].method = indicator["POLARITY"]
                 
@@ -252,7 +250,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                 elif aggregation_method == "MIN":
                     agg_func = pykmhelper.min
                 else:
-                    raise DataManagementException("The aggregation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
+                    raise DataManagementException("The aggregation method is not in the list of allowed values.", computation_ids_with_polarity[0]["ID"], "INDICATOR", 500)
 
                          
                 if computation_method == "RANKEDMINMAX":
@@ -265,7 +263,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                     normal = pykmhelper.zScore_normalization_wholeValueArray       
                     invert = pykmhelper.zScore_normalization_wholeValueArray_inverted
                 else:
-                    raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
+                    raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids_with_polarity[0]["ID"], "INDICATOR", 500)
                     
                 collection.search_nan_features(all_times)
 
