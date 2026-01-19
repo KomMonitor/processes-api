@@ -11,6 +11,7 @@ KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
 KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
 KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
+ALLOWED_ROLES = tuple(os.getenv('ALLOWED_ROLES', "kommonitor-creator").split(","))
 
 
 class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
@@ -39,7 +40,6 @@ class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
         if not token or not token["active"] or token["exp"] < time.time():
             raise InvalidTokenError()
 
-        # require kommonitor-admin for now
-        if "kommonitor-creator" not in token["realm_access"]["roles"]:
+        if not any(role.endswith(ALLOWED_ROLES) for role in token["realm_access"]["roles"]):
             print("access denied - missing required roles!")
             raise InvalidTokenError()
