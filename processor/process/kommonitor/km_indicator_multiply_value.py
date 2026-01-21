@@ -60,10 +60,10 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                 Parameter(
                     name="kommonitorUiParams",
                     value=[{
-                        "longTitle": "Multiplikation eines Indikator mit einem festen Wert",
+                        "longTitle": "Multiplikation eines Indikators mit einem festen Wert",
                         "apiName": processName,
                         "calculation_info": "Produkt aus Indikator und Wert",
-                        "formula": "$ \\prod_{n=1}^{m} I_{n} $",
+                        "formula": "$ I \\times x $",
                         "legend": "",
                         "dynamicFormula": "$$ prod_baseIndicators $$",
                         "dynamicLegend": "${list_baseIndicators}",
@@ -78,7 +78,7 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                             },
                             {
                                 "id": "num_value",
-                                "title": "Notwendiger (Basis-)Indikator",
+                                "title": "Notwendiger Multiplikator",
                                 "description": "",
                                 "contents": [
                                     "num_value"
