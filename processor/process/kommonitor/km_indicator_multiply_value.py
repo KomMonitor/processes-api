@@ -86,13 +86,13 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                 id= "COMPUTATION_ID",
                 title="für die Berechnung erforderlicher Basisindikator",
                 description="Indikatoren ID des erforderlichen Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=True)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "num_value": ProcessInput(
                 id= "NUM_VALUE",
                 title="Multiplikationswert",
                 description="Wert mit welchem der Basisindikator multipliziert wird.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.NUMBER, required=True)
+                schema_=ProcessIOSchema(type_=ProcessIOType.NUMBER, required=["true"])
             )
         }, 
         outputs = KommonitorProcess.common_output
