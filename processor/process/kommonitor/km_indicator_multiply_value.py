@@ -75,6 +75,14 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                                 "contents": [
                                     "computation_id"
                                 ]
+                            },
+                            {
+                                "id": "num_value",
+                                "title": "Notwendiger (Basis-)Indikator",
+                                "description": "",
+                                "contents": [
+                                    "num_value"
+                                ]
                             }
                         ]
                     }]
