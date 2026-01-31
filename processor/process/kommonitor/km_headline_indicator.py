@@ -238,7 +238,7 @@ class KmIndicatorHeadline(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 
@@ -285,6 +285,8 @@ class KmIndicatorHeadline(KommonitorProcess):
 
                         if not z_score:
                             ranked = pykmhelper.rank(indicator_obj.lists[time_key])
+                            print(ranked)
+                            print(raw_time)
                             normalized = func(ranked)
                         else:
                             normalized = func(indicator_obj.lists[time_key])
