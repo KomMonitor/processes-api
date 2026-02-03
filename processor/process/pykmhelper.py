@@ -1142,8 +1142,9 @@ class IndicatorCollection:
             if self.indicators[indicator].bool_missing_timestamp:
                 job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
 
-    def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary):
+    def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary, allDates: list):
         """checks whether spatial unit features are missing for certain indicators and in this case adds a missing timestamp error to the jobSummary
+        also checks whether a timestamp has only NONE values for each spatial unit feature and adds a missing spatial unit feature.
 
         Args:
             job_summary (KommonitorJobSummary): the current kommonitor jobSummary
@@ -1156,6 +1157,22 @@ class IndicatorCollection:
 
             if len(missing_su_features) > 0:
                 job_summary.add_missing_spatial_unit_feature_error(indicator, missing_su_features)
+
+        for indicator in self.indicators:
+
+            for i, date in enumerate(allDates):
+                date_with_prefix = getTargetDateWithPropertyPrefix(date)
+                for feature in self.all_su_features:
+                    emptyTimeSeries = True
+                    if not isNoDataValue(self.indicators[indicator].time_series[feature][date_with_prefix]):
+                        emptyTimeSeries = False
+                        break
+
+                if emptyTimeSeries:
+                    job_summary.add_missing_timestamp_error("INDICATOR", indicator, [date])
+                    allDates.pop(i)
+
+        return allDates
 
     def fetch_indicator_feature_time_series(self):
         """creates a time series which allows direct access to the data using indicator id and su feature id and target date
@@ -3037,7 +3054,11 @@ def getChange_absolute(feature, targetDate, compareDate):
     targetDatePrefix = getTargetDateWithPropertyPrefix(targetDate)
     compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
     targetValue = feature[targetDatePrefix]
-    compareValue = feature[compareDatePrefix]
+    try:
+        compareValue = feature[compareDatePrefix]
+    except KeyError:
+        throwError(f"An error occured because the target value {targetDate} has no compare value in the feature collection.")
+        resultValue = None
 
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         resultValue = float(targetValue) - float(compareValue)
