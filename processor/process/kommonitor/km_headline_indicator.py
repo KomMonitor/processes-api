@@ -285,8 +285,6 @@ class KmIndicatorHeadline(KommonitorProcess):
 
                         if not z_score:
                             ranked = pykmhelper.rank(indicator_obj.lists[time_key])
-                            print(ranked)
-                            print(raw_time)
                             normalized = func(ranked)
                         else:
                             normalized = func(indicator_obj.lists[time_key])
