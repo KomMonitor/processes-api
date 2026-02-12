@@ -13,7 +13,8 @@ import time
 import requests
 from logging import Logger
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+from dataclasses import dataclass, field
 
 import geojson
 import geopandas as gpd
@@ -3476,7 +3477,75 @@ def continuity_consecutive_n_days(feature, targetDate, numberOfDays):
 
 # prefect get_run_logger() schon im KmHelper (schonmal vorbereiten)
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Export Methods and Classes
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 
-    
+@dataclass
+class TargetTime:
+    mode: str
+    include_dates: List[str] = field(default_factory=list)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+@dataclass
+class IndicatorExport:
+    indicator_id: str
+    spatial_unit_ids: List[str]
+    target_time: TargetTime
+    download_formats: List[str]
+
+
+@dataclass
+class GeoressourceExport:
+    georessource_id: str
+    target_time: TargetTime
+    download_formats: List[str]
+
+
+def process_export_inputs(data: dict):
+    # 1. Listen für die extrahierten Objekte initialisieren
+    selected_indicators: List[IndicatorExport] = []
+    selected_georessources: List[GeoressourceExport] = []
+
+    # 2. Indikatoren verarbeiten
+    for ind in data["single_export"]["indicators"]:
+        t_time = ind.get("target_time", {})
+        indicator_obj = IndicatorExport(
+            indicator_id=ind.get("indicator_id"),
+            spatial_unit_ids=ind.get("spatial_unit_ids", []),
+            download_formats=ind.get("download_format", []),
+            target_time=TargetTime(
+                mode=t_time.get("mode"),
+                include_dates=t_time.get("include_dates", []),
+                start_date=t_time.get("start_date"),
+                end_date=t_time.get("end_date")
+            )
+        )
+        selected_indicators.append(indicator_obj)
+
+    # 3. Georessourcen verarbeiten
+    for geo in data.get("georessources", []):
+        t_time = geo.get("target_time", {})
+        geo_obj = GeoressourceExport(
+            georessource_id=geo.get("georessource_id"),
+            download_formats=geo.get("download_format", []),
+            target_time=TargetTime(
+                mode=t_time.get("mode"),
+                include_dates=t_time.get("include_dates", []),
+                start_date=t_time.get("start_date"),
+                end_date=t_time.get("end_date")
+            )
+        )
+        selected_georessources.append(geo_obj)
+
+    return selected_indicators, selected_georessources
+
+# Beispielhafter Aufruf:
+# indicators, georessources = process_export_inputs(received_params)
+
 

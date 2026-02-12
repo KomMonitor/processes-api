@@ -166,7 +166,7 @@ def parse_processes(package: str) -> None:
         with open(process) as fh:
             root = ast.parse(fh.read())
             for node in ast.iter_child_nodes(root):
-                if isinstance(node, ast.ClassDef) and node.bases[0].id == "KommonitorProcess":
+                if isinstance(node, ast.ClassDef):
                     process_path = os.path.normpath(fh.name)
                     processes[node.name] = {
                         "type": "process",
@@ -182,6 +182,7 @@ async def init():
     # Scan for available processes
     parse_processes("kommonitor")
     parse_processes("custom")
+    parse_processes("export")
 
     # deployment = await Deployment.build_from_flow(
     #  flow=aggregate_sum_flow,
