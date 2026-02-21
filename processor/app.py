@@ -155,6 +155,17 @@ def get_job_result_resource(job_id, resource):
 def send_report(path):
     return send_from_directory('results', path)
 
+RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', '/tmp')
+@APP.route('/exports/<filename>')
+@require_oauth()
+def download_file(filename):
+    return send_from_directory(
+        directory=RESULTS_DIR,
+        path=filename,
+        as_attachment=True,
+        mimetype='application/octet-stream'
+    )
+
 
 def parse_processes(package: str) -> None:
     """

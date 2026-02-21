@@ -1,5 +1,8 @@
 import logging
 import openapi_client
+import json
+import os
+import geopandas as gpd
 from openapi_client import ApiClient, ApiException
 from prefect import task, get_run_logger, Task, runtime, flow
 from prefect.cache_policies import NO_CACHE
@@ -13,16 +16,22 @@ except ImportError:
     from processor.process import pykmhelper
     
 try:
-    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, IndicatorExport, GeoressourceExport, TargetTime, process_export_inputs
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, IndicatorExport, GeoressourceExport, TargetTime
 except ImportError:
-    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, IndicatorExport, GeoressourceExport, TargetTime, process_export_inputs
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, IndicatorExport, GeoressourceExport, TargetTime
 
 try:
-    from ..base import KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+    from ..base import KommonitorProcessConfig, KommonitorResult, DataManagementException, store_output_as_file, \
         KOMMONITOR_DATA_MANAGEMENT_URL, setup_logging, data_management_client, format_inputs, generate_flow_run_name
 except ImportError:
-    from processor.process.base import KommonitorProcessConfig, KommonitorResult, DataManagementException, \
+    from processor.process.base import KommonitorProcessConfig, KommonitorResult, DataManagementException, store_output_as_file, \
         KOMMONITOR_DATA_MANAGEMENT_URL, setup_logging, data_management_client, format_inputs, generate_flow_run_name
+
+try:
+    from ..util import dataio
+except ImportError:
+    from processor.process.util import dataio
+
 
 # this name should be set for @flow(name='<processName>') and within detailed_process_description as 
 # additional_parameters.parameters[0].value[0].apiName
@@ -170,7 +179,8 @@ class ExportTest(BasePrefectProcessor):
         ## Run process
         result = run(config=config, logger=logger, data_management_client=dmc)
         print(result)
-        return result
+
+        return store_output_as_file(flow_id, result, logger)
 
     # run Method has to be implemented for all KomMonitor Skripts
     @staticmethod
@@ -185,15 +195,26 @@ class ExportTest(BasePrefectProcessor):
         inputs = config.inputs
         print(inputs)
         # Extract all relevant inputs
-        indicators, georessources = process_export_inputs(inputs)
+        indicators, georessources = pykmhelper.process_export_inputs(inputs)
         print(indicators)
         # 3. Generate result || Main Script    
         indicators_controller = openapi_client.IndicatorsApi(data_management_client)
         spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
 
-        ind = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators[0].indicator_id, indicators[0].spatial_unit_ids[0])
-        
-        print(ind)
-        
-        
-        return {"results": "successful"}
+        raw_series = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(indicators[0].indicator_id, indicators[0].spatial_unit_ids[0])
+        data = json.loads(raw_series.data)
+
+        gdf = gpd.GeoDataFrame.from_features(data["features"])
+
+        PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
+
+        gdf.to_file(f"{PROCESS_RESULTS_DIR}/ExportTest.GeoJSON", driver="GeoJSON")
+        print(gdf.head())
+        return {
+            "status": "successful",
+            "file": {
+                "href": "127.0.0.1:8099/exports/ExportTest.GeoJSON",
+                "rel": "enclosure",
+                "type": "application/octet-stream",
+                "title": "ExportTest.GeoJSON"
+        }}

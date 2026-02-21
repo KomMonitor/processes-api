@@ -19,7 +19,7 @@ def indicator_timeseries_to_dataframe(timeseries: list, indicator_id: str = None
 
     """
     df = pd.DataFrame(timeseries)
-    df = df.melt(id_vars=["ID", "NAME", "arisenFrom", "fid", "validStartDate", "validEndDate"],
+    df = df.melt(id_vars=["ID", "NAME", "fid", "validStartDate"],
                                      var_name=date_col, value_name=value_col)
     df = df[["ID", date_col, value_col]]
     if indicator_id:
