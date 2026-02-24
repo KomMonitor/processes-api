@@ -16,41 +16,33 @@ except ImportError:
     from processor.process import pykmhelper
     
 try:
-    from ..pykmhelper import IndicatorExport, GeoressourceExport, TargetTime
+    from ..base import DataManagementException, store_output_as_file, KommonitorProcessConfig, \
+        KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 except ImportError:
-    from processor.process.pykmhelper import IndicatorExport, GeoressourceExport, TargetTime
+    from processor.process.base import DataManagementException, store_output_as_file, KommonitorProcessConfig, \
+        KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name
 
 try:
-    from ..base import KommonitorProcessConfig, KommonitorResult, DataManagementException, store_output_as_file, \
-        KOMMONITOR_DATA_MANAGEMENT_URL, setup_logging, data_management_client, format_inputs, generate_flow_run_name
-except ImportError:
-    from processor.process.base import KommonitorProcessConfig, KommonitorResult, DataManagementException, store_output_as_file, \
-        KOMMONITOR_DATA_MANAGEMENT_URL, setup_logging, data_management_client, format_inputs, generate_flow_run_name
-
-try:
-    from ..util import dataio
-except ImportError:
-    from processor.process.util import dataio
-
-
-# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
-# additional_parameters.parameters[0].value[0].apiName
-# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
-processName = "export_test"
+    from ..base_export import ExportProcess
+except:
+    from ..base_export import ExportProcess
+    
+processName = "single_export"
 @flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return ExportTest.execute_process_flow(ExportTest.run, job_id, execution_request)
+    return SingleExport.execute_process_flow(SingleExport.run, job_id, execution_request)
 
-class ExportTest(BasePrefectProcessor):
+class SingleExport(ExportProcess):
     process_flow = process_flow
+    
     detailed_process_description = ProcessDescription(
         id=processName,
         version="0.0.1",
-        title="ExportTest",
-        description= "Test",
+        title="SingleExport",
+        description= "Export mehrerer Indikatoren und Georessourcen als Einzeldatensätze in einem bestimmten Format. Die Ausgabe der Einzeldatensätze erfolgt zusammen in einem ZIP-Ordner.",
         example={},
         job_control_options=[
             ProcessJobControlOption.SYNC_EXECUTE,
@@ -117,72 +109,10 @@ class ExportTest(BasePrefectProcessor):
                     }
                 )
             ),
-
-            "spatial_unit": ProcessInput(
-                id="spatial_unit",
-                title="Raumebenen-Export Konfiguration",
-                description="Exportiert mehrere Indikatoren für eine spezifische Raumebene.",
-                schema_=ProcessIOSchema(
-                    type_=ProcessIOType.OBJECT,
-                    properties={
-                        "spatial_unit_id": ProcessIOSchema(type_=ProcessIOType.STRING),
-                        "indicators": ProcessIOSchema(
-                            type_=ProcessIOType.ARRAY,
-                            items=ProcessIOSchema(
-                                type_=ProcessIOType.OBJECT,
-                                properties={
-                                    "indicator_id": ProcessIOSchema(type_=ProcessIOType.STRING),
-                                    "target_time": ProcessIOSchema(
-                                        type_=ProcessIOType.OBJECT,
-                                        properties={
-                                            "mode": ProcessIOSchema(type_=ProcessIOType.STRING, enum=["SINGLE", "START_END", "ALL"]),
-                                            "include_dates": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING)),
-                                            "start_date": ProcessIOSchema(type_=ProcessIOType.STRING),
-                                            "end_date": ProcessIOSchema(type_=ProcessIOType.STRING)
-                                        },
-                                        required=["mode"]
-                                    )
-                                }
-                            )
-                        ),
-                        "download_format": ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
-                    }
-                )
-            ),
-
         },
         outputs = {}
     )
-    def __init__(self, processor_def: dict):
-        super().__init__(processor_def)
-
-    @property
-    def process_description(self) -> schemas.ProcessDescription:
-        description = self.detailed_process_description
-        return description
-
-    @staticmethod
-    def execute_process_flow(
-            run: Task,
-            job_id: str,
-            execution_request: schemas.ExecuteRequest
-    ) -> dict:
-        ## Setup
-        flow_id = runtime.flow_run.name
-        logger = setup_logging(flow_id)
-        logger.info(f"Flow run name: {flow_id}")
-
-        inputs = format_inputs(execution_request)
-        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt")
-        dmc = data_management_client(logger, execution_request, True)
-
-        ## Run process
-        result = run(config=config, logger=logger, data_management_client=dmc)
-        print(result)
-
-        return store_output_as_file(flow_id, result, logger)
-
-    # run Method has to be implemented for all KomMonitor Skripts
+    
     @staticmethod
     @task(cache_policy=NO_CACHE)
     def run(config: KommonitorProcessConfig,

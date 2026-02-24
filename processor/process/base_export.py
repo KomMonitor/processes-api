@@ -1,0 +1,58 @@
+import logging
+import openapi_client
+import json
+import os
+import abc
+import geopandas as gpd
+from openapi_client import ApiClient, ApiException
+from prefect import task, get_run_logger, Task, runtime, flow
+from prefect.cache_policies import NO_CACHE
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.process.base import BasePrefectProcessor
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
+
+from .base import KommonitorProcessConfig, setup_logging, format_inputs, data_management_client, store_output_as_file
+
+class ExportProcess(BasePrefectProcessor):
+    def __init__(self, processor_def: dict):
+        super().__init__(processor_def)
+
+    @property
+    def process_description(self) -> schemas.ProcessDescription:
+        description = self.detailed_process_description
+        return description
+
+    @property
+    @abc.abstractmethod
+    def detailed_process_description(self) -> schemas.ProcessDescription:
+        ...
+
+    @staticmethod
+    def execute_process_flow(
+            run: Task,
+            job_id: str,
+            execution_request: schemas.ExecuteRequest
+    ) -> dict:
+        ## Setup
+        flow_id = runtime.flow_run.name
+        logger = setup_logging(flow_id)
+        logger.info(f"Flow run name: {flow_id}")
+
+        inputs = format_inputs(execution_request)
+        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt")
+        dmc = data_management_client(logger, execution_request, True)
+
+        ## Run process
+        result = run(config=config, logger=logger, data_management_client=dmc)
+        print(result)
+
+        return store_output_as_file(flow_id, result, logger)
+
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
+    @abc.abstractmethod
+    def run(self,
+            config: KommonitorProcessConfig,
+            logger: logging.Logger,
+            dmc: ApiClient) -> dict:
+        ...
