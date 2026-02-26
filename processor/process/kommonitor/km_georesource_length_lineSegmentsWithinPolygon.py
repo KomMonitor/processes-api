@@ -62,7 +62,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                     value=[{
                         "longTitle": "Summierte Linienlänge pro Gebietskörperschaft",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Summierte Linienlänge des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><em>Summierte Linienlänge des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</em> <br/> <em>Filterkriterium:</em> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe der Länge aller Linien innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [

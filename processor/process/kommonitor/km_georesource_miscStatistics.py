@@ -62,7 +62,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                     value=[{
                         "longTitle": "Statistiken anhand Eigenschaft der punktbasierten Georessource",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <em>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´ für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</em><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gewählter Objekt-Eigenschaft",
                         "inputBoxes": [
                             {

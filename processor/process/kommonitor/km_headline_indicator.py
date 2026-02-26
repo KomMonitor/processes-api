@@ -63,7 +63,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                     value=[{
                         "longTitle": "Leitindikator - verkettete Berechnung",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Leitindikatoren-Berechnung</b><br/><br/>Berechnung durch Verkettung der Schritte <b>Normalisierungsfunktion <i>Norm<sub>1</sub></i></b>, und <b>Aggregationsfunktion <i>Aggr<sub>1</sub></i></b> für alle Basisindkatoren.    <br/><br/> <b>Eingangsdaten und Polarität</b> <br/>${list_baseIndicators_withPolarity} <br/><br/> <b>Normalisierungsfunktion <i>Norm<sub>1</sub></i></b> <br/> <i> ${computation_method} </i> <br/><br/> <b>Aggregationsfunktion <i>Aggr<sub>1</sub></i></b> <br/> <i> ${aggregation_method} </i>",
+                        "dynamicLegend": "<b>Leitindikatoren-Berechnung</b><br/><br/>Berechnung durch Verkettung der Schritte <b>Normalisierungsfunktion <em>Norm<sub>1</sub></em></b>, und <b>Aggregationsfunktion <em>Aggr<sub>1</sub></em></b> für alle Basisindkatoren.    <br/><br/> <b>Eingangsdaten und Polarität</b> <br/>${list_baseIndicators_withPolarity} <br/><br/> <b>Normalisierungsfunktion <em>Norm<sub>1</sub></em></b> <br/> <em> ${computation_method} </em> <br/><br/> <b>Aggregationsfunktion <em>Aggr<sub>1</sub></em></b> <br/> <em> ${aggregation_method} </em>",
                         "inputBoxes": [
                            {
                                 "id": "computation_ids_with_polarity",
