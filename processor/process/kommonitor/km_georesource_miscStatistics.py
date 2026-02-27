@@ -40,9 +40,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceMiscStatistics.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmGeoresourceMiscStatistics.run, job_id, execution_request)
 
-class WIPKmGeoresourceMiscStatistics(KommonitorProcess):
+class KmGeoresourceMiscStatistics(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -134,11 +134,12 @@ class WIPKmGeoresourceMiscStatistics(KommonitorProcess):
                         {
                             "apiName": "SUM",
                             "displayName": "Summe",
-                        },
-                        {
-                            "apiName": "STANDARD_DEVIATION",
-                            "displayName": "Standardabweichung",
                         }
+                        # ,
+                        # {
+                        #     "apiName": "STANDARD_DEVIATION",
+                        #     "displayName": "Standardabweichung",
+                        # }
                     ],                    
                     default={
                         "apiName": "MIN",
