@@ -135,11 +135,11 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                             "apiName": "SUM",
                             "displayName": "Summe",
                         }
-                        # ,
-                        # {
-                        #     "apiName": "STANDARD_DEVIATION",
-                        #     "displayName": "Standardabweichung",
-                        # }
+                         ,
+                         {
+                             "apiName": "STANDARD_DEVIATION",
+                             "displayName": "Standardabweichung",
+                         }
                     ],                    
                     default={
                         "apiName": "MIN",
@@ -251,7 +251,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            if e.spatial_unit and bool(job_summary):
+            if e.spatial_unit and not job_summary._su_summary == None:
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
                 job_summary.complete_spatial_unit_summary()
             else:

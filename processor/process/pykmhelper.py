@@ -882,7 +882,7 @@ def applyComputationMethod(valueArray, computationMethod):
         return float(value)
     elif computationMethod == "STANDARD_DEVIATION":
         value = standardDeviation(valueArray, True)
-        return float(value)
+        return value
     else:
         throwError("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
 
@@ -2385,12 +2385,12 @@ def convertPropertyArrayToNumberArray(propertyArray):
         Array<Float>: returns the array of all values that were successfully converted to a number. responseArray.length may be smaller than inputArray.length, if inputArray contains boolean items or items whose Number-conversion result in NaN
     """
     numericArray = []
-    
+
     for value in propertyArray:
         try:
            numericArray.append(float(value))
         except:
-            print(str(value) + " is not convertible to float!")
+            throwError(str(value) + " is not convertible to float!")
 
     return numericArray
 
@@ -2864,12 +2864,13 @@ def standardDeviation(values, computeSampledStandardDeviation):
     Returns:
         float: returns the standard deviation
     """
-    values = convertPropertyArrayToNumberArray(values)
-
-    if computeSampledStandardDeviation:
-        return numpy.std(values, ddof=1)
+    num_values = convertPropertyArrayToNumberArray(values)
+    if len(num_values) == 1:
+        return None
+    elif computeSampledStandardDeviation:
+        return numpy.std(num_values, ddof=1)
     else:
-        return numpy.std(values, ddof=0)
+        return numpy.std(num_values, ddof=0)
 
 def variance(populationArray, computeSampledVariance):
     """Encapsulates numpys function 'var' to compute the variance of a submitted values array
