@@ -122,6 +122,12 @@ def get_schedules(schedule_id=None):
             return flask_app.execute_from_flask(km_processes.delete_schedule, request, schedule_id)
         else:
             return flask_app.execute_from_flask(km_processes.get_schedules, request, schedule_id)
+        
+@APP.post('/schedules/<schedule_id>/execution')
+@require_oauth()
+def schedule_execution(schedule_id):
+    return flask_app.execute_from_flask(km_processes.execute_schedule, request,
+                              schedule_id)
 
 
 @APP.get('/jobs')

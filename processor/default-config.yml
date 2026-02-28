@@ -37,7 +37,7 @@ server:
   gzip: false
   languages:
     # First language is the default language
-    - en-US
+    - en
   # cors: true
   pretty_print: true
   limit: 10

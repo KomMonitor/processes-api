@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,38 +18,41 @@ import pprint
 import re  # noqa: F401
 import json
 
-
-from typing import Any, ClassVar, Dict, List, Optional
-from pydantic import BaseModel, StrictStr
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional, Union
 from openapi_client.models.common_metadata_type import CommonMetadataType
 from openapi_client.models.period_of_validity_type import PeriodOfValidityType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.permission_level_type import PermissionLevelType
+from typing import Optional, Set
+from typing_extensions import Self
 
 class SpatialUnitOverviewType(BaseModel):
     """
     SpatialUnitOverviewType
     """ # noqa: E501
-    allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    permissions: List[StrictStr] = Field(description="list of permissions on this entity")
     available_periods_of_validity: Optional[List[PeriodOfValidityType]] = Field(default=None, alias="availablePeriodsOfValidity")
+    is_public: StrictBool = Field(description="flag whether the resource is publicly accessible", alias="isPublic")
     metadata: CommonMetadataType
-    next_lower_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
-    next_upper_hierarchy_level: StrictStr = Field(description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
+    next_lower_hierarchy_level: Optional[StrictStr] = Field(default=None, description="the identifier/name of the spatial unit level that contains the features of the nearest lower hierarchy level", alias="nextLowerHierarchyLevel")
+    next_upper_hierarchy_level: Optional[StrictStr] = Field(default=None, description="the identifier/name of the spatial unit level that contains the features of the nearest upper hierarchy level", alias="nextUpperHierarchyLevel")
     spatial_unit_id: StrictStr = Field(description="the unique identifier of the spatial unit level the features apply to", alias="spatialUnitId")
     spatial_unit_level: StrictStr = Field(description="the name of the spatial unit level the features apply to", alias="spatialUnitLevel")
+    user_permissions: List[PermissionLevelType] = Field(description="list of permissions that are effective on this dataset for the current user", alias="userPermissions")
     wfs_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WFS instance serving the spatial features of the associated dataset", alias="wfsUrl")
     wms_url: Optional[StrictStr] = Field(default=None, description="the URL of a running WMS instance serving the spatial features of the associated dataset", alias="wmsUrl")
-    user_permissions: Optional[List[StrictStr]] = Field(default=None, description="List of permissions that are effective on this dataset for the current user", alias="userPermissions")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "availablePeriodsOfValidity", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "spatialUnitId", "spatialUnitLevel", "wfsUrl", "wmsUrl", "userPermissions"]
+    is_outline_layer: Optional[StrictBool] = Field(default=None, description="if true, then KomMonitor web client map application will offer this spatial unit as outline layer in legend control", alias="isOutlineLayer")
+    outline_color: Optional[StrictStr] = Field(default=None, description="outline color for this layer as hex code", alias="outlineColor")
+    outline_width: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="outline width as stroke width for outline geometry", alias="outlineWidth")
+    outline_dash_array_string: Optional[StrictStr] = Field(default=None, description="string of line stroke dash array for lines of interest (e.g. 20,20; see https://developer.mozilla.org/de/docs/Web/SVG/Attribute/stroke-dasharray)", alias="outlineDashArrayString")
+    owner_id: Optional[StrictStr] = Field(default=None, description="identifier of the owning group", alias="ownerId")
+    __properties: ClassVar[List[str]] = ["permissions", "availablePeriodsOfValidity", "isPublic", "metadata", "nextLowerHierarchyLevel", "nextUpperHierarchyLevel", "spatialUnitId", "spatialUnitLevel", "userPermissions", "wfsUrl", "wmsUrl", "isOutlineLayer", "outlineColor", "outlineWidth", "outlineDashArrayString", "ownerId"]
 
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -62,7 +65,7 @@ class SpatialUnitOverviewType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of SpatialUnitOverviewType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -76,18 +79,20 @@ class SpatialUnitOverviewType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of each item in available_periods_of_validity (list)
         _items = []
         if self.available_periods_of_validity:
-            for _item in self.available_periods_of_validity:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_available_periods_of_validity in self.available_periods_of_validity:
+                if _item_available_periods_of_validity:
+                    _items.append(_item_available_periods_of_validity.to_dict())
             _dict['availablePeriodsOfValidity'] = _items
         # override the default output from pydantic by calling `to_dict()` of metadata
         if self.metadata:
@@ -95,7 +100,7 @@ class SpatialUnitOverviewType(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of SpatialUnitOverviewType from a dict"""
         if obj is None:
             return None
@@ -104,16 +109,22 @@ class SpatialUnitOverviewType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
-            "availablePeriodsOfValidity": [PeriodOfValidityType.from_dict(_item) for _item in obj.get("availablePeriodsOfValidity")] if obj.get("availablePeriodsOfValidity") is not None else None,
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
+            "permissions": obj.get("permissions"),
+            "availablePeriodsOfValidity": [PeriodOfValidityType.from_dict(_item) for _item in obj["availablePeriodsOfValidity"]] if obj.get("availablePeriodsOfValidity") is not None else None,
+            "isPublic": obj.get("isPublic"),
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "nextLowerHierarchyLevel": obj.get("nextLowerHierarchyLevel"),
             "nextUpperHierarchyLevel": obj.get("nextUpperHierarchyLevel"),
             "spatialUnitId": obj.get("spatialUnitId"),
             "spatialUnitLevel": obj.get("spatialUnitLevel"),
+            "userPermissions": obj.get("userPermissions"),
             "wfsUrl": obj.get("wfsUrl"),
             "wmsUrl": obj.get("wmsUrl"),
-            "userPermissions": obj.get("userPermissions")
+            "isOutlineLayer": obj.get("isOutlineLayer"),
+            "outlineColor": obj.get("outlineColor"),
+            "outlineWidth": obj.get("outlineWidth"),
+            "outlineDashArrayString": obj.get("outlineDashArrayString"),
+            "ownerId": obj.get("ownerId")
         })
         return _obj
 

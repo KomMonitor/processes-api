@@ -4,22 +4,27 @@ import necessary Node Module Dependencies
 
 """
 import copy
-
-from scipy import stats
-import numpy
-import geopandas as gpd
-import geojson
+import datetime
 import json
 import math
-import shapely
+import numbers
 import datetime
+import time
+import requests
 from logging import Logger
 from enum import Enum
-import openapi_client
-from openapi_client import IndicatorOverviewType, IndicatorsControllerApi, SpatialUnitsControllerApi, GeorecourcesControllerApi, ApiException
-from openapi_client.exceptions import ForbiddenException
-from .base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, DataManagementException
 from typing import Optional, Tuple
+
+import geojson
+import geopandas as gpd
+import numpy
+import shapely
+from openapi_client import IndicatorOverviewType, ApiException
+from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
+from openapi_client.exceptions import ForbiddenException
+from scipy import stats
+
+from .base import KommonitorJobSummary, DataManagementException
 
 # Define custom CONSTANTS used within the script
 
@@ -31,6 +36,13 @@ spatialUnitFeatureNamePropertyName = "NAME"
 
 # This constant is required to access indicator timeseries values correctly (i.e. DATE_2018-01-01)
 indicator_date_prefix = "DATE_"
+
+# This constant limits the number of allowed locations for requests against Open Route Service
+# This is necessary especially for GET requests, to keep the GET request length within handable sizes
+MAX_LOCATIONS_FOR_MATRIX = 200 # unsicher
+MAX_LOCATIONS_FOR_ISOCHRONES = 5
+OPENROUTESERVICE_URL = "https://ors5.fbg-hsbo.de/v2/"
+ORS_API_KEY = "ORS_API_KEY"
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -418,7 +430,7 @@ def getIndicatorValueArray(featureCollection, targetDate):
     for feature in featureCollection["features"]:
         indicatorValue = feature["properties"][targetDateWithPrefix]
 
-        if bool(indicatorValue):
+        if not isNoDataValue(indicatorValue) :
             resultArray.append(indicatorValue)
         else: 
             log("A feature did not contain an indicator value for the targetDate " + str(targetDate) + ". Feature was: " + str(feature))
@@ -447,7 +459,7 @@ def getIndicatorIDValueDict(featureCollection, targetDate):
         indicatorValue = feature["properties"][targetDateWithPrefix]
         featureID = getSpatialUnitFeatureIdValue(feature)
 
-        if bool(indicatorValue):
+        if not isNoDataValue(indicatorValue) :
             resultDict[featureID] = indicatorValue
         else:
             log("A feature did not contain an indicator value for the targetDate " + str(targetDate) + ". Feature was: " + str(feature))
@@ -470,8 +482,9 @@ def getIndicatorValueArray_fromIdValueDict(indicatorIdValueDict: dict):
     resultArray = []
 
     for key in indicatorIdValueDict.keys():
-        if bool(key):
-            resultArray.append(indicatorIdValueDict[key])
+        indicatorValue = indicatorIdValueDict[key]
+        if not isNoDataValue(indicatorValue) :
+            resultArray.append(indicatorValue)
         else:
             log("A feature from indicator id value map did not contain an indicator value. Feature has ID: " + str(key))
     
@@ -492,7 +505,7 @@ def getPropertyValueArray(featureCollection, propertyName):
     for feature in featureCollection["features"]:
         propertyValue = feature["properties"][propertyName]
 
-        if bool(propertyValue):
+        if not isNoDataValue(propertyValue):
             resultArray.append(propertyValue)
         else:
             log("A feature did not contain a property value for the propertyName " + str(propertyName) + ". Feature was: " + str(feature))
@@ -583,7 +596,7 @@ def indicatorValueIsNoDataValue(feature, targetDate):
     return isNoDataValue(value)
 
 def isNoDataValue(value):
-    """Checks wheter the value is a NoData value
+    """Checks wheter the value is a NoData value. Already considers if indicator value is a non-empty string for categorial data
 
     Args:
         value (Object): the Value object to be inspected
@@ -591,10 +604,12 @@ def isNoDataValue(value):
     Returns:
         bool: returns 'True' if the value is a NoData Value (i. e. 'None', 'NaN')
     """
-    try: 
-        if value == None:
+    try:
+        if value == None or value == "":
             return True
-        elif math.isnan(float(value)):
+        if isinstance(value, str) and value != "":
+            return False
+        if isinstance(value, numbers.Number) and math.isnan(value):
             return True
         else:
             return False
@@ -784,6 +799,10 @@ def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: 
     Returns:
         dict: returns a geojson featurecollection with only features fitting to the filter operator
     """
+
+    if len(propertyName) == 0 or len(computationFilterOperator) == 0 or len(computationFilterPropertyValue) == 0:
+        return featureCollection
+
     result_collection = copy.deepcopy(featureCollection)
     del result_collection["features"]
     result_collection["features"] = []
@@ -805,7 +824,11 @@ def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, c
     Returns:
         Array | None: returns the filtered Array or None if the wrong computation filter is used. None value has to be handeld separately in the script.
     """
-    filteredArray = []    
+
+    if len(computationFilterOperator) == 0 or len(computationFilterPropertyValue) == 0:
+        return valueArray
+
+    filteredArray = []
 
     if computationFilterOperator == "Equal":
         filteredArray = filter(lambda x: x == computationFilterPropertyValue, valueArray)
@@ -859,7 +882,7 @@ def applyComputationMethod(valueArray, computationMethod):
         return float(value)
     elif computationMethod == "STANDARD_DEVIATION":
         value = standardDeviation(valueArray, True)
-        return float(value)
+        return value
     else:
         throwError("Indicator was not computed from computation ressources because no valid computation method was chosen. Indicator value is set to None.")
 
@@ -922,7 +945,7 @@ class IndicatorCalculationType(str, Enum):
     REFERENCE_INDICATOR = "REFERENCE_INDICATOR"
     NUMERATOR_INDICATOR = "NUMERATOR_INDICATOR"
     DENOMINATOR_INDICATOR = "DENOMINATOR_INDICATOR"
-    
+
 class IndicatorType:
     id: str
     type: IndicatorCalculationType
@@ -961,16 +984,46 @@ class IndicatorType:
             str: returns the allowedRoles of the indicator and spatial unit
         """
         for su in self.meta.applicable_spatial_units:
-            if su.spatial_unit_id == spatialUnit and len(su.allowed_roles) > 0:
-                return su.allowed_roles
+            if su.spatial_unit_id == spatialUnit and len(su.permissions) > 0:
+                return su.permissions
     
-        return self.meta.allowed_roles
+        return self.meta.permissions
+
+    def check_su_is_public(self, spatial_unit_id):
+        """checks whether an indicator is public for an explicit spatial unit, if not the is public flag of the indicator itself are used
+
+        Args:
+            spatial_unit_id (str): the id of the spatial unit
+
+        Returns:
+            bool: returns the is public property of the indicator and spatial unit
+        """
+        for su in self.meta.applicable_spatial_units:
+            if su.spatial_unit_id == spatial_unit_id and su.is_public is not None:
+                return su.is_public
+
+        return self.meta.is_public
+
+    def check_su_owner(self, spatial_unit_id):
+        """checks whether an indicator has an owner for an explicit spatial unit, if not the is owner of the indicator itself are used
+
+        Args:
+            spatial_unit_id (str): the id of the spatial unit
+
+        Returns:
+            str: returns the owner of the indicator and spatial unit
+        """
+        for su in self.meta.applicable_spatial_units:
+            if su.spatial_unit_id == spatial_unit_id and su.owner_id is not None:
+                return su.owner_id
+
+        return self.meta.owner_id
     
-    def get_indicator_by_id(self, indicator_controller: IndicatorsControllerApi):
+    def get_indicator_by_id(self, indicator_controller: IndicatorsApi):
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
-            indicator_controller (IndicatorsControllerApi): the openapi module which provides the functionality
+            indicator_controller (IndicatorsApi): the openapi module which provides the functionality
 
         Raises:
             DataManagementException: cath the datamanagementapierror correctly
@@ -980,11 +1033,11 @@ class IndicatorType:
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, self.id, "INDICATOR", e.status)
         
-    def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsControllerApi, spatial_unit: str):
+    def get_indicator_by_spatial_unit_id_and_id_without_geometry(self, indicators_controller: IndicatorsApi, spatial_unit: str):
         """encapsulates the equal named function from the data management api in order to raise a data management exception which allows to catch this error clearly
 
         Args:
-            indicators_controller (IndicatorsControllerApi): _description_
+            indicators_controller (IndicatorsApi): _description_
             spatial_unit (str): the spatial unit id which shall be queried
 
         Raises:
@@ -995,8 +1048,8 @@ class IndicatorType:
                             self.id, 
                             spatial_unit)
         except (ForbiddenException, ApiException) as e:
-            raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit) 
-        
+            raise DataManagementException(e, self.id, "INDICATOR", e.status, spatial_unit)
+
 class IndicatorCollection:
     indicators: dict[str, IndicatorType]
     intersection_su_features: list
@@ -1055,7 +1108,6 @@ class IndicatorCollection:
 
         for item in self.indicators:
             listApplicableSuFeatures.append(set(self.indicators[item].applicable_su_features))
-        
         intersection = listApplicableSuFeatures[0].copy()
         # union = listApplicableSuFeatures[0].copy()
         for su_features in listApplicableSuFeatures[1:]:
@@ -1090,8 +1142,9 @@ class IndicatorCollection:
             if self.indicators[indicator].bool_missing_timestamp:
                 job_summary.add_missing_timestamp_error("INDICATOR", indicator, self.indicators[indicator].missing_timestamps)
 
-    def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary):
+    def check_applicable_spatial_unit_features(self, job_summary: KommonitorJobSummary, allDates: list):
         """checks whether spatial unit features are missing for certain indicators and in this case adds a missing timestamp error to the jobSummary
+        also checks whether a timestamp has only NONE values for each spatial unit feature and adds a missing spatial unit feature.
 
         Args:
             job_summary (KommonitorJobSummary): the current kommonitor jobSummary
@@ -1099,11 +1152,27 @@ class IndicatorCollection:
         for indicator in self.indicators:
             missing_su_features = []
             for feature in self.all_su_features:
-                if not feature in self.indicators[indicator].applicable_su_features:
+                if not str(feature) in self.indicators[indicator].applicable_su_features:
                     missing_su_features.append(feature)
 
             if len(missing_su_features) > 0:
                 job_summary.add_missing_spatial_unit_feature_error(indicator, missing_su_features)
+
+        for indicator in self.indicators:
+
+            for i, date in enumerate(allDates):
+                date_with_prefix = getTargetDateWithPropertyPrefix(date)
+                for feature in self.all_su_features:
+                    emptyTimeSeries = True
+                    if not isNoDataValue(self.indicators[indicator].time_series[feature][date_with_prefix]):
+                        emptyTimeSeries = False
+                        break
+
+                if emptyTimeSeries:
+                    job_summary.add_missing_timestamp_error("INDICATOR", indicator, [date])
+                    allDates.pop(i)
+
+        return allDates
 
     def fetch_indicator_feature_time_series(self):
         """creates a time series which allows direct access to the data using indicator id and su feature id and target date
@@ -1111,37 +1180,32 @@ class IndicatorCollection:
         for indicator in self.indicators:
             su_features = []
             for feature in self.indicators[indicator].values:
-                id = feature["ID"]
+                id = str(feature["ID"])
                 self.indicators[indicator].time_series[id] = feature
                 su_features.append(id)
 
             self.indicators[indicator].applicable_su_features = su_features
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
-        
+
     def search_nan_features(self, times):
         self.nan_features = {}
         for indicator_id, indicator_obj in self.indicators.items():
             for raw_time in times:
                 time_key = getTargetDateWithPropertyPrefix(raw_time)
-                self.nan_features[time_key] = []
+                if not time_key in self.nan_features:
+                    self.nan_features[time_key] = []
                 for feature in self.intersection_su_features:
                     feature_series = indicator_obj.time_series.get(feature, {})
-                    value = feature_series.get(time_key)
+                    value = feature_series[time_key]
                     if isNoDataValue(value):
                         self.nan_features[time_key].append(feature)
 
-        
-        
-        
-        
-        
-
-def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller: SpatialUnitsApi, spatial_unit: str):
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
-        spatial_unit_controller (SpatialUnitsControllerApi): the spatial unit controller from openapi client
+        spatial_unit_controller (SpatialUnitsApi): the spatial unit controller from openapi client
         spatial_unit (str): the spatial unit id
 
     Raises:
@@ -1159,11 +1223,11 @@ def get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_con
     except (ForbiddenException, ApiException) as e:
         raise DataManagementException(e, spatial_unit, "SPATIAL_UNIT", e.status, spatial_unit) 
         
-def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeorecourcesControllerApi, georesource: str):
+def get_all_georesource_features_by_id_without_preload_content(georesource_controller: GeoresourcesApi, georesource: str):
     """encapsulates the function from data management api to query a valid geojson feature collection from database due to an exception an error gets reported
 
     Args:
-        georesource_controller (GeorecourcesControllerApi): the georecource controller from openapi client
+        georesource_controller (GeorecourcesApi): the georecource controller from openapi client
         georesource (str): the georesource id
 
     Raises:
@@ -1182,11 +1246,11 @@ def get_all_georesource_features_by_id_without_preload_content(georesource_contr
         raise DataManagementException(e, georesource, "SPATIAL_UNIT", e.status) 
     
 
-def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerApi, spatial_unit: str):
+def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsApi, spatial_unit: str):
     """Queries the data management api using the spatial unit controller. The API response gets parsed into correct json to extract all spatial unit features that belong to the requested spatial unit.
 
     Args:
-        spatial_unit_controller (SpatialUnitControllerApi): the openapi client for querying spatial unit data
+        spatial_unit_controller (SpatialUnitApi): the openapi client for querying spatial unit data
         spatial_unit (str): the string ID which identifies the spatial unit
 
     Returns:
@@ -1196,7 +1260,7 @@ def fetch_spatial_unit_features(spatial_unit_controller: SpatialUnitsControllerA
         response_data = spatial_unit_controller.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit)
         geojson_all_features = json.loads(response_data.data)
 
-        all_su_features = [feature["properties"]["ID"] for feature in geojson_all_features["features"]]
+        all_su_features = [str(feature["properties"]["ID"]) for feature in geojson_all_features["features"]]
 
         return all_su_features
     except (ForbiddenException, ApiException) as e:
@@ -1957,37 +2021,342 @@ def summarizeLineSegmentLenghts(featureCollection):
 #   From Here OpenRouteService
 #
 
-def distance_waypath_kilometers():
-    #TODO:  
-    return None
+def distance_waypath_kilometers(point_A, point_B, vehicle_type):
+    """
+    #TODO testing of whole method, docstring
+    """
+    if not isGeoJSONPointFeature(point_A):
+        throwError(f"The submitted object point_A is not a valid GeoJSON point feature. It was: {point_A}")
 
-def distance_matrix_kilometers():
-    #TODO
-    return None
+    if not isGeoJSONPointFeature(point_B):
+        throwError(f"The submitted object point_B is not a valid GeoJSON point feature. It was: {point_B}")
 
-def duration_matrix_seconds():
-    #TODO
-    return None
+    coordinates_A = point_A["geometry"]["coordinates"]
+    coordinates_B = point_B["geometry"]["coordinates"]
 
-def isochrones_byTime():
-    #TODO
-    return None
+    vehicle_map = {
+        "PEDESTRIAN": "foot-walking",
+        "BIKE": "cycling-regular",
+        "CAR": "driving-car"
+    }
+    
+    try:
+        vehicle_string = vehicle_map[vehicle_type]
+    except:
+        vehicle_string = "foot-walking"
 
-def computeIsochrones_byTime():
-    #TODO
-    return None
+    body = {
+        "coordinates":[coordinates_A, coordinates_B]
+    }
 
-def isochrones_byDistance():
-    #TODO
-    return None
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    call = requests.post('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', json=body, headers=headers)
 
-def computeIsochrones_byDistance():
-    #TODO
-    return None
+    log(call.status_code, call.reason)
+    
+    json = call.json()
+    
+    return json["features"][0]["properties"]["summary"]["distance"]
 
-def executeOrsQuery():
-    #TODO
-    return None
+def distance_matrix_kilometers(locations, source_indices, destination_indices, vehicle_type):
+    # Überprüfen, ob alle Locations GeoJSON-Point-Features sind
+    for location in locations:
+        if not isGeoJSONPointFeature(location):
+            raise ValueError(f"The submitted locations array contains objects "
+                             f"that are not valid GeoJSON point features. It was: {location}")
+
+    # Koordinaten-Array extrahieren (Longitude, Latitude!)
+    coordinates_array = [loc["geometry"]["coordinates"] for loc in locations]
+
+    # Fahrzeugtyp umwandeln
+    if vehicle_type == "PEDESTRIAN":
+        vehicle_string = "foot-walking"
+    elif vehicle_type == "BIKE":
+        vehicle_string = "cycling-regular"
+    elif vehicle_type == "CAR":
+        vehicle_string = "driving-car"
+    else:
+        vehicle_string = "foot-walking"
+
+    # Body für POST Request
+    matrix_post_body = {
+        "locations": coordinates_array,
+        "sources": source_indices,
+        "destinations": destination_indices,
+        "metrics": ["distance"],
+        "resolve_locations": True,
+        "units": "km"
+    }
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    url = f"{OPENROUTESERVICE_URL}/matrix/{vehicle_string}"
+    
+    log(f"Query OpenRouteService matrix endpoint ('{url}') "
+        f"with following matrix POST request: {matrix_post_body}")
+
+    try:
+        response = requests.post(url, json=matrix_post_body, headers=headers)
+        matrix = response.json()
+    except Exception as e:
+        log(f"Error while executing OpenRouteService POST request. Error was: {e}")
+        raise
+
+    return matrix
+
+def duration_matrix_seconds(locations, source_indices, destination_indices, vehicle_type):
+    # Überprüfen, ob alle Locations GeoJSON-Point-Features sind
+    for location in locations:
+        if not isGeoJSONPointFeature(location):
+            raise ValueError(f"The submitted locations array contains objects "
+                             f"that are not valid GeoJSON point features. It was: {location}")
+
+    # Koordinaten-Array extrahieren (Longitude, Latitude!)
+    coordinates_array = [loc["geometry"]["coordinates"] for loc in locations]
+
+    # Fahrzeugtyp umwandeln
+    if vehicle_type == "PEDESTRIAN":
+        vehicle_string = "foot-walking"
+    elif vehicle_type == "BIKE":
+        vehicle_string = "cycling-regular"
+    elif vehicle_type == "CAR":
+        vehicle_string = "driving-car"
+    else:
+        vehicle_string = "foot-walking"
+
+    # Body für POST Request
+    matrix_post_body = {
+        "locations": coordinates_array,
+        "sources": source_indices,
+        "destinations": destination_indices,
+        "metrics": ["duration"],
+        "resolve_locations": True
+    }
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    url = f"{OPENROUTESERVICE_URL}/matrix/{vehicle_string}"
+    
+    log(f"Query OpenRouteService matrix endpoint ('{url}') "
+        f"with following matrix POST request: {matrix_post_body}")
+
+    try:
+        response = requests.post(url, json=matrix_post_body, headers=headers)
+        matrix = response.json()
+    except Exception as e:
+        log(f"Error while executing OpenRouteService POST request. Error was: {e}")
+        raise
+
+    return matrix
+
+    
+def isochrones_by_time(
+    starting_points, 
+    vehicle_type: str, 
+    travel_time_seconds: list[int], 
+    dissolve: bool = True, 
+    avoid_features: str = None):
+    """
+    Ruft Isochronen von OpenRouteService ab und batcht Requests,
+    falls mehr als MAX_LOCATIONS_FOR_ORS_REQUEST Locations angegeben sind.
+    """
+    # Validierung der GeoJSON Point Features
+    # for pt in starting_points:
+        # if not isGeoJSONPointFeature(pt):
+        #     throwError(f"Ungültiges GeoJSON Point Feature: {pt}")
+    
+    # Wenn Liste kurz genug → Einmaliger Request
+    if len(starting_points) <= MAX_LOCATIONS_FOR_ISOCHRONES:
+        result_isochrones = compute_isochrones(
+            starting_points,
+            vehicle_type,
+            travel_time_seconds,
+            avoid_features,
+            range_type="time"
+        )
+    
+    #log(f"[INFO] Starte Batch-Verarbeitung: {len(starting_points)} Punkte > {MAX_LOCATIONS_FOR_ISOCHRONES}")
+    
+    result_isochrones = None
+    batch_counter = 0
+    temp_batch = []
+    for idx, pt in enumerate(starting_points):
+        temp_batch.append(pt)
+        
+        # Wenn Batch voll oder letzter Punkt erreicht
+        if len(temp_batch) == MAX_LOCATIONS_FOR_ISOCHRONES or idx == len(starting_points) - 1:
+            temp_iso = compute_isochrones(
+                temp_batch,
+                vehicle_type,
+                travel_time_seconds,
+                avoid_features=avoid_features,
+                range_type="time"
+            )
+            batch_counter += 1
+            
+            if batch_counter == 19:
+                batch_counter = 0
+                log("Maximum amount of OpenRouteService Slots is used. The Script is paused for one minute and will continue after that.")
+                time.sleep(60)
+                
+            if result_isochrones is None:
+                result_isochrones = temp_iso
+            else:
+                # Features zusammenführen
+                print(temp_iso)
+                result_isochrones["features"].extend(temp_iso["features"])
+            
+            # Batch leeren
+            temp_batch = []
+    
+    # Optional: Dissolve
+    if dissolve:
+        return dissolve_features(result_isochrones, "value")
+    return result_isochrones
+
+
+def compute_isochrones(
+    points,
+    vehicle_type,
+    travel_time_seconds,
+    avoid_features: Optional[str],
+    range_type: str
+):
+    """Einzelner ORS-Isochronen-Request"""
+    
+    # Extrahiere Coordinates (lon, lat)
+    coords = [pt["geometry"]["coordinates"] for pt in points]
+    
+    profile_map = {
+        "CAR": "driving-car",
+        "BIKE": "cycling-regular",
+        "PEDESTRIAN": "foot-walking"
+    }
+    profile = profile_map.get(vehicle_type.upper(), "foot-walking")
+    
+    body = {
+        "locations": coords,
+        "range": travel_time_seconds,
+        "range_type": range_type,
+        "attributes": ["area", "reachfactor", "total_pop"]
+    }
+    
+    if avoid_features:
+        body["options"] = {"avoid_features": avoid_features}
+    
+    
+    headers = {
+        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    call = requests.post(f"{OPENROUTESERVICE_URL}/isochrones/{profile}", json=body, headers=headers)
+        
+    return call.json()
+
+def dissolve_features(feature_collection, range_column):
+    """
+    Platzhalter für GeoJSON-Dissolve-Logik.
+    Wenn du Shapely oder GeoPandas nutzt, kannst du hier die Features verschmelzen.
+    """
+    gdf = geoJSONtoGDF(feature_collection)
+    dissolved_list = []
+    
+    # Iteriere über jede eindeutige Isochronen-Range
+    for rng in gdf[range_column].unique():
+        subset = gdf[gdf[range_column] == rng]
+
+        # Alle Polygone vereinigen
+        merged = shapely.ops.unary_union(subset.geometry)
+
+        # Als Feature speichern
+        dissolved_list.append({
+            range_column: rng,
+            "geometry": merged
+        })
+
+    # Neues GeoDataFrame erzeugen und FeatureCollection
+    dissolved_gdf = gpd.GeoDataFrame(dissolved_list, crs=gdf.crs)
+    output_collection = geojson.loads(dissolved_gdf.to_json(drop_id=True))
+    return output_collection    
+
+def isochrones_by_distance(
+    starting_points, 
+    vehicle_type: str, 
+    travel_dist_meters: list[int], 
+    dissolve: bool = True, 
+    avoid_features: str = None):
+    """
+    Ruft Isochronen von OpenRouteService ab und batcht Requests,
+    falls mehr als MAX_LOCATIONS_FOR_ORS_REQUEST Locations angegeben sind.
+    """
+    # Validierung der GeoJSON Point Features
+    # for pt in starting_points:
+        # if not isGeoJSONPointFeature(pt):
+        #     throwError(f"Ungültiges GeoJSON Point Feature: {pt}")
+    
+    # Wenn Liste kurz genug → Einmaliger Request
+    if len(starting_points) <= MAX_LOCATIONS_FOR_ISOCHRONES:
+        result_isochrones = compute_isochrones(
+            starting_points,
+            vehicle_type,
+            travel_dist_meters,
+            avoid_features,
+            range_type="distance"
+        )
+    
+    #log(f"[INFO] Starte Batch-Verarbeitung: {len(starting_points)} Punkte > {MAX_LOCATIONS_FOR_ISOCHRONES}")
+    
+    result_isochrones = None
+    batch_counter = 0
+    temp_batch = []
+    for idx, pt in enumerate(starting_points):
+        temp_batch.append(pt)
+        
+        # Wenn Batch voll oder letzter Punkt erreicht
+        if len(temp_batch) == MAX_LOCATIONS_FOR_ISOCHRONES or idx == len(starting_points) - 1:
+            temp_iso = compute_isochrones(
+                temp_batch,
+                vehicle_type,
+                travel_dist_meters,
+                avoid_features=avoid_features,
+                range_type="distance"
+            )
+            batch_counter += 1
+            
+            if batch_counter == 19:
+                batch_counter = 0
+                log("Maximum amount of OpenRouteService Slots is used. The Script is paused for one minute and will continue after that.")
+                time.sleep(60)
+                
+            if result_isochrones is None:
+                result_isochrones = temp_iso
+            else:
+                # Features zusammenführen
+                print(temp_iso)
+                result_isochrones["features"].extend(temp_iso["features"])
+            
+            # Batch leeren
+            temp_batch = []
+    
+    # Optional: Dissolve
+    if dissolve:
+        return dissolve_features(result_isochrones, "value")
+    return result_isochrones
+
 
 def nearestPoint_waypathDistance():
     #TODO
@@ -2016,12 +2385,12 @@ def convertPropertyArrayToNumberArray(propertyArray):
         Array<Float>: returns the array of all values that were successfully converted to a number. responseArray.length may be smaller than inputArray.length, if inputArray contains boolean items or items whose Number-conversion result in NaN
     """
     numericArray = []
-    
+
     for value in propertyArray:
         try:
            numericArray.append(float(value))
         except:
-            print(str(value) + " is not convertible to float!")
+            throwError(str(value) + " is not convertible to float!")
 
     return numericArray
 
@@ -2495,12 +2864,13 @@ def standardDeviation(values, computeSampledStandardDeviation):
     Returns:
         float: returns the standard deviation
     """
-    values = convertPropertyArrayToNumberArray(values)
-
-    if computeSampledStandardDeviation:
-        return numpy.std(values, ddof=1)
+    num_values = convertPropertyArrayToNumberArray(values)
+    if len(num_values) == 1:
+        return None
+    elif computeSampledStandardDeviation:
+        return numpy.std(num_values, ddof=1)
     else:
-        return numpy.std(values, ddof=0)
+        return numpy.std(num_values, ddof=0)
 
 def variance(populationArray, computeSampledVariance):
     """Encapsulates numpys function 'var' to compute the variance of a submitted values array
@@ -2547,14 +2917,14 @@ def zScore_byPopulationArray(value, populationArray, computeSampledStandardDevia
     """
     try:
         populationArray = convertPropertyArrayToNumberArray(populationArray)
-        
+
         meanPop = mean(populationArray)
         stdPop = standardDeviation(populationArray, computeSampledStandardDeviation)
-            
+
         return (float(value) - meanPop) / stdPop
     except Exception as e:
         throwError(f"Cannot compute Z-Score. Error: {e}")
-           
+
 def zScore_normalization_wholeValueArray(populationArray):
     """Calculates the zscore of a submitted array containing numerical values using following formula (z = (x - mean) / stdw). To calculate the standard deviation is calculated using the population standard deviation. 
 
@@ -2565,16 +2935,16 @@ def zScore_normalization_wholeValueArray(populationArray):
         list: returns a list of the zscore for all numerical values in the submitted list.
     """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
-    
+
     meanValue = mean(numberArray)
     std = standardDeviation(numberArray, False)
-    
+
     zScoreArray = []
     for value in numberArray:
         zScoreArray.append(zScore_byMeanAndStdev(value, meanValue, std))
-        
+
     return zScoreArray
-    
+
 def zScore_normalization_wholeValueArray_inverted(populationArray):
     """Calculates the inverted zscore of a submitted array containing numerical values using following formula (z = 1 - ((x - mean) / stdw )). To calculate the standard deviation is calculated using the population standard deviation. 
 
@@ -2585,14 +2955,14 @@ def zScore_normalization_wholeValueArray_inverted(populationArray):
         list: returns a list of the zscore for all numerical values in the submitted list.
     """
     numberArray = convertPropertyArrayToNumberArray(populationArray)
-    
+
     meanValue = mean(numberArray)
     std = standardDeviation(numberArray, False)
-    
+
     zScoreArray = []
     for value in numberArray:
         zScoreArray.append(1 - zScore_byMeanAndStdev(value, meanValue, std))
-        
+
     return zScoreArray
 
 
@@ -2685,7 +3055,11 @@ def getChange_absolute(feature, targetDate, compareDate):
     targetDatePrefix = getTargetDateWithPropertyPrefix(targetDate)
     compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
     targetValue = feature[targetDatePrefix]
-    compareValue = feature[compareDatePrefix]
+    try:
+        compareValue = feature[compareDatePrefix]
+    except KeyError:
+        throwError(f"An error occured because the target value {targetDate} has no compare value in the feature collection.")
+        resultValue = None
 
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         resultValue = float(targetValue) - float(compareValue)
@@ -3004,7 +3378,7 @@ def computeLinearRegressionSlope(indicatorValueArray, daysArray):
     sumA2 = 0
 
     for i in range(len(indicatorValueArray)):
-        if bool(indicatorValueArray[i]) and bool(daysArray[i]):
+        if indicatorValueArray[i] and bool(daysArray[i]):
             a_NextValue = daysArray[i] - A_mean
             b_NextValue = indicatorValueArray[i]  - B_mean
 
@@ -3031,7 +3405,7 @@ def computeContinuity(feature, dates):
 
     for date in dates: 
         indicatorValue = getIndicatorValue(feature, date)
-        if bool(indicatorValue) and not isNoDataValue(indicatorValue) and not math.isnan(float(indicatorValue)):
+        if not isNoDataValue(indicatorValue) :
             indicatorValueArray.append(indicatorValue)
 
     if not len(dates) == len(indicatorValueArray):

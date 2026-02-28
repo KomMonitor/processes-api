@@ -43,9 +43,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(KmGeoresourceCountPointsWithinPolygon.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceCountPointsWithinPolygon.run, job_id, execution_request)
 
-class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
+class WIPKmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -65,7 +65,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                     value=[{
                         "longTitle": "Anzahl Punktobjekte pro Gebietskörperschaft",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</i> <br/> <i>Filterkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><em>Anzahl Punkte des Datensatzes G<sub>1</sub> pro Raumeinheit</em> <br/> <em>Filterkriterium:</em> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse<br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Summe aller Punkte innerhalb jedes Raumeinheits-Features.",
                         "optional_info": "Anwenden eines Filters anhand einer Objekteigenschaft",
                         "inputBoxes": [
@@ -95,7 +95,7 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
                 id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "comp_filter": ProcessInput(
                 id="comp_filter",
@@ -127,13 +127,15 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
         inputs = config.inputs
 
         # Extract all relevant inputs
+        print("inputs")
+        print(inputs)
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         computation_georecources_id = inputs["georesource_id"]
-        computation_filter_property = inputs["compFilterProp"]
-        computation_filter_operator = inputs["compFilterOperator"]
-        computation_filter_value = inputs["compFilterPropVal"]
+        computation_filter_property = inputs["comp_filter"]["compFilterProp"]
+        computation_filter_operator = inputs["comp_filter"]["compFilterOperator"]
+        computation_filter_value = inputs["comp_filter"]["compFilterPropVal"]
 
         # Init object to store computation results
         result = KommonitorResult()
@@ -141,32 +143,40 @@ class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
-            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+            georesources_controller = openapi_client.GeoresourcesApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
             
             # query indicator metadate to check for errors occured
             ti.get_indicator_by_id(indicators_controller)
-            
+
+            # fetch georesourceMetadata
+            # georesource_metadata_request = georesources_controller.get_georesource_by_id(computation_georecources_id)
+            georesource_metadata = georesources_controller.get_georesource_by_id(computation_georecources_id)
             # extract all dates
-            allDates = target_time["includeDates"]
+            # allDates = target_time["includeDates"]
+
+            target_indicator_applicable_dates = ti.meta.applicable_dates
+            periodsOfValidity = georesource_metadata.available_periods_of_validity            
+            georesource_validStart_dates = []
+            for periodOfValidity in periodsOfValidity:
+                georesource_validStart_dates.append(periodOfValidity.start_date.strftime("%Y-%m-%d"))
+
+            allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
+
+            # fetch the georesource feature collection
+            georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)        
             
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
                 job_summary.init_spatial_unit_summary(spatial_unit)
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
                 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 su_feature_collection = pykmhelper.get_all_spatial_unit_features_by_id_without_preload_content(spatial_unit_controller, spatial_unit)
-
-                # fetch the georesource feature collection
-                georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)
                 
                 # apply the selected computation filter on the FeatureCollection
                 if computation_filter_operator != "None":

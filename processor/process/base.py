@@ -33,13 +33,12 @@ class KommonitorProcessConfig:
 KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
 KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_TARGET_CLIENT_ID = os.getenv('KC_TARGET_CLIENT_ID', "kommonitor-data-management")
-KC_HOSTNAME = os.getenv('KC_HOSTNAME', "keycloak:8443")
+KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
-KC_HOSTNAME_PATH = os.getenv('KC_HOSTNAME_PATH', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 
-@task
+@task(persist_result=False)
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
     if private:
 
@@ -54,7 +53,7 @@ def data_management_client(logger: Logger, execute_request: schemas.ExecuteReque
 
         logger.info(f"Requesting token for user with ID: {execute_request.properties.get('user_id', '')}")
 
-        http = f"https://{KC_HOSTNAME}{KC_HOSTNAME_PATH}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+        http = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
         a = requests.post(http, data=payload)
         a = a.json()
         token = a['access_token']
@@ -126,7 +125,7 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
 
     return inputs
 
-@task
+@task(persist_result=False)
 def setup_logging(job_id: str) -> Logger:
     job_dir = os.path.join(PROCESS_RESULTS_DIR, job_id)
     if not os.path.isdir(job_dir):
@@ -147,7 +146,7 @@ def setup_logging(job_id: str) -> Logger:
     return logger
 
 
-@task
+@task(cache_policy=NO_CACHE)
 def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
     storage_type = "LocalFileSystem"
 
@@ -199,7 +198,7 @@ class ExecutionMode(str, Enum):
     ALL = "ALL"
     DATES = "DATES"
 
-class Popularity(str, Enum):
+class Polarity(str, Enum):
     NORMAL = "NORMAL"
     INVERT = "INVERT"
 
@@ -228,17 +227,29 @@ class KommonitorResult:
     def values(self):
         return self._values
 
-    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.SpatialUnitsControllerApi, allowed_roles: str):
+    def init_spatial_unit_result(self, spatial_unit_id: str, spatial_unit_controller: openapi_client.api.SpatialUnitsApi, permissions: str, is_public: bool, owner_id: str):
         # query 'spatialUnitLevel' in order to prepare the indicator PUT-body
         try:
             su_meta = spatial_unit_controller.get_spatial_units_by_id(spatial_unit_id)
 
             self._su_result = {
                 "applicableSpatialUnit": su_meta.spatial_unit_level,
-                "allowedRoles": allowed_roles,
+                "permissions": permissions,
+                "isPublic": is_public,
+                "ownerId": owner_id,                
+                "spatial_unit_id": spatial_unit_id
             }
         except (ForbiddenException, ApiException) as e:
             raise DataManagementException(e, spatial_unit_id, "SPATIAL_UNIT", e.status, spatial_unit_id)
+
+    def init_spatial_unit_result_with_indicator(self, spatial_unit_id: str,
+                                 spatial_unit_controller: openapi_client.api.SpatialUnitsApi,
+                                 indicator):
+        # # check for existing permissions, isPublic and owner for the concatenation of indicator and spatial unit
+        permissions = indicator.check_su_allowedRoles(spatial_unit_id)
+        is_public = indicator.check_su_is_public(spatial_unit_id)
+        owner_id = indicator.check_su_owner(spatial_unit_id)
+        return self.init_spatial_unit_result(spatial_unit_id, spatial_unit_controller, permissions, is_public, owner_id)
 
     def complete_spatial_unit_result(self):
         if self._su_result:
@@ -378,7 +389,7 @@ class KommonitorJobSummary:
                 su_summary["integratedTargetDates"] = []
 
 
-def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerApi, indicator_id: str,
+def fetch_indicator_timeseries(controller: openapi_client.api.IndicatorsApi, indicator_id: str,
                                spatial_unit_id: str, job_summary: KommonitorJobSummary, logger: logging.Logger):
     try:
         su_metadata = controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(indicator_id, spatial_unit_id)
@@ -389,7 +400,7 @@ def fetch_indicator_timeseries(controller: openapi_client.IndicatorsControllerAp
         return None
 
 
-def fetch_spatial_unit_metadata(controller: openapi_client.SpatialUnitsControllerApi, spatial_unit_id: str,
+def fetch_spatial_unit_metadata(controller: openapi_client.api.SpatialUnitsApi, spatial_unit_id: str,
                                 job_summary: KommonitorJobSummary, logger: logging.Logger):
     try:
         su_metadata = controller.get_spatial_units_by_id(spatial_unit_id)
@@ -409,7 +420,8 @@ class KommonitorProcess(BasePrefectProcessor):
             title="Ziel-Indikator",
             description="Auswahl des Ziel-Indikators, der neu berechnet werden soll.",
             schema_=ProcessIOSchema(
-                type_=ProcessIOType.STRING
+                type_=ProcessIOType.STRING,
+                required=["true"]
             )
         ),
         "target_spatial_units": ProcessInput(
@@ -419,7 +431,8 @@ class KommonitorProcess(BasePrefectProcessor):
             schema_=ProcessIOSchema(
                 type_=ProcessIOType.ARRAY,
                 items=ProcessIOSchema(type_=ProcessIOType.STRING),
-                min_items=1
+                min_items=1,
+                required=["true"]
             )
         ),
         "target_time": ProcessInput(
@@ -560,21 +573,21 @@ class KommonitorProcess(BasePrefectProcessor):
             }
             indicator_id = inputs["target_indicator_id"]
             for res in result.values:
-                indicators_controller = openapi_client.IndicatorsControllerApi(dmc)
+                indicators_controller = openapi_client.api.IndicatorsApi(dmc)
                 # res["allowedRoles"] = []
                 print(res)
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(
                         indicator_id=indicator_id,
-                        indicator_data=res
+                        indicator_data=res #["values"]
                     )
                     if resp.status_code == 200:
-                        output["resultData"].append(res)
+                        output["resultData"].append(res["indicatorValues"])
                     else:
                         job_summary.mark_failed_job(res["applicableSpatialUnit"])
-                except ApiException as e:
-                    logger.error(f"Exception when calling DataManagementAPI: {e}")
-                    job_summary.add_data_management_api_error("indicator", indicator_id, e.status, e.reason, res["applicableSpatialUnit"])
+                except Exception as e: #except ApiException as e: (DataManagementAPI throws Validation error and no ApiException)
+                    logger.error("Exception when trying to update indicator as body with http info.", exc_info=e)
+                    job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
             return store_output_as_file(flow_id, output, logger)

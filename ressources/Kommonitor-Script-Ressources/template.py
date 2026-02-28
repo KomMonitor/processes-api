@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 
+import openapi_client
 from openapi_client import ApiClient
 from openapi_client.rest import ApiException
 from pygeoapi.process.base import *
@@ -52,7 +53,7 @@ class __scriptName__(KommonitorProcess):
             # 3. Generate result || Main Script    
             for spatialUnit in target_spatial_units:
 
-                georesources_controller = openapi_client.IndicatorsControllerApi(data_management_client)
+                georesources_controller = openapi_client.IndicatorsApi(data_management_client)
                 
                 # query the correct indicator using data management api and get all needed target_times according to target_time Schema
                 computationIndicator = georesources_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(

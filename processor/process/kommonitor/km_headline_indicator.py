@@ -14,10 +14,10 @@ from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOTyp
 # from ..base import DataManagementException
 try:
     from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Polarity
 except ImportError:
     from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, DataManagementException, \
-        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Popularity
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, Polarity
 
 try:
     from .. import pykmhelper
@@ -34,16 +34,16 @@ except ImportError:
 # this name should be set for @flow(name='<processName>') and within detailed_process_description as 
 # additional_parameters.parameters[0].value[0].apiName
 # this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
-processName = "km_headline_indicator"
+processName = "km_indicator_headline"
 
 @flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
 def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(KmHeadlineIndicator.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmIndicatorHeadline.run, job_id, execution_request)
 
-class KmHeadlineIndicator(KommonitorProcess):
+class KmIndicatorHeadline(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -63,21 +63,19 @@ class KmHeadlineIndicator(KommonitorProcess):
                     value=[{
                         "longTitle": "Leitindikator - verkettete Berechnung",
                         "apiName": processName,
-                        "formula": "$ \\frac{I_{1}}{I_{2}}  $",
-                        "legend": "<br/>$I_{1}$ = Dividend-Indikator <br/>$I_{2}$ = Divisor-Indikator ",
-                        "dynamicLegend": "<br/> $I_{1}$: ${refIndicatorSelection.indicatorName} [ ${refIndicatorSelection.unit} ] <br/> $I_{2}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "dynamicLegend": "<b>Leitindikatoren-Berechnung</b><br/><br/>Berechnung durch Verkettung der Schritte <b>Normalisierungsfunktion <em>Norm<sub>1</sub></em></b>, und <b>Aggregationsfunktion <em>Aggr<sub>1</sub></em></b> für alle Basisindkatoren.    <br/><br/> <b>Eingangsdaten und Polarität</b> <br/>${list_baseIndicators_withPolarity} <br/><br/> <b>Normalisierungsfunktion <em>Norm<sub>1</sub></em></b> <br/> <em> ${computation_method} </em> <br/><br/> <b>Aggregationsfunktion <em>Aggr<sub>1</sub></em></b> <br/> <em> ${aggregation_method} </em>",
                         "inputBoxes": [
                            {
-                                "id": "computation_ids",
-                                "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Popularität",
+                                "id": "computation_ids_with_polarity",
+                                "title": "Notwendige (Basis-)Indikatoren mit dazugehöriger Polarität",
                                 "description": "",
                                 "contents": [
-                                    "computation_ids"
+                                    "computation_ids_with_polarity"
                                 ]
                            },
                            {
                                 "id": "computation_method",
-                                "title": "Art der Normierung (Min/Max oder Z-Wert)",
+                                "title": "Art der Normalisierung (Ranked Min/Max oder Z-Wert)",
                                 "description": "",
                                 "contents": [
                                     "computation_method"
@@ -97,23 +95,23 @@ class KmHeadlineIndicator(KommonitorProcess):
             ]
         ),
         inputs=KommonitorProcess.common_inputs | {
-            "computation_ids": ProcessInput(
-                id="COMPUTATION_IDS",
+            "computation_ids_with_polarity": ProcessInput(
+                id="computation_ids_with_polarity",
                 title="für die Berechnung erforderliche Basisindikatoren",
-                description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Popularitätseinstellung.",
+                description="Liste mit den Indikatoren-IDs der Basisindikatoren mit deren Polaritätseinstellung.",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.ARRAY,
                     items=ProcessIOSchema(
                         type_=ProcessIOType.OBJECT,
                         properties={
                             "ID": ProcessIOSchema(type_=ProcessIOType.STRING, title="Indikator-ID"),
-                            "POPULARITY": ProcessIOSchema(
+                            "POLARITY": ProcessIOSchema(
                                 type_=ProcessIOType.STRING,
-                                title="Popularität für die Normierung (normal oder invers)",
-                                enum=[Popularity.INVERT, Popularity.NORMAL]
+                                title="Polarität für die Normalisierung (normal oder invers)",
+                                enum=[Polarity.INVERT, Polarity.NORMAL]
                             )
                         },
-                        required=["ID", "POPULARITY"]
+                        required=["ID", "POLARITY"]
                     )
                 )
             ),
@@ -152,11 +150,11 @@ class KmHeadlineIndicator(KommonitorProcess):
                     enum=[
                         {
                             "apiName": "RANKEDMINMAX",
-                            "displayName": "normal ([value - min] / [max - min])",
+                            "displayName": "Ranked Min/Max [(value - min) / (max - min)]",
                         },
                         {
                             "apiName": "ZSCORE",
-                            "displayName": "z = (x - mean) / stdev",
+                            "displayName": "Z-Score [z = (x - mean) / stdev]",
                         }
                     ],                    
                     default={
@@ -184,7 +182,7 @@ class KmHeadlineIndicator(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
-        computation_ids = inputs["computation_ids"]
+        computation_ids_with_polarity = inputs["computation_ids_with_polarity"]
         aggregation_method = inputs["aggregation_method"]
         computation_method = inputs["computation_method"]
         
@@ -194,23 +192,22 @@ class KmHeadlineIndicator(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
             
             collection = IndicatorCollection()
-            for indicator in computation_ids:
+            for indicator in computation_ids_with_polarity:
                 collection.add_indicator(IndicatorType(indicator["ID"], IndicatorCalculationType.COMPUTATION_INDICATOR))
-                collection.indicators[indicator["ID"]].method = indicator["POPULARITY"]
+                collection.indicators[indicator["ID"]].method = indicator["POLARITY"]
                 
             # query indicator metadate to check for errors occured
             # ti.meta = indicators_controller.get_indicator_by_id(
             #    target_id)
             ti.get_indicator_by_id(indicators_controller)
-            
-            print(ti.meta)
+
             for indicator in collection.indicators:
                 collection.indicators[indicator].get_indicator_by_id(indicators_controller)
                     
@@ -218,12 +215,9 @@ class KmHeadlineIndicator(KommonitorProcess):
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
                 job_summary.init_spatial_unit_summary(spatial_unit)
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
@@ -244,7 +238,7 @@ class KmHeadlineIndicator(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 
@@ -256,7 +250,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                 elif aggregation_method == "MIN":
                     agg_func = pykmhelper.min
                 else:
-                    raise DataManagementException("The aggregation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
+                    raise DataManagementException("The aggregation method is not in the list of allowed values.", computation_ids_with_polarity[0]["ID"], "INDICATOR", 500)
 
                          
                 if computation_method == "RANKEDMINMAX":
@@ -269,7 +263,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                     normal = pykmhelper.zScore_normalization_wholeValueArray       
                     invert = pykmhelper.zScore_normalization_wholeValueArray_inverted
                 else:
-                    raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids[0]["ID"], "INDICATOR", 500)
+                    raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids_with_polarity[0]["ID"], "INDICATOR", 500)
                     
                 collection.search_nan_features(all_times)
 
@@ -286,7 +280,7 @@ class KmHeadlineIndicator(KommonitorProcess):
                         for feature in collection.intersection_su_features:
                             if not feature in collection.nan_features[time_key]:
                                 feature_series = indicator_obj.time_series.get(feature, {})
-                                value = feature_series.get(time_key)
+                                value = feature_series[time_key]
                                 indicator_obj.lists[time_key].append(value)
 
                         if not z_score:
@@ -297,7 +291,6 @@ class KmHeadlineIndicator(KommonitorProcess):
                             
                         indicator_obj.lists[time_key] = normalized
 
-
                 # iterate over all features and append the indicator
                 y = 0
                 indicator_values = []
@@ -306,8 +299,10 @@ class KmHeadlineIndicator(KommonitorProcess):
                     for targetTime in all_times:
                         try:
                             time_key = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            if feature in collection.nan_features[time_key]:
+                            if feature in collection.nan_features[time_key] and i > 0:
                                 y += 1
+                                raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
+                            elif feature in collection.nan_features[time_key]:
                                 raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
 
                             try:

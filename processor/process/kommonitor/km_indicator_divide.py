@@ -95,13 +95,13 @@ class KmIndicatorDivide(KommonitorProcess):
                 id= "COMPUTATION_ID_NUMERATOR",
                 title="Auswahl des für die Berechnung erforderlichen Dividenden",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "computation_id_denominator": ProcessInput(
                 id= "COMPUTATION_ID_DENOMINATOR",
                 title="Auswahl des für die Berechnung erforderlichen Divisors",
                 description="Indikatoren-ID des Basisindikators.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             )
         }, 
         outputs = KommonitorProcess.common_output
@@ -132,8 +132,8 @@ class KmIndicatorDivide(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
@@ -157,12 +157,9 @@ class KmIndicatorDivide(KommonitorProcess):
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
                 job_summary.init_spatial_unit_summary(spatial_unit)
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
@@ -183,7 +180,7 @@ class KmIndicatorDivide(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 

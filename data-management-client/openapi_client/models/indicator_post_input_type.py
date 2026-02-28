@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,66 +18,50 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional, Union
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator
-from pydantic import Field
 from openapi_client.models.common_metadata_type import CommonMetadataType
+from openapi_client.models.creation_type_enum import CreationTypeEnum
 from openapi_client.models.default_classification_mapping_type import DefaultClassificationMappingType
 from openapi_client.models.indicator_post_input_type_refrences_to_georesources import IndicatorPOSTInputTypeRefrencesToGeoresources
 from openapi_client.models.indicator_post_input_type_refrences_to_other_indicators import IndicatorPOSTInputTypeRefrencesToOtherIndicators
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.indicator_type_enum import IndicatorTypeEnum
+from typing import Optional, Set
+from typing_extensions import Self
 
 class IndicatorPOSTInputType(BaseModel):
     """
     IndicatorPOSTInputType
     """ # noqa: E501
-    abbreviation: StrictStr = Field(description="abbreviated mark of the indicator")
-    allowed_roles: List[StrictStr] = Field(description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
+    abbreviation: Optional[StrictStr] = Field(default=None, description="abbreviated mark of the indicator")
+    permissions: List[StrictStr] = Field(description="list of permissions on this entity")
     characteristic_value: StrictStr = Field(description="the distuingishing characteristic value of the indicator", alias="characteristicValue")
-    creation_type: StrictStr = Field(description="indicates if the data is simply inserted (INSERTION), computed by an automated script (COMPUTATION) or automatically aggregated by a script (AGGREGATION)", alias="creationType")
+    creation_type: CreationTypeEnum = Field(alias="creationType")
     dataset_name: StrictStr = Field(description="the meaningful name of the indicator", alias="datasetName")
     default_classification_mapping: DefaultClassificationMappingType = Field(alias="defaultClassificationMapping")
-    indicator_type: Optional[StrictStr] = Field(default=None, description="indicates whether the indicator is a status indicator (values represent the extent of the watched phenomenon for a certain point in time) or a dynamic indicator (values represent the change of extent of the watched phenomenon within a certain period of time)", alias="indicatorType")
+    display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")
+    indicator_type: Optional[IndicatorTypeEnum] = Field(default=None, alias="indicatorType")
     interpretation: StrictStr = Field(description="interpretation of the indicator values")
     is_headline_indicator: StrictBool = Field(description="boolean value indicating if the indicator is a headline indicator", alias="isHeadlineIndicator")
     lowest_spatial_unit_for_computation: Optional[StrictStr] = Field(default=None, description="identifier/name of the lowest spatial unit for which the indicator can be computed and thus is available (only necessary for computable indicators)", alias="lowestSpatialUnitForComputation")
     metadata: CommonMetadataType
+    precision: Optional[StrictInt] = Field(default=None, description="Defines the number of decimal places for indicator values. If null, there is no predefined precision for this indicator.")
+    owner_id: StrictStr = Field(description="identifier of the owning group", alias="ownerId")
     process_description: StrictStr = Field(description="description about how the indicator was computed", alias="processDescription")
     reference_date_note: Optional[StrictStr] = Field(default=None, description="an optional note on the reference date of the indicator", alias="referenceDateNote")
-    display_order: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="an order number to control display order in clients", alias="displayOrder")
     refrences_to_georesources: Optional[List[IndicatorPOSTInputTypeRefrencesToGeoresources]] = Field(default=None, description="array of references to other georesource datasets. E.g., if an indicator is defined by performing geometric-topological operations, then the identifiers of those required georesources can be referenced here", alias="refrencesToGeoresources")
     refrences_to_other_indicators: Optional[List[IndicatorPOSTInputTypeRefrencesToOtherIndicators]] = Field(default=None, description="array of references to other indicators. E.g., if an indicator is defined by combining four other indicators, then the identifiers of those other indicators can be referenced here", alias="refrencesToOtherIndicators")
     tags: List[StrictStr] = Field(description="list of tag labels for the indicator")
     topic_reference: StrictStr = Field(description="id of the last topic hierarchy entity ", alias="topicReference")
     unit: StrictStr = Field(description="unit of the indicator values")
-    __properties: ClassVar[List[str]] = ["abbreviation", "allowedRoles", "characteristicValue", "creationType", "datasetName", "defaultClassificationMapping", "indicatorType", "interpretation", "isHeadlineIndicator", "lowestSpatialUnitForComputation", "metadata", "processDescription", "referenceDateNote", "displayOrder", "refrencesToGeoresources", "refrencesToOtherIndicators", "tags", "topicReference", "unit"]
+    is_public: StrictBool = Field(description="flag whether the resource is publicly accessible", alias="isPublic")
+    __properties: ClassVar[List[str]] = ["abbreviation", "permissions", "characteristicValue", "creationType", "datasetName", "defaultClassificationMapping", "displayOrder", "indicatorType", "interpretation", "isHeadlineIndicator", "lowestSpatialUnitForComputation", "metadata", "precision", "ownerId", "processDescription", "referenceDateNote", "refrencesToGeoresources", "refrencesToOtherIndicators", "tags", "topicReference", "unit", "isPublic"]
 
-    @field_validator('creation_type')
-    def creation_type_validate_enum(cls, value):
-        """Validates the enum"""
-        if value not in ('INSERTION', 'COMPUTATION', 'AGGREGATION'):
-            raise ValueError("must be one of enum values ('INSERTION', 'COMPUTATION', 'AGGREGATION')")
-        return value
-
-    @field_validator('indicator_type')
-    def indicator_type_validate_enum(cls, value):
-        """Validates the enum"""
-        if value is None:
-            return value
-
-        if value not in ('STATUS_ABSOLUTE', 'DYNAMIC_ABSOLUTE', 'STATUS_RELATIVE', 'DYNAMIC_RELATIVE', 'STATUS_STANDARDIZED', 'DYNAMIC_STANDARDIZED'):
-            raise ValueError("must be one of enum values ('STATUS_ABSOLUTE', 'DYNAMIC_ABSOLUTE', 'STATUS_RELATIVE', 'DYNAMIC_RELATIVE', 'STATUS_STANDARDIZED', 'DYNAMIC_STANDARDIZED')")
-        return value
-
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -90,7 +74,7 @@ class IndicatorPOSTInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of IndicatorPOSTInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -104,10 +88,12 @@ class IndicatorPOSTInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of default_classification_mapping
@@ -119,21 +105,21 @@ class IndicatorPOSTInputType(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of each item in refrences_to_georesources (list)
         _items = []
         if self.refrences_to_georesources:
-            for _item in self.refrences_to_georesources:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_refrences_to_georesources in self.refrences_to_georesources:
+                if _item_refrences_to_georesources:
+                    _items.append(_item_refrences_to_georesources.to_dict())
             _dict['refrencesToGeoresources'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in refrences_to_other_indicators (list)
         _items = []
         if self.refrences_to_other_indicators:
-            for _item in self.refrences_to_other_indicators:
-                if _item:
-                    _items.append(_item.to_dict())
+            for _item_refrences_to_other_indicators in self.refrences_to_other_indicators:
+                if _item_refrences_to_other_indicators:
+                    _items.append(_item_refrences_to_other_indicators.to_dict())
             _dict['refrencesToOtherIndicators'] = _items
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of IndicatorPOSTInputType from a dict"""
         if obj is None:
             return None
@@ -143,24 +129,27 @@ class IndicatorPOSTInputType(BaseModel):
 
         _obj = cls.model_validate({
             "abbreviation": obj.get("abbreviation"),
-            "allowedRoles": obj.get("allowedRoles"),
+            "permissions": obj.get("permissions"),
             "characteristicValue": obj.get("characteristicValue"),
             "creationType": obj.get("creationType"),
             "datasetName": obj.get("datasetName"),
-            "defaultClassificationMapping": DefaultClassificationMappingType.from_dict(obj.get("defaultClassificationMapping")) if obj.get("defaultClassificationMapping") is not None else None,
+            "defaultClassificationMapping": DefaultClassificationMappingType.from_dict(obj["defaultClassificationMapping"]) if obj.get("defaultClassificationMapping") is not None else None,
+            "displayOrder": obj.get("displayOrder"),
             "indicatorType": obj.get("indicatorType"),
             "interpretation": obj.get("interpretation"),
             "isHeadlineIndicator": obj.get("isHeadlineIndicator"),
             "lowestSpatialUnitForComputation": obj.get("lowestSpatialUnitForComputation"),
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "precision": obj.get("precision"),
+            "ownerId": obj.get("ownerId"),
             "processDescription": obj.get("processDescription"),
             "referenceDateNote": obj.get("referenceDateNote"),
-            "displayOrder": obj.get("displayOrder"),
-            "refrencesToGeoresources": [IndicatorPOSTInputTypeRefrencesToGeoresources.from_dict(_item) for _item in obj.get("refrencesToGeoresources")] if obj.get("refrencesToGeoresources") is not None else None,
-            "refrencesToOtherIndicators": [IndicatorPOSTInputTypeRefrencesToOtherIndicators.from_dict(_item) for _item in obj.get("refrencesToOtherIndicators")] if obj.get("refrencesToOtherIndicators") is not None else None,
+            "refrencesToGeoresources": [IndicatorPOSTInputTypeRefrencesToGeoresources.from_dict(_item) for _item in obj["refrencesToGeoresources"]] if obj.get("refrencesToGeoresources") is not None else None,
+            "refrencesToOtherIndicators": [IndicatorPOSTInputTypeRefrencesToOtherIndicators.from_dict(_item) for _item in obj["refrencesToOtherIndicators"]] if obj.get("refrencesToOtherIndicators") is not None else None,
             "tags": obj.get("tags"),
             "topicReference": obj.get("topicReference"),
-            "unit": obj.get("unit")
+            "unit": obj.get("unit"),
+            "isPublic": obj.get("isPublic")
         })
         return _obj
 

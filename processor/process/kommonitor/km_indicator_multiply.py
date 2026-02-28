@@ -86,7 +86,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                 id= "COMPUTATION_IDS",
                 title="für die Berechnung erforderliche Basisindikatoren",
                 description="Liste mit den Indikatoren-IDs der Basisindikatoren.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, items=ProcessIOSchema(type_=ProcessIOType.STRING))
+                schema_=ProcessIOSchema(type_=ProcessIOType.ARRAY, required=["true"], items=ProcessIOSchema(type_=ProcessIOType.STRING))
             )
         }, 
         outputs = KommonitorProcess.common_output
@@ -116,8 +116,8 @@ class KmIndicatorMultiply(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
@@ -137,12 +137,10 @@ class KmIndicatorMultiply(KommonitorProcess):
             bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
 
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowed_roles = ti.check_su_allowedRoles(spatial_unit)
 
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowed_roles)
                 job_summary.init_spatial_unit_summary(spatial_unit)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
                 # store the list containing all features-IDs as an attribute for the collection
@@ -165,7 +163,7 @@ class KmIndicatorMultiply(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 
@@ -209,6 +207,7 @@ class KmIndicatorMultiply(KommonitorProcess):
             # 4.1 Return success and result
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
+            logger.error(f"Error while requesting Data Management API: {e}")
             # 4.2 Catch possible errors cleanly
             if e.spatial_unit and bool(job_summary):
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)

@@ -40,9 +40,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(KmGeoresourceShareByPropertyValue.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceShareByPropertyValue.run, job_id, execution_request)
 
-class KmGeoresourceShareByPropertyValue(KommonitorProcess):
+class WIPKmGeoresourceShareByPropertyValue(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -63,7 +63,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                         "longTitle": "Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
                         "apiName": processName,
                         "calculation_info": "Prozentualer Anteil gewählter Punkte innerhalb jedes Raumeinheits-Features. Auswahl: Anwenden eines Filters durch eine Objekteigenschaft",
-                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i>  <br/> <i>Auswahlkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><em>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</em>  <br/> <em>Auswahlkriterium:</em> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "inputBoxes": [
                             {
                             "id": "georesource_id",
@@ -91,7 +91,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                 id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "comp_filter": ProcessInput(
                 id="comp_filter",
@@ -137,9 +137,9 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
-            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+            georesources_controller = openapi_client.GeoresourcesApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
@@ -148,15 +148,23 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
             ti.meta = indicators_controller.get_indicator_by_id(
                 target_id)
             
+            # fetch georesourceMetadata
+            # georesource_metadata_request = georesources_controller.get_georesource_by_id(computation_georecources_id)
+            georesource_metadata = georesources_controller.get_georesource_by_id(computation_georecources_id)
             # extract all dates
-            allDates = target_time["includeDates"]
+            # allDates = target_time["includeDates"]
+
+            target_indicator_applicable_dates = ti.meta.applicable_dates
+            periodsOfValidity = georesource_metadata.available_periods_of_validity            
+            georesource_validStart_dates = []
+            for periodOfValidity in periodsOfValidity:
+                georesource_validStart_dates.append(periodOfValidity.start_date.strftime("%Y-%m-%d"))
+
+            allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
             
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.

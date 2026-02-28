@@ -62,7 +62,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                     value=[{
                         "longTitle": "Statistiken anhand Eigenschaft der punktbasierten Georessource",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <em>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´ für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</em><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gewählter Objekt-Eigenschaft",
                         "inputBoxes": [
                             {
@@ -99,13 +99,13 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 id= "georesource_id",
                 title="Auswahl der für die Berechnung erforderlichen Georesource",
                 description="ID der Georesource.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "compProp": ProcessInput(
                 id= "compProp",
                 title="Numerische Objekteigenschaft.",
                 description="Auswahl der für die Berechnung erforderlichen Eigenschaft.",
-                schema_=ProcessIOSchema(type_=ProcessIOType.STRING)
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
             ),
             "compMeth": ProcessInput(
                 id= "compMeth",
@@ -113,6 +113,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                 description="",
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
+                    required=["true"],
                     enum=[
                         {
                             "apiName": "MIN",
@@ -133,11 +134,12 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                         {
                             "apiName": "SUM",
                             "displayName": "Summe",
-                        },
-                        {
-                            "apiName": "STANDARD_DEVIATION",
-                            "displayName": "Standardabweichung",
                         }
+                         ,
+                         {
+                             "apiName": "STANDARD_DEVIATION",
+                             "displayName": "Standardabweichung",
+                         }
                     ],                    
                     default={
                         "apiName": "MIN",
@@ -175,9 +177,9 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
 
         try:
             # 3. Generate result || Main Script    
-            indicators_controller = openapi_client.IndicatorsControllerApi(data_management_client)
-            spatial_unit_controller = openapi_client.SpatialUnitsControllerApi(data_management_client)
-            georesources_controller = openapi_client.GeorecourcesControllerApi(data_management_client)
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+            georesources_controller = openapi_client.GeoresourcesApi(data_management_client)
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
@@ -186,15 +188,23 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             ti.meta = indicators_controller.get_indicator_by_id(
                 target_id)
             
+            # fetch georesourceMetadata
+            # georesource_metadata_request = georesources_controller.get_georesource_by_id(computation_georecources_id)
+            georesource_metadata = georesources_controller.get_georesource_by_id(computation_georecources_id)
             # extract all dates
-            allDates = target_time["includeDates"]
+            # allDates = target_time["includeDates"]
+
+            target_indicator_applicable_dates = ti.meta.applicable_dates
+            periodsOfValidity = georesource_metadata.available_periods_of_validity            
+            georesource_validStart_dates = []
+            for periodOfValidity in periodsOfValidity:
+                georesource_validStart_dates.append(periodOfValidity.start_date.strftime("%Y-%m-%d"))
+
+            allDates = pykmhelper.getAll_target_time(target_time, set(target_indicator_applicable_dates), [set(georesource_validStart_dates)])
             
             for spatial_unit in target_spatial_units:
-                # check for existing allowedRoles for the concatenation of indicator and spatial unit
-                allowedRoles = ti.check_su_allowedRoles(spatial_unit)
-                
                 # Init results and job summary for current spatial unit
-                result.init_spatial_unit_result(spatial_unit, spatial_unit_controller, allowedRoles)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
                 job_summary.init_spatial_unit_summary(spatial_unit)
 
                 # query data-management-api to get all spatial unit features for the current spatial unit.
@@ -241,7 +251,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            if e.spatial_unit and bool(job_summary):
+            if e.spatial_unit and not job_summary._su_summary == None:
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
                 job_summary.complete_spatial_unit_summary()
             else:

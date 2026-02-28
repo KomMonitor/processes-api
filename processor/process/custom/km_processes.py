@@ -92,7 +92,7 @@ def schedule_process(api: API, request: APIRequest,
 
         result = api.manager.schedule_process(
             process_id, data_dict)
-        # schedule_id, mime_type, tempOut, status, tempHeader = result
+
         schedule_id, mime_type, status = result
 
         if api.manager.is_async:
@@ -290,6 +290,50 @@ def delete_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, i
                 'scheduleID': schedule_id,
                 'status': "DISMISSED",
                 'message': 'Schedule dismissed',
+                'links': [{
+                    'href': schedules_url,
+                    'rel': 'up',
+                    'type': FORMAT_TYPES[F_JSON],
+                    'title': l10n.translate('The schedule list for the current process', request.locale)  # noqa
+                }]
+            }
+        else:
+            return api.get_exception(
+                HTTPStatus.INTERNAL_SERVER_ERROR, response_headers,
+                request.format, 'InternalError', schedule_id
+            )
+    logger.info(response)
+    # TODO: this response does not have any headers
+    return {}, http_status, to_json(response, api.pretty_print)
+
+def execute_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, int, str]:
+    """
+    Trigger a schedule execution
+
+    :param schedule_id: schedule identifier
+
+    :returns: tuple of headers, status code, content
+    """
+
+    response_headers = request.get_response_headers(
+        SYSTEM_LOCALE, **api.api_headers)
+    try:
+        job_id = api.manager.trigger_flow_from_schedule(schedule_id)
+    except ScheduleNotFoundError:
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, response_headers, request.format,
+            'NoSuchSchedule', schedule_id
+        )
+    else:
+        if job_id is not None:
+            http_status = HTTPStatus.OK
+            schedules_url = f"{api.base_url}/schedules"
+
+            response = {
+                'scheduleID': schedule_id,
+                'jobID': job_id,
+                'status': "CREATED",
+                'message': 'Schedule execution triggered',
                 'links': [{
                     'href': schedules_url,
                     'rel': 'up',

@@ -1,0 +1,229 @@
+import math
+import logging
+from typing import Tuple
+import openapi_client
+from openapi_client import ApiClient
+from prefect import task, flow
+from prefect.cache_policies import NO_CACHE
+from pygeoapi.process.base import *
+from pygeoapi.util import JobStatus
+from pygeoapi_prefect import schemas
+from pygeoapi_prefect.schemas import ProcessDescription, ProcessJobControlOption, Parameter, \
+    AdditionalProcessIOParameters
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType
+
+try:
+    from .. import pykmhelper
+except ImportError:
+    from processor.process import pykmhelper
+
+try:
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+except ImportError:
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+
+try:
+    from ..base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, DataManagementException
+except ImportError:
+    from processor.process.base import KommonitorProcess, KommonitorProcessConfig, KommonitorResult, \
+        KommonitorJobSummary, KOMMONITOR_DATA_MANAGEMENT_URL, generate_flow_run_name, DataManagementException
+
+# this name should be set for @flow(name='<processName>') and within detailed_process_description as 
+# additional_parameters.parameters[0].value[0].apiName
+# this is necessary in order to have a comparable name between prefect schedules and pygeoAPI process descriptions
+processName = "km_indicator_multiply_value"
+
+@flow(persist_result=True, name=processName, flow_run_name=generate_flow_run_name)
+def process_flow(
+        job_id: str,
+        execution_request: schemas.ExecuteRequest
+) -> dict:
+    return KommonitorProcess.execute_process_flow(KmIndicatorMultiplyValue.run, job_id, execution_request)
+
+
+class KmIndicatorMultiplyValue(KommonitorProcess):
+    process_flow = process_flow
+
+    detailed_process_description = ProcessDescription(
+        id=processName,
+        version="0.0.1",
+        title="Multiplikation (fester Wert)",
+        description= "Multipliziert einen Indikator mit einem festen Wert.",
+        example={},
+        job_control_options=[
+            ProcessJobControlOption.SYNC_EXECUTE,
+            ProcessJobControlOption.ASYNC_EXECUTE,
+        ],
+        additional_parameters=AdditionalProcessIOParameters(
+            parameters=[
+                Parameter(
+                    name="kommonitorUiParams",
+                    value=[{
+                        "longTitle": "Multiplikation eines Indikators mit einem festen Wert",
+                        "apiName": processName,
+                        "calculation_info": "Produkt aus Indikator und Wert",
+                        "formula": "$ I \\times x $",
+                        "legend": "",
+                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "inputBoxes": [
+                            {
+                                "id": "computation_id",
+                                "title": "Notwendiger (Basis-)Indikator",
+                                "description": "",
+                                "contents": [
+                                    "computation_id"
+                                ]
+                            },
+                            {
+                                "id": "num_value",
+                                "title": "Notwendiger Multiplikator",
+                                "description": "",
+                                "contents": [
+                                    "num_value"
+                                ]
+                            }
+                        ]
+                    }]
+                )
+            ]
+        ),
+        inputs=KommonitorProcess.common_inputs | {
+            "computation_id": ProcessInput(
+                id= "COMPUTATION_ID",
+                title="für die Berechnung erforderlicher Basisindikator",
+                description="Indikatoren ID des erforderlichen Basisindikators.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.STRING, required=["true"])
+            ),
+            "num_value": ProcessInput(
+                id= "NUM_VALUE",
+                title="Multiplikationswert",
+                description="Wert mit welchem der Basisindikator multipliziert wird.",
+                schema_=ProcessIOSchema(type_=ProcessIOType.NUMBER, required=["true"])
+            )
+        }, 
+        outputs = KommonitorProcess.common_output
+    )
+
+    # run Method has to be implemented for all KomMonitor Skripts
+    @staticmethod
+    @task(cache_policy=NO_CACHE)
+    def run(config: KommonitorProcessConfig,
+            logger: logging.Logger,
+            data_management_client: ApiClient) -> Tuple[JobStatus, KommonitorResult, KommonitorJobSummary]:
+
+        logger.debug("Starting execution...")
+
+         # Load inputs
+        inputs = config.inputs
+        # Extract all relevant inputs
+        target_id = inputs["target_indicator_id"]
+        computation_id = inputs["computation_id"]
+        target_spatial_units = inputs["target_spatial_units"]
+        target_time = inputs["target_time"]
+        num_value = inputs["num_value"]
+        
+        
+        # Init object to store computation results
+        result = KommonitorResult()
+        job_summary = KommonitorJobSummary()
+
+        try:
+            # 3. Generate result || Main Script    
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+
+            # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
+            ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
+            
+            collection = IndicatorCollection()
+            collection.add_indicator(IndicatorType(computation_id, IndicatorCalculationType.COMPUTATION_INDICATOR))
+            
+
+            # query indicator metadate to check for errors occured
+            ti.get_indicator_by_id(indicators_controller)
+            
+            for indicator in collection.indicators:
+                collection.indicators[indicator].get_indicator_by_id(indicators_controller)
+
+            # calculate intersection dates and all dates that have to be computed according to target_time schema
+            bool_missing_timestamp, all_times = pykmhelper.getAll_target_time_from_indicator_collection(ti, collection, target_time)   
+
+            for spatial_unit in target_spatial_units:
+
+                # Init results and job summary for current spatial unit
+                job_summary.init_spatial_unit_summary(spatial_unit)
+                result.init_spatial_unit_result_with_indicator(spatial_unit, spatial_unit_controller, ti)
+
+                # query data-management-api to get all spatial unit features for the current spatial unit.
+                # store the list containing all features-IDs as an attribute for the collection
+                collection.fetch_all_spatial_unit_features(spatial_unit_controller, spatial_unit)
+
+                # catch missing timestamp error
+                if bool_missing_timestamp:
+                     collection.check_applicable_target_dates(job_summary)
+
+                # catch missing spatial unit error
+                collection.check_applicable_spatial_units(spatial_unit, job_summary)
+
+                # query the correct indicator for numerator and denominator
+                for indicator in collection.indicators:
+                    collection.indicators[indicator].values = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_geometry(
+                        indicator, 
+                        spatial_unit)
+                    
+                collection.fetch_indicator_feature_time_series()
+
+                # get the intersection of all applicable su_features and check for missing spatial unit feature error
+                collection.find_intersection_applicable_su_features()
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
+
+                logger.debug("Retrieved required indicators successfully")
+
+                # iterate over all features an append the indicator here happen the main calculations for the requested values
+                indicator_values = []  
+                for feature in collection.intersection_su_features:
+                    valueMapping = []
+                    for targetTime in all_times:
+                        try:
+                            try:
+                                time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
+                                
+                                time_value = float(collection.indicators[computation_id].time_series[feature][time_with_prefix])
+                                value = float(num_value) * time_value
+                            except TypeError:
+                                value = None    
+                            
+                        except RuntimeError as r:
+                            logger.error(r)
+                            logger.error(f"There occurred an error during the processing of the indicator for spatial unit: {spatial_unit}")
+                            job_summary.add_processing_error("INDICATOR", computation_id, str(r), targetTime, feature)
+                            value = None
+                            
+                        valueMapping.append({"indicatorValue": value, "timestamp": targetTime})
+                    indicator_values.append({"spatialReferenceKey": str(feature), "valueMapping": valueMapping})
+                
+                # Job Summary and results
+                job_summary.add_number_of_integrated_features(len(indicator_values))
+                job_summary.add_integrated_target_dates(all_times)
+                job_summary.add_modified_resource(KOMMONITOR_DATA_MANAGEMENT_URL, target_id, spatial_unit)
+                job_summary.complete_spatial_unit_summary()
+
+                result.add_indicator_values(indicator_values)
+                result.complete_spatial_unit_result()
+
+                # logger.info(result.values)
+                # logger.info(job_summary.summary)
+            # 4.1 Return success and result
+            return JobStatus.successful, result, job_summary
+        except DataManagementException as e:
+            logger.error(f"Error while requesting Data Management API: {e}")
+            # 4.2 Catch possible errors cleanly
+            if e.spatial_unit and bool(job_summary):
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            else:
+                job_summary.init_spatial_unit_summary(target_spatial_units[0])
+                job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
+                job_summary.complete_spatial_unit_summary()
+            return JobStatus.failed, None, job_summary

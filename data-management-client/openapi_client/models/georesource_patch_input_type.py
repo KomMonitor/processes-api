@@ -3,7 +3,7 @@
 """
     KomMonitor Data Access API
 
-    erster Entwurf einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
+    Definition einer Datenzugriffs-API, die den Zugriff auf die KomMonitor-Datenhaltungsschicht kapselt.
 
     The version of the OpenAPI document: 0.0.1
     Contact: christian.danowski-buhren@hs-bochum.de
@@ -18,61 +18,41 @@ import pprint
 import re  # noqa: F401
 import json
 
-
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional, Union
-from pydantic import BaseModel, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator
-from pydantic import Field
+from typing_extensions import Annotated
+from openapi_client.models.color_type import ColorType
 from openapi_client.models.common_metadata_type import CommonMetadataType
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
+from openapi_client.models.poi_marker_style_enum import PoiMarkerStyleEnum
+from typing import Optional, Set
+from typing_extensions import Self
 
 class GeoresourcePATCHInputType(BaseModel):
     """
     GeoresourcePATCHInputType
     """ # noqa: E501
-    allowed_roles: Optional[List[StrictStr]] = Field(default=None, description="list of role identifiers that have read access rights for this dataset", alias="allowedRoles")
     aoi_color: Optional[StrictStr] = Field(default=None, description="color name or color code (i.e. hex number) for areas of interest", alias="aoiColor")
     dataset_name: Optional[StrictStr] = Field(default=None, description="the meaningful name of the dataset", alias="datasetName")
     is_aoi: Optional[StrictBool] = Field(default=None, description="boolean value indicating if the dataset contains areas of interest", alias="isAOI")
     is_loi: Optional[StrictBool] = Field(default=None, description="boolean value indicating if the dataset contains lines of interest", alias="isLOI")
     is_poi: Optional[StrictBool] = Field(default=None, description="boolean value indicating if the dataset contains points of interest", alias="isPOI")
     loi_color: Optional[StrictStr] = Field(default=None, description="color name or color code (i.e. hex number) for lines of interest", alias="loiColor")
-    loi_dash_array_string: Optional[StrictStr] = Field(default=None, description="sring of line stroke dash array for lines of interest (e.g. 20,20; see https://developer.mozilla.org/de/docs/Web/SVG/Attribute/stroke-dasharray)", alias="loiDashArrayString")
+    loi_dash_array_string: Optional[StrictStr] = Field(default=None, description="string of line stroke dash array for lines of interest (e.g. 20,20; see https://developer.mozilla.org/de/docs/Web/SVG/Attribute/stroke-dasharray)", alias="loiDashArrayString")
     loi_width: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="display width for lines of interest (number of pixels in leaflet)", alias="loiWidth")
     metadata: CommonMetadataType
-    poi_marker_color: Optional[StrictStr] = Field(default=None, description="If georesource is a POI then custom POI marker color can be set by specifying one of the following color names", alias="poiMarkerColor")
+    poi_marker_style: Optional[PoiMarkerStyleEnum] = Field(default=None, alias="poiMarkerStyle")
+    poi_marker_text: Optional[Annotated[str, Field(strict=True, max_length=3)]] = Field(default=None, description="the poi marker text string to be used if poiMarkerStyle is set to text", alias="poiMarkerText")
+    poi_marker_color: Optional[ColorType] = Field(default=None, alias="poiMarkerColor")
     poi_symbol_bootstrap3_name: Optional[StrictStr] = Field(default=None, description="If georesource is a POI then custom POI marker symbol can be set by specifying the name of a Bootstrap 3 glyphicon symbol (i.e. \"home\" for a home symbol or \"education\" for a students hat symbol)", alias="poiSymbolBootstrap3Name")
-    poi_symbol_color: Optional[StrictStr] = Field(default=None, description="If georesource is a POI then custom POI symbol color can be set by specifying one of the following color names", alias="poiSymbolColor")
+    poi_symbol_color: Optional[ColorType] = Field(default=None, alias="poiSymbolColor")
     topic_reference: Optional[StrictStr] = Field(default=None, description="id of the last topic hierarchy entity ", alias="topicReference")
-    __properties: ClassVar[List[str]] = ["allowedRoles", "aoiColor", "datasetName", "isAOI", "isLOI", "isPOI", "loiColor", "loiDashArrayString", "loiWidth", "metadata", "poiMarkerColor", "poiSymbolBootstrap3Name", "poiSymbolColor", "topicReference"]
+    __properties: ClassVar[List[str]] = ["aoiColor", "datasetName", "isAOI", "isLOI", "isPOI", "loiColor", "loiDashArrayString", "loiWidth", "metadata", "poiMarkerStyle", "poiMarkerText", "poiMarkerColor", "poiSymbolBootstrap3Name", "poiSymbolColor", "topicReference"]
 
-    @field_validator('poi_marker_color')
-    def poi_marker_color_validate_enum(cls, value):
-        """Validates the enum"""
-        if value is None:
-            return value
-
-        if value not in ('white', 'red', 'orange', 'beige', 'green', 'blue', 'purple', 'pink', 'gray', 'black'):
-            raise ValueError("must be one of enum values ('white', 'red', 'orange', 'beige', 'green', 'blue', 'purple', 'pink', 'gray', 'black')")
-        return value
-
-    @field_validator('poi_symbol_color')
-    def poi_symbol_color_validate_enum(cls, value):
-        """Validates the enum"""
-        if value is None:
-            return value
-
-        if value not in ('white', 'red', 'orange', 'beige', 'green', 'blue', 'purple', 'pink', 'gray', 'black'):
-            raise ValueError("must be one of enum values ('white', 'red', 'orange', 'beige', 'green', 'blue', 'purple', 'pink', 'gray', 'black')")
-        return value
-
-    model_config = {
-        "populate_by_name": True,
-        "validate_assignment": True,
-        "protected_namespaces": (),
-    }
+    model_config = ConfigDict(
+        populate_by_name=True,
+        validate_assignment=True,
+        protected_namespaces=(),
+    )
 
 
     def to_str(self) -> str:
@@ -85,7 +65,7 @@ class GeoresourcePATCHInputType(BaseModel):
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str) -> Optional[Self]:
         """Create an instance of GeoresourcePATCHInputType from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
@@ -99,10 +79,12 @@ class GeoresourcePATCHInputType(BaseModel):
           were set at model initialization. Other fields with value `None`
           are ignored.
         """
+        excluded_fields: Set[str] = set([
+        ])
+
         _dict = self.model_dump(
             by_alias=True,
-            exclude={
-            },
+            exclude=excluded_fields,
             exclude_none=True,
         )
         # override the default output from pydantic by calling `to_dict()` of metadata
@@ -111,7 +93,7 @@ class GeoresourcePATCHInputType(BaseModel):
         return _dict
 
     @classmethod
-    def from_dict(cls, obj: Dict) -> Self:
+    def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
         """Create an instance of GeoresourcePATCHInputType from a dict"""
         if obj is None:
             return None
@@ -120,7 +102,6 @@ class GeoresourcePATCHInputType(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "allowedRoles": obj.get("allowedRoles"),
             "aoiColor": obj.get("aoiColor"),
             "datasetName": obj.get("datasetName"),
             "isAOI": obj.get("isAOI"),
@@ -129,7 +110,9 @@ class GeoresourcePATCHInputType(BaseModel):
             "loiColor": obj.get("loiColor"),
             "loiDashArrayString": obj.get("loiDashArrayString"),
             "loiWidth": obj.get("loiWidth"),
-            "metadata": CommonMetadataType.from_dict(obj.get("metadata")) if obj.get("metadata") is not None else None,
+            "metadata": CommonMetadataType.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "poiMarkerStyle": obj.get("poiMarkerStyle"),
+            "poiMarkerText": obj.get("poiMarkerText"),
             "poiMarkerColor": obj.get("poiMarkerColor"),
             "poiSymbolBootstrap3Name": obj.get("poiSymbolBootstrap3Name"),
             "poiSymbolColor": obj.get("poiSymbolColor"),
