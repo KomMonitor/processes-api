@@ -2,6 +2,7 @@ import abc
 import json
 import logging
 import os
+import sys
 import urllib.parse as urlparse
 import uuid
 from dataclasses import dataclass
@@ -126,7 +127,7 @@ def format_inputs(execution_request: schemas.ExecuteRequest):
     return inputs
 
 @task(persist_result=False)
-def setup_logging(job_id: str) -> Logger:
+def setup_logging(job_id: str) -> tuple[Logger, logging.Handler]:
     job_dir = os.path.join(PROCESS_RESULTS_DIR, job_id)
     if not os.path.isdir(job_dir):
         os.mkdir(job_dir)
@@ -143,8 +144,16 @@ def setup_logging(job_id: str) -> Logger:
         logger.setLevel(gunicorn_logger.level)
 
     logger.debug("Setup logging ...")
-    return logger
+    return logger, filelogger
 
+@task(persist_result=False)
+def close_logging(logger: Logger, handler: logging.Handler):
+    try:
+        handler.flush()
+        handler.close()
+        logger.logger.removeHandler(handler)
+    except Exception as ex:
+        sys.stderr.write(f"Warning: Could not close log handler: {ex}\n")
 
 @task(cache_policy=NO_CACHE)
 def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
@@ -550,7 +559,7 @@ class KommonitorProcess(BasePrefectProcessor):
     ) -> dict:
         ## Setup
         flow_id = runtime.flow_run.name
-        logger = setup_logging(flow_id)
+        logger, handler = setup_logging(flow_id)
         logger.info(f"Flow run name: {flow_id}")
 
         inputs = format_inputs(execution_request)
@@ -565,7 +574,9 @@ class KommonitorProcess(BasePrefectProcessor):
                 "jobSummary": job_summary.summary,
                 "resultData": [],
             }
-            return store_output_as_file(flow_id, output, logger)
+            result = store_output_as_file(flow_id, output, logger)
+            close_logging(logger, handler)
+            return result
         else:
             output = {
                 "jobSummary": None,
@@ -590,7 +601,9 @@ class KommonitorProcess(BasePrefectProcessor):
                     job_summary.add_data_management_api_error("indicator", indicator_id, 404, "something is wrong with your submitted http body", res["applicableSpatialUnit"])
                     job_summary.mark_failed_job(res["applicableSpatialUnit"])
             output["jobSummary"] = job_summary.summary
-            return store_output_as_file(flow_id, output, logger)
+            result = store_output_as_file(flow_id, output, logger)
+            close_logging(logger, handler)
+            return result
 
 
     @staticmethod
