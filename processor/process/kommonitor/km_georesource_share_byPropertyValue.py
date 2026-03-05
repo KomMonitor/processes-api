@@ -40,9 +40,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceShareByPropertyValue.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmGeoresourceShareByPropertyValue.run, job_id, execution_request)
 
-class WIPKmGeoresourceShareByPropertyValue(KommonitorProcess):
+class KmGeoresourceShareByPropertyValue(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -126,10 +126,11 @@ class WIPKmGeoresourceShareByPropertyValue(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
+        comp_filter = inputs["comp_filter"]
         computation_georecources_id = inputs["georesource_id"]
-        computation_filter_property = inputs["compFilterProp"]
-        computation_filter_operator = inputs["compFilterOperator"]
-        computation_filter_value = inputs["compFilterPropVal"]
+        computation_filter_property = comp_filter["compFilterProp"]
+        computation_filter_operator = comp_filter["compFilterOperator"]
+        computation_filter_value = comp_filter["compFilterPropVal"]
 
         # Init object to store computation results
         result = KommonitorResult()
