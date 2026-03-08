@@ -807,11 +807,17 @@ def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: 
     del result_collection["features"]
     result_collection["features"] = []
 
+
     for feature in featureCollection["features"]:
-        if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
-            result_collection["features"].append(feature)
-    
+        try:
+            if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
+                result_collection["features"].append(feature)
+        except KeyError:
+            log(f"There is no property {propertyName} in feature with ID: {feature["properties"]["ID"]}")
+            continue
+
     return result_collection
+
 
 def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, computationFilterPropertyValue):
     """applys a computation filter to a submitted value array and returns the filtered Array. Several filter operators are valid.
