@@ -65,7 +65,7 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                         "calculation_info": "Produkt aus Indikator und Wert",
                         "formula": "$ I \\times x $",
                         "legend": "",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $x$: ${num_value} ",
                         "inputBoxes": [
                             {
                                 "id": "computation_id",
