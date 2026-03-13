@@ -813,7 +813,7 @@ def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: 
             if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
                 result_collection["features"].append(feature)
         except KeyError:
-            log(f"There is no property {propertyName} in feature with ID: {feature["properties"]["ID"]}")
+            log(f"There is no property {propertyName} in feature with ID: {feature['properties']['ID']}")
             continue
 
     return result_collection
