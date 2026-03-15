@@ -208,9 +208,9 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 if temporal_type == "YEARS":
                     func = pykmhelper.changeRelative_n_years_percent
                 elif temporal_type == "MONTHS":
-                    func = pykmhelper.changeAbsolute_n_months
+                    func = pykmhelper.changeRelative_n_months_percent
                 elif temporal_type == "DAYS":
-                    func = pykmhelper.changeAbsolute_n_days
+                    func = pykmhelper.changeRelative_n_days_percent
 
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  

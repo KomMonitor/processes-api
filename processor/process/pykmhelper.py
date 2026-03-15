@@ -3089,7 +3089,12 @@ def getChange_relative_percent(feature, targetDate, compareDate):
     compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
     
     targetValue = feature[targetDatePrefix]
-    compareValue = feature[compareDatePrefix]
+    try:
+        compareValue = feature[compareDatePrefix]
+    except KeyError:
+        throwError(f"An error occured because the target value {targetDate} has no compare value in the feature collection.")
+        resultValue = None
+
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         if float(compareValue) == 0:
             resultValue = None
