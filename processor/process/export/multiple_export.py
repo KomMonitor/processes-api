@@ -65,6 +65,7 @@ class MultipleExport(ExportProcess):
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
                     properties={
+                        "crs": ProcessIOSchema(type_=ProcessIOType.STRING),
                         "indicators": ProcessIOSchema(
                             type_=ProcessIOType.ARRAY,
                             items=ProcessIOSchema(

@@ -906,7 +906,10 @@ def filter_feature_lifespan(feature_collection, targetDate: str):
     for feature in feature_collection["features"]:
         startDate = formatStringAsDate(feature["properties"]["validStartDate"])
         if "validEndDate" in feature["properties"]:
-            endDate = formatStringAsDate(feature["properties"]["validEndDate"])
+            if not feature["properties"]["validEndDate"] is None:
+                endDate = formatStringAsDate(feature["properties"]["validEndDate"])
+            else:
+                endDate = datetime.date.today()
         else: 
             endDate = datetime.date.today()
 
@@ -3490,6 +3493,32 @@ class TargetTime:
     include_dates: List[str] = field(default_factory=list)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    dates_prefix: List[str] = field(default_factory=list)
+    
+    def translate_dates_indicator(self, column_dates: list):
+        if self.mode == "SINGLE":
+            for date in self.include_dates:
+                date_with_prefix = getTargetDateWithPropertyPrefix(date)
+                if not date_with_prefix in column_dates:
+                    throwError(f"Date {date} is not available in data.")
+                else:
+                    self.dates_prefix.append(date_with_prefix)
+        elif self.mode == "ALL":
+            self.dates_prefix = column_dates
+        elif self.mode == "START_END":
+            start = formatStringAsDate(self.start_date)
+            end = formatStringAsDate(self.end_date)
+            for date_string in column_dates:
+                date = formatStringAsDate(getTargetDate_without_prefix(date_string))
+                if start <= date <= end:
+                    string = formatDateAsString(date)
+                    self.dates_prefix.append(getTargetDateWithPropertyPrefix(string))
+            if len(self.dates_prefix) == 0:
+                throwError(f"The data contains no date in between {start} - {end}")
+        else:
+            throwError(f"Time-mode {self.mode} not supported")
+            
+            
 
 
 @dataclass
@@ -3498,21 +3527,111 @@ class IndicatorExport:
     spatial_unit_ids: List[str]
     target_time: TargetTime
     download_formats: List[str]
+    spatial_unit_gdfs: dict = field(default_factory=dict)
+    indicator_name: str = field(default_factory=str)
+    spatial_unit_names: dict = field(default_factory=dict)
 
+    def add_geodataframes(self, indicators_controller: IndicatorsApi):
+        metadata = indicators_controller.get_indicator_by_id(self.indicator_id)
+        applicableSUs = metadata.applicable_spatial_units
+        self.indicator_name = metadata.indicator_name
+        
+        for spatial_unit in self.spatial_unit_ids:
+            raw_series = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(self.indicator_id, spatial_unit)
+            data = json.loads(raw_series.data)
 
+            gdf = gpd.GeoDataFrame.from_features(data["features"], crs="EPSG:4326")
+
+            self.spatial_unit_gdfs[spatial_unit] = gdf
+            for su in applicableSUs:
+                if su.spatial_unit_id == spatial_unit:
+                    self.spatial_unit_names[spatial_unit] = su.spatial_unit_name
+            
+            
+    def filter_target_times(self):
+        for spatial_unit, gdf in self.spatial_unit_gdfs.items():
+            try:
+                columns = list(gdf.columns)
+                date_columns = [item for item in columns if indicator_date_prefix in item]
+                self.target_time.translate_dates_indicator(date_columns)
+                drop_columns = [x for x in date_columns if x not in self.target_time.dates_prefix]
+                gdf.drop(columns=drop_columns, inplace=True)
+
+            except Exception as e:
+                throwError(f"An error occured during Target-time filtering for indi. {self.indicator_id} and su {spatial_unit}: {e}")
+
+    def export_files_single_export(self, path, crs):
+        for spatial_unit, gdf in self.spatial_unit_gdfs.items():
+            gdf.to_crs(crs=crs, inplace=True)
+            su_name = self.spatial_unit_names[spatial_unit]
+            filename = f"{self.indicator_name}_{su_name}"
+            for format in self.download_formats:
+                export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf)
+                
+                
+    
 @dataclass
-class GeoressourceExport:
+class GeoresourceExport:
     georessource_id: str
     target_time: TargetTime
     download_formats: List[str]
+    gdf: Optional[gpd.GeoDataFrame] = None
+    georessource_name: str = field(default_factory=str)
+
+    def add_geodataframe(self, georessource_controller: GeoresourcesApi):
+        georessource = georessource_controller.get_all_georesource_features_by_id_without_preload_content(self.georessource_id)
+        metadata = georessource_controller.get_georesource_by_id(self.georessource_id)
+        data = json.loads(georessource.data)
+
+        self.gdf = gpd.GeoDataFrame.from_features(data["features"], crs="EPSG:4326")
+        self.georessource_name = metadata.dataset_name
+
+    def filter_target_times(self):
+        if self.target_time.mode == "ALL":
+            pass
+        elif self.target_time.mode == "SINGLE":
+            feature_collection = json.loads(self.gdf.to_json())
+            for date in self.target_time.include_dates:
+                feature_collection = filter_feature_lifespan(feature_collection, date)
+            self.gdf = gpd.GeoDataFrame.from_features(feature_collection["features"], crs="EPSG:4326")
+        elif self.target_time.mode == "START_END":
+            throwError("Time-mode 'START_END' is not yet supported for georessource-exports.")
+        
+    def export_files_single_export(self, path, crs):
+        self.gdf.to_crs(crs=crs, inplace=True)
+        for format in self.download_formats:
+            export_gdf_to_fileformat(format=format, path=path, filename=self.georessource_name, gdf=self.gdf)
 
 
-def process_export_inputs(data: dict):
-    # 1. Listen für die extrahierten Objekte initialisieren
+
+def export_gdf_to_fileformat(format: str, path: str, filename: str, gdf: gpd.GeoDataFrame):
+    """Exports a Geodataframe as a file or shapefile-folder to the submitted path. The method and driver is based on predefined fileformat
+
+    Args:
+        format (str): the format as which the gdf should be exported ("GEOPACKAGE", "GEOJSON", "SHAPE", "EXCEL", "CSV")
+        path (str): the path to the folder where the file should be saved to
+        filename (str): the name for the file 
+        gdf (gpd.GeoDataFrame): the geodataframe to export
+    """
+    if "FID" in gdf.columns:
+        gdf.rename(columns={"FID": "km_fid"}, inplace=True)
+                    
+    if format == "GEOPACKAGE":
+        gdf.to_file(rf"{path}\{filename}.gpkg", driver="GPKG", index=False)
+    elif format == "SHAPE":
+        gdf.to_file(rf"{path}\{filename}", driver="ESRI Shapefile", index=False)
+    elif format == "GEOJSON":
+        gdf.to_file(rf"{path}\{filename}.geojson", driver="GeoJSON", index=False)
+    elif format == "EXCEL":
+        gdf.to_excel(rf"{path}\{filename}.xlsx", index=False)
+    elif format == "CSV":
+        gdf.to_csv(rf"{path}\{filename}.csv", index=False)
+
+def process_single_export_inputs(data: dict):
     selected_indicators: List[IndicatorExport] = []
-    selected_georessources: List[GeoressourceExport] = []
-
-    # 2. Indikatoren verarbeiten
+    selected_georessources: List[GeoresourceExport] = []
+    crs = data["single_export"]["crs"]
+    # 2. compute indicators
     for ind in data["single_export"]["indicators"]:
         t_time = ind.get("target_time", {})
         indicator_obj = IndicatorExport(
@@ -3528,10 +3647,10 @@ def process_export_inputs(data: dict):
         )
         selected_indicators.append(indicator_obj)
 
-    # 3. Georessourcen verarbeiten
-    for geo in data.get("georessources", []):
+    # 3. compute georessources
+    for geo in data["single_export"]["georessources"]:
         t_time = geo.get("target_time", {})
-        geo_obj = GeoressourceExport(
+        geo_obj = GeoresourceExport(
             georessource_id=geo.get("georessource_id"),
             download_formats=geo.get("download_format", []),
             target_time=TargetTime(
@@ -3543,9 +3662,5 @@ def process_export_inputs(data: dict):
         )
         selected_georessources.append(geo_obj)
 
-    return selected_indicators, selected_georessources
-
-# Beispielhafter Aufruf:
-# indicators, georessources = process_export_inputs(received_params)
-
+    return crs, selected_indicators, selected_georessources
 

@@ -1,6 +1,7 @@
 import logging
 import openapi_client
 import json
+import shutil
 import os
 import geopandas as gpd
 from openapi_client import ApiClient, ApiException
@@ -65,6 +66,7 @@ class SingleExport(ExportProcess):
                 schema_=ProcessIOSchema(
                     type_=ProcessIOType.OBJECT,
                     properties={
+                        "crs": ProcessIOSchema(type_=ProcessIOType.STRING),
                         "indicators": ProcessIOSchema(
                             type_=ProcessIOType.ARRAY,
                             items=ProcessIOSchema(
@@ -117,34 +119,50 @@ class SingleExport(ExportProcess):
     @task(cache_policy=NO_CACHE)
     def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> dict:
+            data_management_client: ApiClient,
+            job_id: str) -> dict:
         
         logger.debug("Starting execution...")
 
         # Load inputs
         inputs = config.inputs
-        print(inputs)
-        # Extract all relevant inputs
-        indicators, georessources = pykmhelper.process_export_inputs(inputs)
-        print(indicators)
-        # 3. Generate result || Main Script    
-        indicators_controller = openapi_client.IndicatorsApi(data_management_client)
-        spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+        try:
+            # Extract all relevant inputs
+            crs, indicators, georesources = pykmhelper.process_single_export_inputs(inputs)
 
-        raw_series = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(indicators[0].indicator_id, indicators[0].spatial_unit_ids[0])
-        data = json.loads(raw_series.data)
+            # 3. Generate result || Main Script
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            georesources_controller = openapi_client.GeoresourcesApi(data_management_client)
 
-        gdf = gpd.GeoDataFrame.from_features(data["features"])
+            PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
+            path = rf"{PROCESS_RESULTS_DIR}\{job_id}\export_data"
+            
+            if not os.path.isdir(path):
+                os.mkdir(path)
+            
+            if len(indicators) > 0:
+                for indicator in indicators:
+                    indicator.add_geodataframes(indicators_controller)
+                    indicator.filter_target_times()
+                    indicator.export_files_single_export(path, crs)
 
-        PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
+            if len(georesources) > 0:
+                for georesource in georesources:
+                    georesource.add_geodataframe(georesources_controller)
+                    georesource.filter_target_times()
+                    georesource.export_files_single_export(path, crs)
 
-        gdf.to_file(f"{PROCESS_RESULTS_DIR}/ExportTest.GeoJSON", driver="GeoJSON")
-        print(gdf.head())
-        return {
-            "status": "successful",
-            "file": {
-                "href": "127.0.0.1:8099/exports/ExportTest.GeoJSON",
-                "rel": "enclosure",
-                "type": "application/octet-stream",
-                "title": "ExportTest.GeoJSON"
-        }}
+            shutil.make_archive(path, "zip", path)
+            shutil.rmtree(path)
+
+            return {
+                "status": "successful",
+                "file": {
+                    "href": f"127.0.0.1:8099/exports/{job_id}/export_data.zip",
+                    "rel": "enclosure",
+                    "type": "application/octet-stream",
+                    "title": f"{job_id}.zip"
+            }}
+        except Exception as e:
+           logger.error(f"An Error occured during single export: {e}")
+           return None

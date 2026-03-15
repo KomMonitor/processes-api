@@ -66,6 +66,7 @@ class SpatialUnitExport(ExportProcess):
                     type_=ProcessIOType.OBJECT,
                     properties={
                         "spatial_unit_id": ProcessIOSchema(type_=ProcessIOType.STRING),
+                        "crs": ProcessIOSchema(type_=ProcessIOType.STRING),
                         "indicators": ProcessIOSchema(
                             type_=ProcessIOType.ARRAY,
                             items=ProcessIOSchema(

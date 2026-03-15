@@ -195,7 +195,7 @@ class ExportTest(BasePrefectProcessor):
         inputs = config.inputs
         print(inputs)
         # Extract all relevant inputs
-        indicators, georessources = pykmhelper.process_export_inputs(inputs)
+        indicators, georessources = pykmhelper.process_single_export_inputs(inputs)
         print(indicators)
         # 3. Generate result || Main Script    
         indicators_controller = openapi_client.IndicatorsApi(data_management_client)

@@ -156,11 +156,12 @@ def send_report(path):
     return send_from_directory('results', path)
 
 RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', '/tmp')
-@APP.route('/exports/<filename>')
+@APP.route('/exports/<job_id>/<filename>')
 @require_oauth()
-def download_file(filename):
+def download_file(job_id, filename):
+    dir = rf"{RESULTS_DIR}\{job_id}"
     return send_from_directory(
-        directory=RESULTS_DIR,
+        directory=dir,
         path=filename,
         as_attachment=True,
         mimetype='application/octet-stream'
