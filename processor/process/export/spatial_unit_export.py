@@ -1,8 +1,8 @@
 import logging
 import openapi_client
-import json
 import os
-import geopandas as gpd
+import shutil
+import openpyxl
 from openapi_client import ApiClient, ApiException
 from prefect import task, get_run_logger, Task, runtime, flow
 from prefect.cache_policies import NO_CACHE
@@ -98,19 +98,54 @@ class SpatialUnitExport(ExportProcess):
     @task(cache_policy=NO_CACHE)
     def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
-            data_management_client: ApiClient) -> dict:
+            data_management_client: ApiClient,
+            job_id: str) -> dict:
         
         logger.debug("Starting execution...")
 
-        # Load inputs
-        inputs = config.inputs
-        print(inputs)
-        # Extract all relevant inputs
-        indicators, georessources = pykmhelper.process_export_inputs(inputs)
-        print(indicators)
-        # 3. Generate result || Main Script    
-        indicators_controller = openapi_client.IndicatorsApi(data_management_client)
-        spatial_unit_controller = openapi_client.SpatialUnitsApi(data_management_client)
+        try:
+            # Load inputs
+            inputs = config.inputs
+            print(inputs)
+            # Extract all relevant inputs
+            # in this case every IndicatorExport item of indicators has only one spatial unit id
+            crs, format, indicators = pykmhelper.process_spatial_unit_export_inputs(inputs)
 
-        return None
-        
+            # 3. Generate result || Main Script
+            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+
+            PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
+            path = rf"{PROCESS_RESULTS_DIR}\{job_id}\export_data"
+
+            if not os.path.isdir(path):
+                os.mkdir(path)
+
+            if len(indicators) > 0:
+                for indicator in indicators:
+                    indicator.add_geodataframes(indicators_controller)
+                    indicator.filter_target_times()
+                    if "GEOPACKAGE" in format:
+                        indicator.export_gpkg_spatial_unit_export(path, crs)
+
+                if "CSV" in format:
+                    filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
+                    merged_gdf.to_csv(rf"{path}\{filename}.csv")
+
+                if "EXCEL" in format:
+                    filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
+                    merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
+
+            shutil.make_archive(path, "zip", path)
+            shutil.rmtree(path)
+
+            return {
+                "status": "successful",
+                "file": {
+                    "href": f"127.0.0.1:8099/exports/{job_id}/export_data.zip",
+                    "rel": "enclosure",
+                    "type": "application/octet-stream",
+                    "title": f"{job_id}.zip"
+            }}
+        except Exception as e:
+          logger.error(f"An Error occured during spatial unit export: {e}")
+          return None

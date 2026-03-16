@@ -15,9 +15,10 @@ from logging import Logger
 from enum import Enum
 from typing import Optional, Tuple, List
 from dataclasses import dataclass, field
-
+import openpyxl
 import geojson
 import geopandas as gpd
+import pandas as pd
 import numpy
 import shapely
 from openapi_client import IndicatorOverviewType, ApiException
@@ -3474,11 +3475,6 @@ def continuity_consecutive_n_days(feature, targetDate, numberOfDays):
     return trend
 
 
-#TODO
-
-# Process Parameter (Objekt oder Dictionary)
-
-# prefect get_run_logger() schon im KmHelper (schonmal vorbereiten)
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
@@ -3568,6 +3564,27 @@ class IndicatorExport:
             for format in self.download_formats:
                 export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf)
                 
+    def export_gpkg_spatial_unit_export(self, path, crs):
+        for spatial_unit, gdf in self.spatial_unit_gdfs.items():
+            gdf.to_crs(crs=crs, inplace=True)
+
+            if "FID" in gdf.columns:
+                gdf.rename(columns={"FID": "km_fid"}, inplace=True)
+
+            filename = self.spatial_unit_names[spatial_unit]
+            filepath = rf"{path}\{filename}.gpkg"
+            gdf.to_file(filepath, driver="GPKG", layer=self.indicator_name)
+
+    def export_gpkg_multiple_export(self, path, crs):
+        for spatial_unit, gdf in self.spatial_unit_gdfs.items():
+            gdf.to_crs(crs=crs, inplace=True)
+
+            if "FID" in gdf.columns:
+                gdf.rename(columns={"FID": "km_fid"}, inplace=True)
+
+            filename = self.indicator_name
+            filepath = rf"{path}\{filename}.gpkg"
+            gdf.to_file(filepath, driver="GPKG", layer=self.spatial_unit_names[spatial_unit])
                 
     
 @dataclass
@@ -3615,7 +3632,7 @@ def export_gdf_to_fileformat(format: str, path: str, filename: str, gdf: gpd.Geo
     """
     if "FID" in gdf.columns:
         gdf.rename(columns={"FID": "km_fid"}, inplace=True)
-                    
+
     if format == "GEOPACKAGE":
         gdf.to_file(rf"{path}\{filename}.gpkg", driver="GPKG", index=False)
     elif format == "SHAPE":
@@ -3626,6 +3643,44 @@ def export_gdf_to_fileformat(format: str, path: str, filename: str, gdf: gpd.Geo
         gdf.to_excel(rf"{path}\{filename}.xlsx", index=False)
     elif format == "CSV":
         gdf.to_csv(rf"{path}\{filename}.csv", index=False)
+
+def merge_multiple_dataframes(indicators: list):
+    gdfs = {}
+    processed_gdfs = []
+
+    for indicator in indicators:
+        for spatial_unit, gdf in indicator.spatial_unit_gdfs.items():
+            columns = list(gdf.columns)
+            keep_columns = [item for item in columns if indicator_date_prefix in item]
+            keep_columns.append("ID")
+            remove_columns = [col for col in columns if not col in keep_columns]
+
+            filename = indicator.spatial_unit_names[spatial_unit]
+            gdf.drop(columns=remove_columns, inplace=True)
+            gdfs[indicator.indicator_name] = gdf
+
+    for name, gdf in gdfs.items():
+        gdf_long = gdf.melt(
+            id_vars=["ID"],
+            var_name="Datum",
+            value_name=name
+        )
+        processed_gdfs.append(gdf_long)
+
+    # 2. Alle DataFrames nacheinander über FID und Datum zusammenführen
+    final_gdf = processed_gdfs[0]
+    for next_gdf in processed_gdfs[1:]:
+        final_gdf = pd.merge(final_gdf, next_gdf, on=["ID", "Datum"], how="outer")
+
+    return filename, final_gdf
+
+def create_target_time(t_time: dict) -> TargetTime:
+    return TargetTime(
+        mode=t_time.get("mode"),
+        include_dates=t_time.get("include_dates", []),
+        start_date=t_time.get("start_date"),
+        end_date=t_time.get("end_date")
+    )
 
 def process_single_export_inputs(data: dict):
     selected_indicators: List[IndicatorExport] = []
@@ -3638,12 +3693,7 @@ def process_single_export_inputs(data: dict):
             indicator_id=ind.get("indicator_id"),
             spatial_unit_ids=ind.get("spatial_unit_ids", []),
             download_formats=ind.get("download_format", []),
-            target_time=TargetTime(
-                mode=t_time.get("mode"),
-                include_dates=t_time.get("include_dates", []),
-                start_date=t_time.get("start_date"),
-                end_date=t_time.get("end_date")
-            )
+            target_time=create_target_time(t_time)
         )
         selected_indicators.append(indicator_obj)
 
@@ -3653,14 +3703,42 @@ def process_single_export_inputs(data: dict):
         geo_obj = GeoresourceExport(
             georessource_id=geo.get("georessource_id"),
             download_formats=geo.get("download_format", []),
-            target_time=TargetTime(
-                mode=t_time.get("mode"),
-                include_dates=t_time.get("include_dates", []),
-                start_date=t_time.get("start_date"),
-                end_date=t_time.get("end_date")
-            )
+            target_time=create_target_time(t_time)
         )
         selected_georessources.append(geo_obj)
 
     return crs, selected_indicators, selected_georessources
 
+def process_spatial_unit_export_inputs(data: dict):
+    selected_indicators: List[IndicatorExport] = []
+    crs = data["spatial_unit"]["crs"]
+    format = data["spatial_unit"]["download_format"]
+    spatial_unit = data["spatial_unit"]["spatial_unit_id"]
+    # 2. compute indicators
+    for ind in data["spatial_unit"]["indicators"]:
+        t_time = ind.get("target_time", {})
+        indicator_obj = IndicatorExport(
+            indicator_id=ind.get("indicator_id"),
+            spatial_unit_ids=[spatial_unit],
+            download_formats=None,
+            target_time=create_target_time(t_time)
+        )
+        selected_indicators.append(indicator_obj)
+        
+    return crs, format, selected_indicators
+
+def process_multiple_export_inputs(data: dict):
+    selected_indicators: List[IndicatorExport] = []
+    crs = data["multiple_export"]["crs"]
+    # 2. compute indicators
+    for ind in data["multiple_export"]["indicators"]:
+        t_time = ind.get("target_time", {})
+        indicator_obj = IndicatorExport(
+            indicator_id=ind.get("indicator_id"),
+            spatial_unit_ids=ind.get("spatial_unit_ids", []),
+            download_formats=None,
+            target_time=create_target_time(t_time)
+        )
+        selected_indicators.append(indicator_obj)
+        
+    return crs, selected_indicators
