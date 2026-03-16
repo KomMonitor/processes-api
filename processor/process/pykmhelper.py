@@ -922,6 +922,40 @@ def filter_feature_lifespan(feature_collection, targetDate: str):
 
     return result_collection
     
+def filter_feature_lifespan_start_end(feature_collection, start: str, end: str):
+    """Applys a filter on a feature collection. Therefore it gets checked, whether a specified "targetDate" is included in the lifespan of each feature of the collection.
+
+    Args:
+        feature_collection (FeatureCollection): a valid GeoJSON Feature Collection with a number of features the shall be filtered
+        targetDate (str): a date in the form 'YYYY-MM-DD' which should be inside the features lifespan
+
+    Returns:
+        FeatureCollection: returns the FeatureCollection where all features are valid for the submitted targetDate
+    """
+    start = formatStringAsDate(start)
+    end = formatStringAsDate(end)
+
+    result_collection = copy.deepcopy(feature_collection)
+    del result_collection["features"]
+    result_collection["features"] = []
+
+    for feature in feature_collection["features"]:
+        startDate = formatStringAsDate(feature["properties"]["validStartDate"])
+        if "validEndDate" in feature["properties"]:
+            if not feature["properties"]["validEndDate"] is None:
+                endDate = formatStringAsDate(feature["properties"]["validEndDate"])
+            else:
+                endDate = datetime.date.today()
+        else: 
+            endDate = datetime.date.today()
+
+        if startDate <= start <= endDate or startDate <= end <= endDate:
+            result_collection["features"].append(feature)
+
+    if len(result_collection["features"]) == 0 and len(feature_collection["features"]) > 0:
+        throwError(f"None of the features has a lifespan which contains the requested timespan: {start} - {end}")
+
+    return result_collection
 # Classes designed for use in km-script-resources
 # class ProcessingError:
 #     resource_type: str
@@ -3612,7 +3646,9 @@ class GeoresourceExport:
                 feature_collection = filter_feature_lifespan(feature_collection, date)
             self.gdf = gpd.GeoDataFrame.from_features(feature_collection["features"], crs="EPSG:4326")
         elif self.target_time.mode == "START_END":
-            throwError("Time-mode 'START_END' is not yet supported for georessource-exports.")
+            feature_collection = json.loads(self.gdf.to_json())
+            feature_collection = filter_feature_lifespan_start_end(feature_collection, self.target_time.start_date, self.target_time.end_date)
+            self.gdf = gpd.GeoDataFrame.from_features(feature_collection["features"], crs="EPSG:4326")
         
     def export_files_single_export(self, path, crs):
         self.gdf.to_crs(crs=crs, inplace=True)

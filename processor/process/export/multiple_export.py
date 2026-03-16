@@ -119,13 +119,15 @@ class MultipleExport(ExportProcess):
 
             if not os.path.isdir(path):
                 os.mkdir(path)
-
-            if len(indicators) > 0:
-                for indicator in indicators:
-                    indicator.add_geodataframes(indicators_controller)
-                    indicator.filter_target_times()
-                    indicator.export_gpkg_multiple_export(path, crs)
-
+            try:
+                if len(indicators) > 0:
+                    for indicator in indicators:
+                        indicator.add_geodataframes(indicators_controller)
+                        indicator.filter_target_times()
+                        indicator.export_gpkg_multiple_export(path, crs)
+            except RuntimeError as e:
+                logger.error(f"A processing-error occured during multiple indicator export: {e}")
+                
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
 

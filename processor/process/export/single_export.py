@@ -139,18 +139,24 @@ class SingleExport(ExportProcess):
             
             if not os.path.isdir(path):
                 os.mkdir(path)
-            
-            if len(indicators) > 0:
-                for indicator in indicators:
-                    indicator.add_geodataframes(indicators_controller)
-                    indicator.filter_target_times()
-                    indicator.export_files_single_export(path, crs)
 
-            if len(georesources) > 0:
-                for georesource in georesources:
-                    georesource.add_geodataframe(georesources_controller)
-                    georesource.filter_target_times()
-                    georesource.export_files_single_export(path, crs)
+            try:
+                if len(indicators) > 0:
+                    for indicator in indicators:
+                        indicator.add_geodataframes(indicators_controller)
+                        indicator.filter_target_times()
+                        indicator.export_files_single_export(path, crs)
+            except RuntimeError as e:
+                logger.error(f"A processing-error occured during indicators single export: {e}")
+
+            try:
+                if len(georesources) > 0:
+                    for georesource in georesources:
+                        georesource.add_geodataframe(georesources_controller)
+                        georesource.filter_target_times()
+                        georesource.export_files_single_export(path, crs)
+            except RuntimeError as e:
+                logger.error(f"A processing-error occured during georesources single export: {e}")
 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)

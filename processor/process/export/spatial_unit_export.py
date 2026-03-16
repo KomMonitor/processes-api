@@ -120,20 +120,23 @@ class SpatialUnitExport(ExportProcess):
             if not os.path.isdir(path):
                 os.mkdir(path)
 
-            if len(indicators) > 0:
-                for indicator in indicators:
-                    indicator.add_geodataframes(indicators_controller)
-                    indicator.filter_target_times()
-                    if "GEOPACKAGE" in format:
-                        indicator.export_gpkg_spatial_unit_export(path, crs)
+            try:
+                if len(indicators) > 0:
+                    for indicator in indicators:
+                        indicator.add_geodataframes(indicators_controller)
+                        indicator.filter_target_times()
+                        if "GEOPACKAGE" in format:
+                            indicator.export_gpkg_spatial_unit_export(path, crs)
 
-                if "CSV" in format:
-                    filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                    merged_gdf.to_csv(rf"{path}\{filename}.csv")
+                    if "CSV" in format:
+                        filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
+                        merged_gdf.to_csv(rf"{path}\{filename}.csv")
 
-                if "EXCEL" in format:
-                    filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                    merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
+                    if "EXCEL" in format:
+                        filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
+                        merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
+            except RuntimeError as e:
+                logger.error(f"A processing-error occured during spatial unit indicator export: {e}")
 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
