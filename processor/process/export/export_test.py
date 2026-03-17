@@ -18,7 +18,7 @@ except ImportError:
 try:
     from ..pykmhelper import IndicatorExport, GeoressourceExport, TargetTime
 except ImportError:
-    from processor.process.pykmhelper import IndicatorExport, GeoressourceExport, TargetTime
+    from processor.process.pykmhelper import IndicatorExport, GeoresourceExport, TargetTime
 
 try:
     from ..base import KommonitorProcessConfig, KommonitorResult, DataManagementException, store_output_as_file, \
