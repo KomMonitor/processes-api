@@ -4,16 +4,24 @@ import glob
 import os
 import secrets
 
+import httpx
 from authlib.integrations.flask_oauth2 import ResourceProtector
 from flask import Flask, send_from_directory, request
+
+from prefect.client.orchestration import get_client
+from prefect.server.schemas import filters
 from werkzeug.utils import secure_filename
 
 from flask_cors import CORS
 
 from auth import KomMonitorIntrospectTokenValidator
 from process.custom import km_processes
+from process import utils
 
 import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 if not os.getenv("PYGEOAPI_CONFIG"):
     os.environ["PYGEOAPI_CONFIG"] = os.path.join(os.path.dirname(__file__), "default-config.yml")
@@ -21,9 +29,14 @@ if not os.getenv("PYGEOAPI_OPENAPI"):
     os.environ["PYGEOAPI_OPENAPI"] = os.path.join(os.path.dirname(__file__), "default-openapi.yml")
 
 KOMMONITOR_CORS_ORIGIN = os.getenv('KOMMONITOR_PROCESSES_API_ALLOWED_CORS_ORIGINS', "http://localhost:8000")
+JOB_STORAGE_DURATION = os.getenv('JOB_STORAGE_DURATION', "P30D")
+JOB_CLEAN_ENABLED = os.getenv('JOB_CLEAN_ENABLED', "False")
+JOB_CLEAN_CRON = os.getenv('JOB_CLEAN_CRON', "0 0 * * *")
 
 from pygeoapi import flask_app
 from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, processes_api, execute_from_flask
+
+JOB_CLEAN_NAME = "pygeoapi_job_clean"
 
 require_oauth = ResourceProtector()
 require_oauth.register_token_validator(KomMonitorIntrospectTokenValidator())
@@ -174,7 +187,7 @@ def parse_processes(package: str) -> None:
     """
     processes = flask_app.api_.manager.processes
     for process in glob.glob(f"process/{package}/*.py"):
-        print(process)
+        logger.debug(process)
         with open(process) as fh:
             root = ast.parse(fh.read())
             for node in ast.iter_child_nodes(root):
@@ -190,29 +203,65 @@ def parse_processes(package: str) -> None:
     api_.config['resources'] = processes
 
 
+async def check_deployment_exists(deployment_name) -> bool:
+    async with get_client() as client:
+        deployments = await client.read_deployments(
+            deployment_filter=filters.DeploymentFilter(
+                name=filters.DeploymentFilterName(any_=[deployment_name])
+            )
+        )
+        if deployments:
+            return True
+        else:
+            return False
+
+
+async def deploy_job_clean():
+    source_name = os.path.dirname(os.path.abspath(utils.__file__))
+    module_name = os.path.basename(utils.__file__)
+    entrypoint = str.join(":", [module_name, "clean_job_storage_flow"])
+    run_params = {
+        "job_storage_duration": JOB_STORAGE_DURATION
+    }
+
+    try:
+        deployment = await asyncio.wait_for(
+            utils.clean_job_storage_flow.from_source(source=source_name, entrypoint=entrypoint,),timeout=10
+        )
+        deploy_id = await deployment.deploy(
+            name=JOB_CLEAN_NAME,
+            cron=JOB_CLEAN_CRON,
+            work_pool_name="kommonitor-work-pool",
+            parameters=run_params
+        )
+        logger.info(f'Successfully created deployment for job cleaning {deploy_id}')
+    except httpx.ConnectError as err:
+        logger.info(f"Could not connect to prefect server to create deployment for job cleaning: {str(err)}")
+
+
+async def init_job_clean():
+    # await utils.clean_job_storage_flow(JOB_STORAGE_DURATION)
+    deployment_exists = await check_deployment_exists(JOB_CLEAN_NAME)
+    if deployment_exists:
+        logger.info("Deployment for job cleaning already exists.")
+    else:
+        await deploy_job_clean()
+
+
 async def init():
     # Scan for available processes
     parse_processes("kommonitor")
     parse_processes("custom")
     parse_processes("export")
 
-    # deployment = await Deployment.build_from_flow(
-    #  flow=aggregate_sum_flow,
-    #  name="example",
-    #  version="1",
-    #  tags=["demo"],
-    # )
-
-    # deployment.schedule = CronSchedule(
-    #  cron="*/5 * * * *"
-    # )
-    # await deployment.apply()
+    if JOB_CLEAN_ENABLED:
+        await init_job_clean()
     pass
 
 asyncio.run(init())
 
-def run():
 
+def run():
     APP.run(debug=False,
             host=api_.config['server']['bind']['host'],
             port=api_.config['server']['bind']['port'])

@@ -63,7 +63,7 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
                         "longTitle": "Prozentualer Anteil für eine Teilmenge gewählter Punktobjekte pro Gebietskörperschaft",
                         "apiName": processName,
                         "calculation_info": "Prozentualer Anteil gewählter Punkte innerhalb jedes Raumeinheits-Features. Auswahl: Anwenden eines Filters durch eine Objekteigenschaft",
-                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><i>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</i>  <br/> <i>Auswahlkriterium:</i> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Berechnung gemäß Geodatenanalyse<br/><em>Prozentualer Anteil der Auswahl an allen Punkten des Datensatzes G<sub>1</sub> pro Raumeinheits-Feature</em>  <br/> <em>Auswahlkriterium:</em> georesource_filter_legend <br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "inputBoxes": [
                             {
                             "id": "georesource_id",
@@ -126,10 +126,11 @@ class KmGeoresourceShareByPropertyValue(KommonitorProcess):
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
+        comp_filter = inputs["comp_filter"]
         computation_georecources_id = inputs["georesource_id"]
-        computation_filter_property = inputs["compFilterProp"]
-        computation_filter_operator = inputs["compFilterOperator"]
-        computation_filter_value = inputs["compFilterPropVal"]
+        computation_filter_property = comp_filter["compFilterProp"]
+        computation_filter_operator = comp_filter["compFilterOperator"]
+        computation_filter_value = comp_filter["compFilterPropVal"]
 
         # Init object to store computation results
         result = KommonitorResult()

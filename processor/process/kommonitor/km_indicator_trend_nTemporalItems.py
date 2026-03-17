@@ -201,7 +201,7 @@ class KmIndicatorTrendNTemporalItems(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 

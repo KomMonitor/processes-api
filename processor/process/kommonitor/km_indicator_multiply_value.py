@@ -65,7 +65,7 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
                         "calculation_info": "Produkt aus Indikator und Wert",
                         "formula": "$ I \\times x $",
                         "legend": "",
-                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]",
+                        "dynamicLegend": "<br/> $I_{1}$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $x$: ${num_value} ",
                         "inputBoxes": [
                             {
                                 "id": "computation_id",
@@ -176,7 +176,7 @@ class KmIndicatorMultiplyValue(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 

@@ -62,7 +62,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                     value=[{
                         "longTitle": "Statistiken anhand Eigenschaft der punktbasierten Georessource",
                         "apiName": processName,
-                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <i>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´</i> für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</i><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
+                        "dynamicLegend": "<b>Geodatenanalyse: Statistische Berechnung <em>´${compMeth}´ anhand Objekteigenschaft ´${compProp}´ für alle Punktobjekte des Datensatzes G<sub>1</sub> innerhalb des jeweiligen Raumeinheits-Features</em><b><br/><br/>Legende zur Geodatenanalyse</b><br/>G<sub>1</sub>: ${georesourceSelection.datasetName}",
                         "calculation_info": "Identifikation aller Punkte innerhalb jedes Raumeinheits-Features mit anschließender statistischen Indikatorenberechnung anhand gewählter Objekt-Eigenschaft",
                         "inputBoxes": [
                             {
@@ -134,11 +134,12 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
                         {
                             "apiName": "SUM",
                             "displayName": "Summe",
-                        },
-                        {
-                            "apiName": "STANDARD_DEVIATION",
-                            "displayName": "Standardabweichung",
                         }
+                         ,
+                         {
+                             "apiName": "STANDARD_DEVIATION",
+                             "displayName": "Standardabweichung",
+                         }
                     ],                    
                     default={
                         "apiName": "MIN",
@@ -250,7 +251,7 @@ class KmGeoresourceMiscStatistics(KommonitorProcess):
             return JobStatus.successful, result, job_summary
         except DataManagementException as e:
             # 4.2 Catch possible errors cleanly
-            if e.spatial_unit and bool(job_summary):
+            if e.spatial_unit and not job_summary._su_summary == None:
                 job_summary.add_data_management_api_error(e.resource_type, e.id, e.error_code, e)
                 job_summary.complete_spatial_unit_summary()
             else:

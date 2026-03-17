@@ -58,9 +58,9 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
                     value=[{
                         "longTitle": "Relative Veränderung bezogen auf einen Referenzzeitpunkt",
                         "apiName": processName,
-                        "formula": "$$ 100 \\times \\frac{A_{N} - A_{M}}{A_{M}} $$",
+                        "formula": "$$ 100 \\times \\frac{I_{N} - I_{M}}{I_{M}} $$",
                         "legend": "<br/>$N$ = Ziel-Zeitpunkt<br/>$M$ = fester Referenz-Zeitpunkt ",
-                        "dynamicLegend": "<br/> $A$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt '${reference_date}'",
+                        "dynamicLegend": "<br/> $I$: ${compIndicatorSelection.indicatorName} [ ${compIndicatorSelection.unit} ]<br/> $N$: Ziel-Zeitpunkt<br/> $M$: fester Referenz-Zeitpunkt '${reference_date}'",
                         "inputBoxes": [
                             {
                             "id": "computation_id",
@@ -171,7 +171,7 @@ class KmIndicatorRelChangeRefDate(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 

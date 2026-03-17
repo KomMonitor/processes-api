@@ -200,7 +200,7 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
-                collection.check_applicable_spatial_unit_features(job_summary)
+                all_times = collection.check_applicable_spatial_unit_features(job_summary, all_times)
 
                 logger.debug("Retrieved required indicators successfully")
 
@@ -208,9 +208,9 @@ class KmIndicatorRelChangeNTemporalItems(KommonitorProcess):
                 if temporal_type == "YEARS":
                     func = pykmhelper.changeRelative_n_years_percent
                 elif temporal_type == "MONTHS":
-                    func = pykmhelper.changeAbsolute_n_months
+                    func = pykmhelper.changeRelative_n_months_percent
                 elif temporal_type == "DAYS":
-                    func = pykmhelper.changeAbsolute_n_days
+                    func = pykmhelper.changeRelative_n_days_percent
 
                 # iterate over all features an append the indicator here happen the main calculations for the requested values
                 indicator_values = []  
