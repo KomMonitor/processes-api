@@ -126,7 +126,7 @@ class MultipleExport(ExportProcess):
                         indicator.filter_target_times()
                         indicator.export_gpkg_multiple_export(path, crs)
             except RuntimeError as e:
-                logger.error(f"A processing-error occured during multiple indicator export: {e}")
+                logger.error(f"A processing-error occurred during multiple indicator export: {e}")
                 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
@@ -140,6 +140,6 @@ class MultipleExport(ExportProcess):
                     "title": f"{job_id}.zip"
             }}
         except Exception as e:
-          logger.error(f"An Error occured during spatial unit export: {e}")
+          logger.error(f"An Error occurred during spatial unit export: {e}")
           return None
         

@@ -1010,7 +1010,7 @@ def geom2Feature(geom):
         elif geom.geom_type == "MultiPolygon":
             return geojson.Feature(id=None, geometry=shapely.MultiPolygon(geom))
     except:
-        throwError("An Error occured in function 'geom2Feature'! The geom from which the feature shall be created is none of type (Point, Linestring, Polygon, MultiPoint, MultiLineString, MultiPolygon)")
+        throwError("An Error occurred in function 'geom2Feature'! The geom from which the feature shall be created is none of type (Point, Linestring, Polygon, MultiPoint, MultiLineString, MultiPolygon)")
 
 def area(geoJSON):
     """Encapsulated geopandas function 'area' to compute the area of the submitted Features in square meters

@@ -136,7 +136,7 @@ class SpatialUnitExport(ExportProcess):
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
                         merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
             except RuntimeError as e:
-                logger.error(f"A processing-error occured during spatial unit indicator export: {e}")
+                logger.error(f"A processing-error occurred during spatial unit indicator export: {e}")
 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
@@ -150,5 +150,5 @@ class SpatialUnitExport(ExportProcess):
                     "title": f"{job_id}.zip"
             }}
         except Exception as e:
-          logger.error(f"An Error occured during spatial unit export: {e}")
+          logger.error(f"An Error occurred during spatial unit export: {e}")
           return None

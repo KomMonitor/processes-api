@@ -13,7 +13,7 @@ import time
 import requests
 from logging import Logger
 from enum import Enum
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from dataclasses import dataclass, field
 import openpyxl
 import geojson
@@ -1471,7 +1471,7 @@ def geom2Feature(geom):
         elif geom.geom_type == "MultiPolygon":
             return geojson.Feature(id=None, geometry=shapely.MultiPolygon(geom))
     except:
-        throwError("An Error occured in function 'geom2Feature'! The geom from which the feature shall be created is none of type (Point, Linestring, Polygon, MultiPoint, MultiLineString, MultiPolygon)")
+        throwError("An Error occurred in function 'geom2Feature'! The geom from which the feature shall be created is none of type (Point, Linestring, Polygon, MultiPoint, MultiLineString, MultiPolygon)")
 
 def area(geoJSON):
     """Encapsulated geopandas function 'area' to compute the area of the submitted Features in square meters
@@ -3576,8 +3576,7 @@ class IndicatorExport:
             for su in applicableSUs:
                 if su.spatial_unit_id == spatial_unit:
                     self.spatial_unit_names[spatial_unit] = su.spatial_unit_name
-            
-            
+
     def filter_target_times(self):
         for spatial_unit, gdf in self.spatial_unit_gdfs.items():
             try:
@@ -3588,7 +3587,7 @@ class IndicatorExport:
                 gdf.drop(columns=drop_columns, inplace=True)
 
             except Exception as e:
-                throwError(f"An error occured during Target-time filtering for indi. {self.indicator_id} and su {spatial_unit}: {e}")
+                throwError(f"An error occurred during Target-time filtering for indicator. {self.indicator_id} and spatial unit {spatial_unit}: {e}")
 
     def export_files_single_export(self, path, crs):
         for spatial_unit, gdf in self.spatial_unit_gdfs.items():
@@ -3718,7 +3717,7 @@ def create_target_time(t_time: dict) -> TargetTime:
         end_date=t_time.get("end_date")
     )
 
-def process_single_export_inputs(data: dict):
+def process_single_export_inputs(data: dict) -> Tuple[str, List[IndicatorExport], List[GeoresourceExport]]:
     selected_indicators: List[IndicatorExport] = []
     selected_georessources: List[GeoresourceExport] = []
     crs = data["single_export"]["crs"]
@@ -3745,7 +3744,7 @@ def process_single_export_inputs(data: dict):
 
     return crs, selected_indicators, selected_georessources
 
-def process_spatial_unit_export_inputs(data: dict):
+def process_spatial_unit_export_inputs(data: dict) -> Tuple[str, str, list[IndicatorExport]]:
     selected_indicators: List[IndicatorExport] = []
     crs = data["spatial_unit"]["crs"]
     format = data["spatial_unit"]["download_format"]
@@ -3763,7 +3762,7 @@ def process_spatial_unit_export_inputs(data: dict):
         
     return crs, format, selected_indicators
 
-def process_multiple_export_inputs(data: dict):
+def process_multiple_export_inputs(data: dict) -> Tuple[str, list[IndicatorExport]]:
     selected_indicators: List[IndicatorExport] = []
     crs = data["multiple_export"]["crs"]
     # 2. compute indicators
