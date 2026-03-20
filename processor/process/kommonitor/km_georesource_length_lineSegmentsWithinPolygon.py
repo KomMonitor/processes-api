@@ -40,9 +40,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(KmGeoresourceLengthLineSegmentsWithinPolygon.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceLengthLineSegmentsWithinPolygon.run, job_id, execution_request)
 
-class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
+class WIPKmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
