@@ -3,8 +3,8 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "processor"
-version = "0.1.0"
+name = "processes-api"
+version = "1.0.1"
 description = "Kommonitor Processes API"
 authors = [
     {name = "Sebastian Drost", email = "s.drost@52north.org"}
