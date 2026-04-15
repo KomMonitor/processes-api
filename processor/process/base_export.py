@@ -43,7 +43,8 @@ class ExportProcess(BasePrefectProcessor):
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
-        output = run(config=config, logger=logger, data_management_client=dmc, job_id=flow_id)
+        output = run(config=config, logger=logger, data_management_client=dmc, job_id=job_id, flow_id=flow_id)
+        output["userId"] = execution_request.properties["user_id"]
         logger.debug(output)
         result = store_output_as_file(flow_id, output, logger)
         close_logging(logger, handler)
@@ -56,5 +57,6 @@ class ExportProcess(BasePrefectProcessor):
             config: KommonitorProcessConfig,
             logger: logging.Logger,
             dmc: ApiClient,
-            job_id: str) -> dict:
+            job_id: str,
+            flow_id: str) -> dict:
         ...
