@@ -4,7 +4,7 @@ import time
 import requests
 from authlib.oauth2.rfc6750 import InvalidTokenError
 from authlib.oauth2.rfc7662 import IntrospectTokenValidator, IntrospectionToken
-from flask import g
+from flask import g, request as flask_request
 from oauthlib.oauth2 import OAuth2Token
 
 KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
@@ -12,6 +12,38 @@ KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
 KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 ALLOWED_ROLES = tuple(os.getenv('ALLOWED_ROLES', "kommonitor-creator").split(","))
+
+PUBLIC_PROCESSES = ["MultipleExport", "SingleExport", "SpatialUnitExport"]
+
+API_GET_PROCESSES = "get_processes"
+API_CREATE_PROCESS = "create_process"
+API_UPDATE_PROCESS = "update_process"
+API_EXECUTE_PROCESS = "execute_process_jobs"
+API_SCHEDULE_PROCESS = "schedule_process"
+API_GET_SCHEDULES = "get_schedules"
+API_SCHEDULE_EXECUTION = "schedule_execution"
+API_GET_JOBS = "get_jobs"
+API_GET_JOB_RESULT = "get_job_result"
+API_GET_JOB_RESULT_RESOURCE = "get_job_result_resource"
+API_SEND_REPORT = "send_report"
+API_DOWNLOAD_FILE = "download_file"
+
+
+def check_process_authentication_required(process_id):
+    if process_id in PUBLIC_PROCESSES:
+        return False
+    else:
+        return True
+
+
+def check_endpoint_authentication_required(endpoint, view_args):
+    if endpoint == API_DOWNLOAD_FILE:
+        return False
+    elif endpoint == API_EXECUTE_PROCESS:
+        process_id = view_args.get('process_id')
+        return check_process_authentication_required(process_id)
+    else:
+        return True
 
 
 class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
@@ -37,6 +69,16 @@ class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
         return token
 
     def validate_token(self, token, scopes, request):
+        endpoint = flask_request.endpoint
+        view_args = flask_request.view_args or {}
+
+        requires_auth = check_endpoint_authentication_required(endpoint, view_args)
+
+        if token is None:
+            if requires_auth:
+                raise InvalidTokenError()
+            return
+
         if not token or not token["active"] or token["exp"] < time.time():
             raise InvalidTokenError()
 

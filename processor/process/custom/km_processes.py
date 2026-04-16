@@ -421,14 +421,15 @@ def download_file(api: API, request: APIRequest, job_id, filedir):
         mimetype, job_output = api.manager.get_job_result(job_id)
         output = json.loads(job_output.decode('utf-8'))
         file_name = output["file"]["title"]
-        result_user_id =  output["userId"]
-        try:
-            current_user_id = g.get("user_id")
-            if result_user_id != current_user_id:
-                raise InsufficientScopeError()
-        except AttributeError as err:
-            logger.warning(err)
-
+        # If output has a userId we have to check if requesting user is allowed to fetch export results
+        if "userId" in output:
+            result_user_id =  output["userId"]
+            try:
+                current_user_id = g.get("user_id")
+                if result_user_id != current_user_id:
+                    raise InsufficientScopeError()
+            except AttributeError as err:
+                logger.warning(err)
     except JobResultNotFoundError:
         return api.get_exception(
             HTTPStatus.INTERNAL_SERVER_ERROR, headers,
