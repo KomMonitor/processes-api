@@ -427,7 +427,10 @@ def download_file(api: API, request: APIRequest, job_id, filedir):
             try:
                 current_user_id = g.get("user_id")
                 if result_user_id != current_user_id:
-                    raise InsufficientScopeError()
+                    return api.get_exception(
+                        HTTPStatus.FORBIDDEN, headers,
+                        request.format, 'JobResultNotFoundError', job_id
+                    )
             except AttributeError as err:
                 logger.warning(err)
     except JobResultNotFoundError:

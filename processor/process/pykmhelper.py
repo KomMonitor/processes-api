@@ -21,7 +21,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy
 import shapely
-from openapi_client import IndicatorOverviewType, ApiException
+from openapi_client import IndicatorOverviewType, ApiException, GeoresourcesPublicApi, IndicatorsPublicApi
 from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
 from openapi_client.exceptions import ForbiddenException
 from scipy import stats
@@ -3594,13 +3594,13 @@ class IndicatorExport:
     indicator_name: str = field(default_factory=str)
     spatial_unit_names: dict = field(default_factory=dict)
 
-    def add_geodataframes(self, indicators_controller: IndicatorsApi):
-        metadata = indicators_controller.get_indicator_by_id(self.indicator_id)
+    def add_geodataframes(self, indicators_controller: IndicatorsApi | IndicatorsPublicApi):
+        metadata = get_indicator_metadata(indicators_controller, self.indicator_id)
         applicableSUs = metadata.applicable_spatial_units
         self.indicator_name = metadata.indicator_name
         
         for spatial_unit in self.spatial_unit_ids:
-            raw_series = indicators_controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(self.indicator_id, spatial_unit)
+            raw_series = get_indicator_data(indicators_controller, self.indicator_id, spatial_unit)
             data = json.loads(raw_series.data)
 
             gdf = gpd.GeoDataFrame.from_features(data["features"], crs="EPSG:4326")
@@ -3661,9 +3661,9 @@ class GeoresourceExport:
     gdf: Optional[gpd.GeoDataFrame] = None
     georessource_name: str = field(default_factory=str)
 
-    def add_geodataframe(self, georessource_controller: GeoresourcesApi):
-        georessource = georessource_controller.get_all_georesource_features_by_id_without_preload_content(self.georessource_id)
-        metadata = georessource_controller.get_georesource_by_id(self.georessource_id)
+    def add_geodataframe(self, georessource_controller: GeoresourcesApi | GeoresourcesPublicApi):
+        georessource = get_georesource_features(georessource_controller, self.georessource_id)
+        metadata = get_georesource_metadata(georessource_controller, self.georessource_id)
         data = json.loads(georessource.data)
 
         self.gdf = gpd.GeoDataFrame.from_features(data["features"], crs="EPSG:4326")
@@ -3810,3 +3810,37 @@ def process_multiple_export_inputs(data: dict) -> Tuple[str, list[IndicatorExpor
         selected_indicators.append(indicator_obj)
         
     return crs, selected_indicators
+
+def get_indicator_data(controller: IndicatorsApi | IndicatorsPublicApi, indicator_id: str, spatial_unit_id: str):
+    if isinstance(controller, IndicatorsApi):
+        return controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(indicator_id, spatial_unit_id)
+    elif isinstance(controller, IndicatorsPublicApi):
+        return controller.get_public_indicator_by_spatial_unit_id_and_id_without_preload_content(indicator_id, spatial_unit_id)
+    else:
+        raise NotImplementedError()
+
+def get_indicator_metadata(controller: IndicatorsApi | IndicatorsPublicApi, indicator_id: str):
+    if isinstance(controller, IndicatorsApi):
+        return controller.get_indicator_by_id(indicator_id)
+    elif isinstance(controller, IndicatorsPublicApi):
+        return controller.get_public_indicator_by_id(indicator_id)
+    else:
+        raise NotImplementedError()
+
+def get_georesource_features(controller: GeoresourcesApi | GeoresourcesPublicApi, georesource_id: str):
+    if isinstance(controller, GeoresourcesApi):
+        return controller.get_all_georesource_features_by_id_without_preload_content(georesource_id)
+    elif isinstance(controller, GeoresourcesPublicApi):
+        return controller.get_all_public_georesource_features_by_id_without_preload_content(georesource_id)
+    else:
+        raise NotImplementedError()
+
+def get_georesource_metadata(controller: GeoresourcesApi | GeoresourcesPublicApi, georesource_id: str):
+    if isinstance(controller, GeoresourcesApi):
+        return controller.get_georesource_by_id(georesource_id)
+    elif isinstance(controller, GeoresourcesPublicApi):
+        return controller.get_public_georesource_by_id(georesource_id)
+    else:
+        raise NotImplementedError()
+
+
