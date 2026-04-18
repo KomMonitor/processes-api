@@ -3627,6 +3627,7 @@ class IndicatorExport:
             gdf.to_crs(crs=crs, inplace=True)
             su_name = self.spatial_unit_names[spatial_unit]
             filename = f"{self.indicator_name}_{su_name}"
+            gdf = gdf.drop(columns="geometry")
             for format in self.download_formats:
                 export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf)
                 
