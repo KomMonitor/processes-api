@@ -99,7 +99,8 @@ class MultipleExport(ExportProcess):
     def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient,
-            job_id: str) -> dict:
+            job_id: str,
+            flow_id: str) -> dict:
         
         logger.debug("Starting execution...")
 
@@ -115,7 +116,7 @@ class MultipleExport(ExportProcess):
             indicators_controller = openapi_client.IndicatorsApi(data_management_client)
 
             PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
-            path = rf"{PROCESS_RESULTS_DIR}\{job_id}\export_data"
+            path = rf"{PROCESS_RESULTS_DIR}\{flow_id}\export_data"
 
             if not os.path.isdir(path):
                 os.mkdir(path)
@@ -137,7 +138,7 @@ class MultipleExport(ExportProcess):
                     "href": f"127.0.0.1:8099/exports/{job_id}/export_data.zip",
                     "rel": "enclosure",
                     "type": "application/octet-stream",
-                    "title": f"{job_id}.zip"
+                    "title": f"{flow_id}/export_data.zip"
             }}
         except Exception as e:
           logger.error(f"An Error occurred during spatial unit export: {e}")

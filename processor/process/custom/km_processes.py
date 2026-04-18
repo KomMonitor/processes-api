@@ -1,28 +1,31 @@
+from authlib.oauth2.rfc6750 import InsufficientScopeError
 from pygeoapi.api import (
-    SYSTEM_LOCALE
+    SYSTEM_LOCALE, apply_gzip
 )
 import json
 import logging
 import urllib.parse
 from datetime import datetime, timezone
 from http import HTTPStatus
-from typing import Tuple
+from typing import Tuple, Union
 
 from pygeoapi import l10n
 from pygeoapi.api import (
     APIRequest, API, SYSTEM_LOCALE, F_JSON, FORMAT_TYPES, F_HTML
 )
+from pygeoapi.flask_app import api_, get_response
 from pygeoapi.process.base import (
-    JobNotFoundError, ProcessorExecuteError
+    JobNotFoundError, ProcessorExecuteError, JobResultNotFoundError
 )
 from pygeoapi.process.manager.base import Subscriber
 from pygeoapi.util import (
-    render_j2_template, JobStatus, RequestedProcessExecutionMode,
+    json_serial, render_j2_template, JobStatus, RequestedProcessExecutionMode,
     to_json, DATETIME_FORMAT)
 from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
 from pygeoapi_prefect.process.base import ScheduleNotFoundError
+from flask import send_from_directory, Response, Request, g
 
 # class ScheduleNotFoundError(Exception):
 #     pass
@@ -33,6 +36,37 @@ if __name__ != '__main__':
         gunicorn_logger = logging.getLogger('gunicorn.error')
         logger.handlers = gunicorn_logger.handlers
         logger.setLevel(gunicorn_logger.level)
+
+
+def execute_from_flask_custom(api_function, request: Request, *args,
+                       skip_valid_check=False) -> Response:
+    """
+    Executes API function from Flask
+
+    :param api_function: API function
+    :param request: request object
+    :param *args: variable length additional arguments
+    :param skip_validity_check: bool
+
+    :returns: A Response instance
+    """
+
+    api_request = APIRequest.from_flask(request, api_.locales)
+
+    content: Union[str, bytes]
+
+    if not skip_valid_check and not api_request.is_valid():
+        headers, status, content = api_.get_format_exception(api_request)
+    else:
+        result = api_function(api_, api_request, *args)
+        if isinstance(result, Response):
+            return result
+        headers, status, content = result
+        content = apply_gzip(headers, content)
+
+    return get_response((headers, status, content))
+
+
 
 def schedule_process(api: API, request: APIRequest,
                     process_id) -> Tuple[dict, int, str]:
@@ -349,3 +383,65 @@ def execute_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, 
     logger.info(response)
     # TODO: this response does not have any headers
     return {}, http_status, to_json(response, api.pretty_print)
+
+
+def download_file(api: API, request: APIRequest, job_id, filedir):
+    headers = request.get_response_headers(SYSTEM_LOCALE,
+                                           **api.api_headers)
+    try:
+        job = api.manager.get_job(job_id)
+    except JobNotFoundError:
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, headers,
+            request.format, 'NoSuchJob', job_id
+        )
+
+    status = JobStatus[job['status']]
+
+    if status == JobStatus.running:
+        msg = 'job still running'
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, headers,
+            request.format, 'ResultNotReady', msg)
+
+    elif status == JobStatus.accepted:
+        # NOTE: this case is not mentioned in the specification
+        msg = 'job accepted but not yet running'
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, headers,
+            request.format, 'ResultNotReady', msg)
+
+    elif status == JobStatus.failed:
+        msg = 'job failed'
+        return api.get_exception(
+            HTTPStatus.BAD_REQUEST, headers, request.format,
+            'InvalidParameterValue', msg)
+
+    try:
+        mimetype, job_output = api.manager.get_job_result(job_id)
+        output = json.loads(job_output.decode('utf-8'))
+        file_name = output["file"]["title"]
+        # If output has a userId we have to check if requesting user is allowed to fetch export results
+        if "userId" in output:
+            result_user_id =  output["userId"]
+            try:
+                current_user_id = g.get("user_id")
+                if result_user_id != current_user_id:
+                    return api.get_exception(
+                        HTTPStatus.FORBIDDEN, headers,
+                        request.format, 'JobResultNotFoundError', job_id
+                    )
+            except AttributeError as err:
+                logger.warning(err)
+    except JobResultNotFoundError:
+        return api.get_exception(
+            HTTPStatus.INTERNAL_SERVER_ERROR, headers,
+            request.format, 'JobResultNotFound', job_id
+        )
+    return send_from_directory(
+        directory=filedir,
+        path=file_name,
+        as_attachment=True,
+        mimetype='application/octet-stream'
+    )
+
