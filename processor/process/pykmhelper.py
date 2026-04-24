@@ -3750,7 +3750,7 @@ def merge_multiple_dataframes(indicators: list):
 def create_target_time(t_time: dict) -> TargetTime:
     valid_modes = ["SINGLE", "START_END", "ALL"]
     
-    mode = t_time["mode"] if t_time["mode"] in valid_modes else throwError(f"Mode {t_time["mode"]} not supported, choose between {valid_modes}")
+    mode = t_time["mode"] if t_time["mode"] in valid_modes else throwError(f"Mode {t_time['mode']} not supported, choose between {valid_modes}")
     include_dates = t_time.get("include_dates", [])
     if mode == "SINGLE" and len(include_dates) == 0:
         throwError(f"You need to submit at least one value for 'include_dates' if mode 'SINGLE' is chosen.")
