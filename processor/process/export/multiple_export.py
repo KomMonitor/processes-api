@@ -139,7 +139,7 @@ class MultipleExport(ExportProcess):
             return {
                 "status": "successful",
                 "file": {
-                    "href": f"127.0.0.1:8099/exports/{job_id}/export_data.zip",
+                    "href": f"{config.server_url}/exports/{job_id}/export_data.zip",
                     "rel": "enclosure",
                     "type": "application/octet-stream",
                     "title": f"{flow_id}/export_data.zip"

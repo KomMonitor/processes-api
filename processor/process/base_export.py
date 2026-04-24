@@ -11,7 +11,7 @@ from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
 
-from .base import KommonitorProcessConfig, setup_logging, format_inputs, data_management_client, store_output_as_file, close_logging
+from .base import KommonitorProcessConfig, setup_logging, format_inputs, data_management_client, store_output_as_file, close_logging, PROCESSES_API_URL
 
 class ExportProcess(BasePrefectProcessor):
     def __init__(self, processor_def: dict):
@@ -39,7 +39,7 @@ class ExportProcess(BasePrefectProcessor):
         logger.info(f"Flow run name: {flow_id}")
 
         inputs = format_inputs(execution_request)
-        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt")
+        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt", PROCESSES_API_URL)
 
         if "user_id" in execution_request.properties:
             dmc = data_management_client(logger, execution_request, True)

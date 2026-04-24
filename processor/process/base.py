@@ -29,6 +29,7 @@ class KommonitorProcessConfig:
     job_id: str
     inputs: dict[str, any]
     output_path: str
+    server_url: str
 
 
 KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
@@ -38,6 +39,7 @@ KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
+PROCESSES_API_URL = os.getenv('PROCESSES_API_URL', "http://127.0.0.1:8099/api")
 
 @task(persist_result=False)
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
@@ -563,7 +565,7 @@ class KommonitorProcess(BasePrefectProcessor):
         logger.info(f"Flow run name: {flow_id}")
 
         inputs = format_inputs(execution_request)
-        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt")
+        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt", PROCESSES_API_URL)
         dmc = data_management_client(logger, execution_request, True)
 
         ## Run process
