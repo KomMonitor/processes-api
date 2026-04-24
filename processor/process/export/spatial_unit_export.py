@@ -138,6 +138,7 @@ class SpatialUnitExport(ExportProcess):
                         merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during spatial unit indicator export: {e}")
+                raise RuntimeError(f"A processing-error occurred during spatial unit indicator export: {e}")
 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
@@ -152,4 +153,7 @@ class SpatialUnitExport(ExportProcess):
             }}
         except Exception as e:
           logger.error(f"An Error occurred during spatial unit export: {e}")
-          return None
+          return {
+               "status": "failed",
+               "error": str(e)
+           }

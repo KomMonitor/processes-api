@@ -153,6 +153,7 @@ class SingleExport(ExportProcess):
                         indicator.export_files_single_export(path, crs)
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during indicators single export: {e}")
+                raise RuntimeError(f"A processing-error occurred during indicators single export: {e}")
 
             try:
                 if len(georesources) > 0:
@@ -162,6 +163,8 @@ class SingleExport(ExportProcess):
                         georesource.export_files_single_export(path, crs)
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during georesources single export: {e}")
+                raise RuntimeError(f"A processing-error occurred during indicators single export: {e}")
+
 
             shutil.make_archive(path, "zip", path)
             shutil.rmtree(path)
@@ -176,4 +179,7 @@ class SingleExport(ExportProcess):
             }}
         except Exception as e:
            logger.error(f"An Error occurred during single export: {e}")
-           return None
+           return {
+               "status": "failed",
+               "error": str(e)
+           }

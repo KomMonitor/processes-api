@@ -17,6 +17,7 @@ from typing import Optional, Tuple, List, Any
 from dataclasses import dataclass, field
 import openpyxl
 import geojson
+import pyproj
 import geopandas as gpd
 import pandas as pd
 import numpy
@@ -3744,74 +3745,102 @@ def merge_multiple_dataframes(indicators: list):
     return filename, final_gdf
 
 def create_target_time(t_time: dict) -> TargetTime:
+    valid_modes = ["SINGLE", "START_END", "ALL"]
+    
+    mode = t_time["mode"] if t_time["mode"] in valid_modes else throwError(f"Mode {t_time["mode"]} not supported, choose between {valid_modes}")
+    include_dates = t_time.get("include_dates", [])
+    if mode == "SINGLE" and len(include_dates) == 0:
+        throwError(f"You need to submit at least one value for 'include_dates' if mode 'SINGLE' is chosen.")
+    start_date = t_time.get("start_date")
+    end_date = t_time.get("end_date")
+    if mode == "START_END" and ( start_date is None or end_date is None ):
+        throwError(f"You need to submit values for 'start_date' and 'end_date' if mode 'START_END' is chosen.")
+    
     return TargetTime(
-        mode=t_time.get("mode"),
-        include_dates=t_time.get("include_dates", []),
-        start_date=t_time.get("start_date"),
-        end_date=t_time.get("end_date")
+        mode=mode,
+        include_dates=include_dates,
+        start_date=start_date,
+        end_date=end_date
     )
 
+def check_download_data(format: list):
+    valid_formats = ["GEOPACKAGE", "SHAPE", "GEOJSON", "EXCEL", "CSV"]
+    for form in format:
+        if not form in valid_formats:
+            throwError(f"The input-format {form} is not a valid choose between: {valid_formats}")
+    return format
+    
 def process_single_export_inputs(data: dict) -> Tuple[str, List[IndicatorExport], List[GeoresourceExport]]:
-    selected_indicators: List[IndicatorExport] = []
-    selected_georessources: List[GeoresourceExport] = []
-    crs = data["single_export"]["crs"]
-    # 2. compute indicators
-    for ind in data["single_export"]["indicators"]:
-        t_time = ind.get("target_time", {})
-        indicator_obj = IndicatorExport(
-            indicator_id=ind.get("indicator_id"),
-            spatial_unit_ids=ind.get("spatial_unit_ids", []),
-            download_formats=ind.get("download_format", []),
-            target_time=create_target_time(t_time)
-        )
-        selected_indicators.append(indicator_obj)
+    try:
+        selected_indicators: List[IndicatorExport] = []
+        selected_georessources: List[GeoresourceExport] = []
+        crs = pyproj.CRS.from_user_input(data["single_export"]["crs"])
+        # 2. compute indicators
+        for ind in data["single_export"]["indicators"]:
+            t_time = ind.get("target_time", {})
+            indicator_obj = IndicatorExport(
+                indicator_id=ind.get("indicator_id"),
+                spatial_unit_ids=ind.get("spatial_unit_ids", []),
+                download_formats=check_download_data(ind.get("download_format", [])),
+                target_time=create_target_time(t_time)
+            )
+            selected_indicators.append(indicator_obj)
 
-    # 3. compute georessources
-    for geo in data["single_export"]["georessources"]:
-        t_time = geo.get("target_time", {})
-        geo_obj = GeoresourceExport(
-            georessource_id=geo.get("georessource_id"),
-            download_formats=geo.get("download_format", []),
-            target_time=create_target_time(t_time)
-        )
-        selected_georessources.append(geo_obj)
+        # 3. compute georessources
+        for geo in data["single_export"]["georessources"]:
+            t_time = geo.get("target_time", {})
+            geo_obj = GeoresourceExport(
+                georessource_id=geo.get("georessource_id"),
+                download_formats=check_download_data(geo.get("download_format", [])),
+                target_time=create_target_time(t_time)
+            )
+            selected_georessources.append(geo_obj)
 
-    return crs, selected_indicators, selected_georessources
+        return crs, selected_indicators, selected_georessources
+    except Exception as e:
+        throwError(f"Error during processing of submitted input-values: {e}")
+
 
 def process_spatial_unit_export_inputs(data: dict) -> Tuple[str, str, list[IndicatorExport]]:
-    selected_indicators: List[IndicatorExport] = []
-    crs = data["spatial_unit"]["crs"]
-    format = data["spatial_unit"]["download_format"]
-    spatial_unit = data["spatial_unit"]["spatial_unit_id"]
-    # 2. compute indicators
-    for ind in data["spatial_unit"]["indicators"]:
-        t_time = ind.get("target_time", {})
-        indicator_obj = IndicatorExport(
-            indicator_id=ind.get("indicator_id"),
-            spatial_unit_ids=[spatial_unit],
-            download_formats=None,
-            target_time=create_target_time(t_time)
-        )
-        selected_indicators.append(indicator_obj)
-        
-    return crs, format, selected_indicators
+    try:
+        selected_indicators: List[IndicatorExport] = []
+        crs = pyproj.CRS.from_user_input(data["spatial_unit"]["crs"]) 
+        format = check_download_data(data["spatial_unit"]["download_format"])
+        spatial_unit = data["spatial_unit"]["spatial_unit_id"]
+        # 2. compute indicators
+        for ind in data["spatial_unit"]["indicators"]:
+            t_time = ind.get("target_time", {})
+            indicator_obj = IndicatorExport(
+                indicator_id=ind.get("indicator_id"),
+                spatial_unit_ids=[spatial_unit],
+                download_formats=None,
+                target_time=create_target_time(t_time)
+            )
+            selected_indicators.append(indicator_obj)
+            
+        return crs, format, selected_indicators
+    except Exception as e:
+        throwError(f"Error during processing of submitted input-values: {e}")
 
 def process_multiple_export_inputs(data: dict) -> Tuple[str, list[IndicatorExport]]:
-    selected_indicators: List[IndicatorExport] = []
-    crs = data["multiple_export"]["crs"]
-    # 2. compute indicators
-    for ind in data["multiple_export"]["indicators"]:
-        t_time = ind.get("target_time", {})
-        indicator_obj = IndicatorExport(
-            indicator_id=ind.get("indicator_id"),
-            spatial_unit_ids=ind.get("spatial_unit_ids", []),
-            download_formats=None,
-            target_time=create_target_time(t_time)
-        )
-        selected_indicators.append(indicator_obj)
-        
-    return crs, selected_indicators
-
+    try:
+        selected_indicators: List[IndicatorExport] = []
+        crs = pyproj.CRS.from_user_input(data["multiple_export"]["crs"])
+        # 2. compute indicators
+        for ind in data["multiple_export"]["indicators"]:
+            t_time = ind.get("target_time", {})
+            indicator_obj = IndicatorExport(
+                indicator_id=ind.get("indicator_id"),
+                spatial_unit_ids=ind.get("spatial_unit_ids", []),
+                download_formats=None,
+                target_time=create_target_time(t_time)
+            )
+            selected_indicators.append(indicator_obj)
+            
+        return crs, selected_indicators
+    except Exception as e:
+        throwError(f"Error during processing of submitted input-values: {e}")
+    
 def get_indicator_data(controller: IndicatorsApi | IndicatorsPublicApi, indicator_id: str, spatial_unit_id: str):
     if isinstance(controller, IndicatorsApi):
         return controller.get_indicator_by_spatial_unit_id_and_id_without_preload_content(indicator_id, spatial_unit_id)
