@@ -3628,9 +3628,12 @@ class IndicatorExport:
             gdf.to_crs(crs=crs, inplace=True)
             su_name = self.spatial_unit_names[spatial_unit]
             filename = f"{self.indicator_name}_{su_name}"
-            gdf = gdf.drop(columns="geometry")
             for format in self.download_formats:
-                export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf)
+                if format == "CSV" or format == "EXCEL":
+                    gdf_without_geom = gdf.drop(columns="geometry")
+                    export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf_without_geom)
+                else:
+                    export_gdf_to_fileformat(format=format, path=path, filename=filename, gdf=gdf)
                 
     def export_gpkg_spatial_unit_export(self, path, crs):
         for spatial_unit, gdf in self.spatial_unit_gdfs.items():

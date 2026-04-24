@@ -113,7 +113,10 @@ class MultipleExport(ExportProcess):
             crs, indicators = pykmhelper.process_multiple_export_inputs(inputs)
 
             # 3. Generate result || Main Script
-            indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            if data_management_client.configuration.access_token:
+                indicators_controller = openapi_client.IndicatorsApi(data_management_client)
+            else:
+                indicators_controller = openapi_client.IndicatorsPublicApi(data_management_client)
 
             PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
             path = rf"{PROCESS_RESULTS_DIR}\{flow_id}\export_data"
