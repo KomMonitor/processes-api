@@ -128,9 +128,11 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]
         computation_georecources_id = inputs["georesource_id"]
-        computation_filter_property = inputs["compFilterProp"]
-        computation_filter_operator = inputs["compFilterOperator"]
-        computation_filter_value = inputs["compFilterPropVal"]
+
+        comp_filter = inputs["comp_filter"]
+        computation_filter_property = comp_filter.get("compFilterProp", )
+        computation_filter_operator = comp_filter.get("compFilterOperator", )
+        computation_filter_value = comp_filter.get("compFilterPropVal", )
 
         # Init object to store computation results
         result = KommonitorResult()
@@ -175,7 +177,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                 georesource_collection = pykmhelper.get_all_georesource_features_by_id_without_preload_content(georesources_controller, computation_georecources_id)
                 
                 # apply the selected computation filter on the FeatureCollection
-                if computation_filter_operator != "None":
+                if not computation_filter_operator == None:
                     georesource_collection = pykmhelper.applyComputationFilter_onFeatureCollection(georesource_collection, computation_filter_property, computation_filter_operator, computation_filter_value)
 
                 georesource_collection = pykmhelper.transformMultiLineStringToLineStrings(georesource_collection)
@@ -188,6 +190,7 @@ class KmGeoresourceLengthLineSegmentsWithinPolygon(KommonitorProcess):
                     for targetTime in allDates:
                         try:
                             lines_in_polygon = pykmhelper.intersectLineFeatureCollectionByPolygonFeature(georesource_collection, feature)
+
                             collection_filtered_lines = pykmhelper.filter_feature_lifespan(lines_in_polygon, targetTime)
                             value = pykmhelper.summarizeLineSegmentLenghts(collection_filtered_lines)
                         except (RuntimeError, ZeroDivisionError) as r:
