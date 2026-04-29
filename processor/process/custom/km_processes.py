@@ -440,6 +440,7 @@ def download_file(api: API, request: APIRequest, job_id, resultdir):
         )
     filedir = os.path.join(resultdir, os.path.dirname(file_name))
     file = os.path.basename(file_name)
+    logger.info(f"Export file {file} from {filedir}")
     return send_from_directory(
         directory=filedir,
         path=file,
