@@ -1,15 +1,12 @@
 import logging
+
 import openapi_client
-import json
-import os
-import shutil
-import geopandas as gpd
-from openapi_client import ApiClient, ApiException
-from prefect import task, get_run_logger, Task, runtime, flow
+from openapi_client import ApiClient
+from prefect import task, flow
 from prefect.cache_policies import NO_CACHE
 from pygeoapi_prefect import schemas
-from pygeoapi_prefect.process.base import BasePrefectProcessor
-from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, \
+    ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
 
 try:
     from .. import pykmhelper
@@ -99,8 +96,7 @@ class MultipleExport(ExportProcess):
     def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient,
-            job_id: str,
-            flow_id: str) -> dict:
+            export_dir: str) -> dict[str, str] | None:
         
         logger.debug("Starting execution...")
 
@@ -118,32 +114,16 @@ class MultipleExport(ExportProcess):
             else:
                 indicators_controller = openapi_client.IndicatorsPublicApi(data_management_client)
 
-            PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
-            path = rf"{PROCESS_RESULTS_DIR}\{flow_id}\export_data"
-
-            if not os.path.isdir(path):
-                os.mkdir(path)
             try:
                 if len(indicators) > 0:
                     for indicator in indicators:
                         indicator.add_geodataframes(indicators_controller)
                         indicator.filter_target_times()
-                        indicator.export_gpkg_multiple_export(path, crs)
+                        indicator.export_gpkg_multiple_export(export_dir, crs)
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during multiple indicator export: {e}")
                 raise RuntimeError(f"A processing-error occurred during multiple indicator export: {e}")
 
-            shutil.make_archive(path, "zip", path)
-            shutil.rmtree(path)
-
-            return {
-                "status": "successful",
-                "file": {
-                    "href": f"{config.server_url}/exports/{job_id}/export_data.zip",
-                    "rel": "enclosure",
-                    "type": "application/octet-stream",
-                    "title": f"{flow_id}/export_data.zip"
-            }}
         except Exception as e:
           logger.error(f"An Error occurred during multiple export: {e}")
           return {

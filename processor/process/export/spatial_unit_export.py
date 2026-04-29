@@ -1,14 +1,12 @@
 import logging
+
 import openapi_client
-import os
-import shutil
-import openpyxl
-from openapi_client import ApiClient, ApiException
-from prefect import task, get_run_logger, Task, runtime, flow
+from openapi_client import ApiClient
+from prefect import task, flow
 from prefect.cache_policies import NO_CACHE
 from pygeoapi_prefect import schemas
-from pygeoapi_prefect.process.base import BasePrefectProcessor
-from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
+from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessDescription, \
+    ProcessJobControlOption, AdditionalProcessIOParameters, Parameter
 
 try:
     from .. import pykmhelper
@@ -100,7 +98,8 @@ class SpatialUnitExport(ExportProcess):
             logger: logging.Logger,
             data_management_client: ApiClient,
             job_id: str,
-            flow_id: str) -> dict:
+            flow_id: str,
+            export_dir: str) -> dict[str, str] | None:
         
         logger.debug("Starting execution...")
 
@@ -118,42 +117,25 @@ class SpatialUnitExport(ExportProcess):
             else:
                 indicators_controller = openapi_client.IndicatorsPublicApi(data_management_client)
 
-            PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
-            path = rf"{PROCESS_RESULTS_DIR}\{flow_id}\export_data"
-
-            if not os.path.isdir(path):
-                os.mkdir(path)
-
             try:
                 if len(indicators) > 0:
                     for indicator in indicators:
                         indicator.add_geodataframes(indicators_controller)
                         indicator.filter_target_times()
                         if "GEOPACKAGE" in format:
-                            indicator.export_gpkg_spatial_unit_export(path, crs)
+                            indicator.export_gpkg_spatial_unit_export(export_dir, crs)
 
                     if "CSV" in format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        merged_gdf.to_csv(rf"{path}\{filename}.csv")
+                        merged_gdf.to_csv(rf"{export_dir}\{filename}.csv")
 
                     if "EXCEL" in format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        merged_gdf.to_excel(rf"{path}\{filename}.xlsx")
+                        merged_gdf.to_excel(rf"{export_dir}\{filename}.xlsx")
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during spatial unit indicator export: {e}")
                 raise RuntimeError(f"A processing-error occurred during spatial unit indicator export: {e}")
 
-            shutil.make_archive(path, "zip", path)
-            shutil.rmtree(path)
-
-            return {
-                "status": "successful",
-                "file": {
-                    "href": f"{config.server_url}/exports/{job_id}/export_data.zip",
-                    "rel": "enclosure",
-                    "type": "application/octet-stream",
-                    "title": f"{flow_id}/export_data.zip"
-            }}
         except Exception as e:
           logger.error(f"An Error occurred during spatial unit export: {e}")
           return {
