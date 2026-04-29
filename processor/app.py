@@ -170,9 +170,9 @@ def send_report(path):
     return send_from_directory('results', path)
 
 
-@APP.route('/exports/<job_id>/<filename>', endpoint=API_DOWNLOAD_FILE)
+@APP.route('/exports/<job_id>', endpoint=API_DOWNLOAD_FILE)
 @require_oauth(optional=True)
-def download_file(job_id, filename):
+def download_file(job_id):
     return km_processes.execute_from_flask_custom(km_processes.download_file, request, job_id, RESULTS_DIR)
 
 

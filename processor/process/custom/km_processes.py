@@ -5,7 +5,7 @@ from pygeoapi.api import (
 import json
 import logging
 import urllib.parse
-from datetime import datetime, timezone
+import os
 from http import HTTPStatus
 from typing import Tuple, Union
 
@@ -385,7 +385,7 @@ def execute_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, 
     return {}, http_status, to_json(response, api.pretty_print)
 
 
-def download_file(api: API, request: APIRequest, job_id, filedir):
+def download_file(api: API, request: APIRequest, job_id, resultdir):
     headers = request.get_response_headers(SYSTEM_LOCALE,
                                            **api.api_headers)
     try:
@@ -438,9 +438,11 @@ def download_file(api: API, request: APIRequest, job_id, filedir):
             HTTPStatus.INTERNAL_SERVER_ERROR, headers,
             request.format, 'JobResultNotFound', job_id
         )
+    filedir = os.path.join(resultdir, os.path.dirname(file_name))
+    file = os.path.basename(file_name)
     return send_from_directory(
         directory=filedir,
-        path=file_name,
+        path=file,
         as_attachment=True,
         mimetype='application/octet-stream'
     )
