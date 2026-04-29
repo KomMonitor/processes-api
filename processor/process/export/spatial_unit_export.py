@@ -1,4 +1,5 @@
 import logging
+import os
 
 import openapi_client
 from openapi_client import ApiClient
@@ -127,11 +128,11 @@ class SpatialUnitExport(ExportProcess):
 
                     if "CSV" in format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        merged_gdf.to_csv(rf"{export_dir}\{filename}.csv")
+                        os.path.join(export_dir, rf"{filename}.csv")
 
                     if "EXCEL" in format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        merged_gdf.to_excel(rf"{export_dir}\{filename}.xlsx")
+                        os.path.join(export_dir, rf"{filename}.xlsx")
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during spatial unit indicator export: {e}")
                 raise RuntimeError(f"A processing-error occurred during spatial unit indicator export: {e}")

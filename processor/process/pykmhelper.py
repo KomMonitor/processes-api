@@ -9,6 +9,7 @@ import json
 import math
 import numbers
 import datetime
+import os.path
 import time
 import requests
 from logging import Logger
@@ -3643,7 +3644,7 @@ class IndicatorExport:
                 gdf.rename(columns={"FID": "km_fid"}, inplace=True)
 
             filename = self.spatial_unit_names[spatial_unit]
-            filepath = rf"{path}\{filename}.gpkg"
+            filepath = os.path.join(path, rf"{filename}.gpkg")
             gdf.to_file(filepath, driver="GPKG", layer=self.indicator_name)
 
     def export_gpkg_multiple_export(self, path, crs):
@@ -3654,7 +3655,7 @@ class IndicatorExport:
                 gdf.rename(columns={"FID": "km_fid"}, inplace=True)
 
             filename = self.indicator_name
-            filepath = rf"{path}\{filename}.gpkg"
+            filepath = os.path.join(path, rf"{filename}.gpkg")
             gdf.to_file(filepath, driver="GPKG", layer=self.spatial_unit_names[spatial_unit])
                 
     
@@ -3707,15 +3708,15 @@ def export_gdf_to_fileformat(format: str, path: str, filename: str, gdf: gpd.Geo
         gdf.rename(columns={"FID": "km_fid"}, inplace=True)
 
     if format == "GEOPACKAGE":
-        gdf.to_file(rf"{path}\{filename}.gpkg", driver="GPKG", index=False)
+        gdf.to_file(os.path.join(path, rf"{filename}.gpkg"), driver="GPKG", index=False)
     elif format == "SHAPE":
-        gdf.to_file(rf"{path}\{filename}", driver="ESRI Shapefile", index=False)
+        gdf.to_file(os.path.join(path, filename), driver="ESRI Shapefile", index=False)
     elif format == "GEOJSON":
-        gdf.to_file(rf"{path}\{filename}.geojson", driver="GeoJSON", index=False)
+        gdf.to_file(os.path.join(path, rf"{filename}.geojson"), driver="GeoJSON", index=False)
     elif format == "EXCEL":
-        gdf.to_excel(rf"{path}\{filename}.xlsx", index=False)
+        gdf.to_excel(os.path.join(path, rf"{filename}.xlsx"), index=False)
     elif format == "CSV":
-        gdf.to_csv(rf"{path}\{filename}.csv", index=False)
+        gdf.to_csv(os.path.join(path, rf"{filename}.csv"), index=False)
 
 def merge_multiple_dataframes(indicators: list):
     gdfs = {}
