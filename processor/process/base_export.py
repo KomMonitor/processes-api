@@ -58,12 +58,13 @@ class ExportProcess(BasePrefectProcessor):
 
         if "user_id" in execution_request.properties:
             dmc = data_management_client(logger, execution_request, True)
-            output = run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
+            run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
+            output = create_response(config.server_url, job_id, flow_id)
             output["userId"] = execution_request.properties["user_id"]
         else:
             dmc = data_management_client(logger, execution_request, False)
             run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
-        output = create_response(config.server_url, job_id, flow_id)
+            output = create_response(config.server_url, job_id, flow_id)
         logger.debug(output)
         shutil.make_archive(export_dir, "zip", export_dir)
         shutil.rmtree(export_dir)
