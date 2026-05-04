@@ -45,32 +45,39 @@ class ExportProcess(BasePrefectProcessor):
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
-        flow_id = runtime.flow_run.name
-        logger, handler = setup_logging(flow_id)
-        logger.info(f"Flow run name: {flow_id}")
+        try:
+            flow_id = runtime.flow_run.name
+            logger, handler = setup_logging(flow_id)
+            logger.info(f"Flow run name: {flow_id}")
 
-        inputs = format_inputs(execution_request)
-        config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt", PROCESSES_API_URL)
+            inputs = format_inputs(execution_request)
+            config = KommonitorProcessConfig(flow_id, inputs, f"{flow_id}/output-result.txt", PROCESSES_API_URL)
 
-        export_dir = os.path.join(PROCESS_RESULTS_DIR, flow_id, "export_data")
-        if not os.path.isdir(export_dir):
-            os.mkdir(export_dir)
+            export_dir = os.path.join(PROCESS_RESULTS_DIR, flow_id, "export_data")
+            if not os.path.isdir(export_dir):
+                os.mkdir(export_dir)
 
-        if "user_id" in execution_request.properties:
-            dmc = data_management_client(logger, execution_request, True)
-            run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
-            output = create_response(config.server_url, job_id, flow_id)
-            output["userId"] = execution_request.properties["user_id"]
-        else:
-            dmc = data_management_client(logger, execution_request, False)
-            run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
-            output = create_response(config.server_url, job_id, flow_id)
-        logger.debug(output)
-        shutil.make_archive(export_dir, "zip", export_dir)
-        shutil.rmtree(export_dir)
-        result = store_output_as_file(flow_id, output, logger)
-        close_logging(logger, handler)
-        return result
+            if "user_id" in execution_request.properties:
+                dmc = data_management_client(logger, execution_request, True)
+                run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
+                output = create_response(config.server_url, job_id, flow_id)
+                output["userId"] = execution_request.properties["user_id"]
+            else:
+                dmc = data_management_client(logger, execution_request, False)
+                run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
+                output = create_response(config.server_url, job_id, flow_id)
+            logger.debug(output)
+            shutil.make_archive(export_dir, "zip", export_dir)
+            shutil.rmtree(export_dir)
+            result = store_output_as_file(flow_id, output, logger)
+            close_logging(logger, handler)
+            return result
+        except Exception as e:
+            logger.error(f"An Error occurred during export: {e}")
+            return {
+                "status": "failed",
+                "error": str(e)
+    }
 
     @staticmethod
     @task(cache_policy=NO_CACHE)
