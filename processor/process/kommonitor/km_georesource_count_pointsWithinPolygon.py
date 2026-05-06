@@ -43,9 +43,9 @@ def process_flow(
         job_id: str,
         execution_request: schemas.ExecuteRequest
 ) -> dict:
-    return KommonitorProcess.execute_process_flow(WIPKmGeoresourceCountPointsWithinPolygon.run, job_id, execution_request)
+    return KommonitorProcess.execute_process_flow(KmGeoresourceCountPointsWithinPolygon.run, job_id, execution_request)
 
-class WIPKmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
+class KmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
     process_flow = process_flow
     
     detailed_process_description = ProcessDescription(
@@ -127,8 +127,6 @@ class WIPKmGeoresourceCountPointsWithinPolygon(KommonitorProcess):
         inputs = config.inputs
 
         # Extract all relevant inputs
-        print("inputs")
-        print(inputs)
         target_id = inputs["target_indicator_id"]
         target_spatial_units = inputs["target_spatial_units"]
         target_time = inputs["target_time"]

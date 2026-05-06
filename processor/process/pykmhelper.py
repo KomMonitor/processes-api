@@ -807,11 +807,17 @@ def applyComputationFilter_onFeatureCollection(featureCollection, propertyName: 
     del result_collection["features"]
     result_collection["features"] = []
 
+
     for feature in featureCollection["features"]:
-        if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
-            result_collection["features"].append(feature)
-    
+        try:
+            if bool_filterValue_byOperator(feature["properties"][propertyName], computationFilterOperator, computationFilterPropertyValue):
+                result_collection["features"].append(feature)
+        except KeyError:
+            log(f"There is no property {propertyName} in feature with ID: {feature['properties']['ID']}")
+            continue
+
     return result_collection
+
 
 def applyComputationFilter_onValueArray(valueArray, computationFilterOperator, computationFilterPropertyValue):
     """applys a computation filter to a submitted value array and returns the filtered Array. Several filter operators are valid.
@@ -3083,7 +3089,12 @@ def getChange_relative_percent(feature, targetDate, compareDate):
     compareDatePrefix = getTargetDateWithPropertyPrefix(compareDate)
     
     targetValue = feature[targetDatePrefix]
-    compareValue = feature[compareDatePrefix]
+    try:
+        compareValue = feature[compareDatePrefix]
+    except KeyError:
+        throwError(f"An error occured because the target value {targetDate} has no compare value in the feature collection.")
+        resultValue = None
+
     if not isNoDataValue(compareValue) and not isNoDataValue(targetValue):
         if float(compareValue) == 0:
             resultValue = None
