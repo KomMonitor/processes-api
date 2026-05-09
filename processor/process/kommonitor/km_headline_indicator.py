@@ -25,7 +25,7 @@ except ImportError:
     from processor.process import pykmhelper
     
 try:
-    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+    from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, isNoDataValue
 except ImportError:
     from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
 
@@ -197,12 +197,14 @@ class KmIndicatorHeadline(KommonitorProcess):
 
             # create Indicator Objects and IndicatorCollection to store the informations belonging to the Indicator
             ti = IndicatorType(target_id, IndicatorCalculationType.TARGET_INDICATOR)
-            
+
+            computation_ids = []
             collection = IndicatorCollection()
             for indicator in computation_ids_with_polarity:
                 collection.add_indicator(IndicatorType(indicator["ID"], IndicatorCalculationType.COMPUTATION_INDICATOR))
                 collection.indicators[indicator["ID"]].method = indicator["POLARITY"]
-                
+                computation_ids.append(indicator["ID"])
+
             # query indicator metadate to check for errors occured
             # ti.meta = indicators_controller.get_indicator_by_id(
             #    target_id)
@@ -234,7 +236,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                 for indicator in collection.indicators:
                     collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller, spatial_unit)
 
-                collection.fetch_indicator_feature_time_series()
+                collection.fetch_indicator_feature_time_series(validate_lifespan=True)
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
@@ -265,7 +267,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                 else:
                     raise DataManagementException("The computation method is not in the list of allowed values.", computation_ids_with_polarity[0]["ID"], "INDICATOR", 500)
                     
-                collection.search_nan_features(all_times)
+                #collection.search_nan_features(all_times)
 
                 for indicator_id, indicator_obj in collection.indicators.items():
                     indicator_obj.lists = {}
@@ -277,40 +279,38 @@ class KmIndicatorHeadline(KommonitorProcess):
                     for raw_time in all_times:
                         time_key = pykmhelper.getTargetDateWithPropertyPrefix(raw_time)
                         indicator_obj.lists[time_key] = []
+
                         for feature in collection.intersection_su_features:
-                            if not feature in collection.nan_features[time_key]:
-                                feature_series = indicator_obj.time_series.get(feature, {})
-                                value = feature_series[time_key]
-                                indicator_obj.lists[time_key].append(value)
+                            # if not feature in collection.nan_features[time_key]:
+                            feature_series = indicator_obj.time_series.get(feature, {})
+                            value = feature_series[time_key]
+                            indicator_obj.lists[time_key].append(value)
 
                         if not z_score:
-                            ranked = pykmhelper.rank(indicator_obj.lists[time_key])
+                            ranked = pykmhelper.rank(indicator_obj.lists[time_key], ignore_nan=True)
                             normalized = func(ranked)
                         else:
                             normalized = func(indicator_obj.lists[time_key])
-                            
+
                         indicator_obj.lists[time_key] = normalized
 
                 # iterate over all features and append the indicator
-                y = 0
                 indicator_values = []
                 for i, feature in enumerate(collection.intersection_su_features):
                     valueMapping = []
                     for targetTime in all_times:
                         try:
                             time_key = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
-                            if feature in collection.nan_features[time_key] and i > 0:
-                                y += 1
-                                raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
-                            elif feature in collection.nan_features[time_key]:
-                                raise RuntimeError("In one of the indicators, the spatial unit does not have a valid numerical value — calculation not possible.")
-
                             try:
                                 value_list = []
-                                for indicator_id, indicator_obj in collection.indicators.items():
-                                    value_list.append(indicator_obj.lists[time_key][i - y])
-                                    
-                                value = agg_func(value_list)
+                                for indicator in computation_ids:
+                                    value_list.append(collection.indicators[indicator].lists[time_key][i])
+                                
+                                # for indicator_id, indicator_obj in collection.indicators.items():
+                                #     value_list.append(indicator_obj.lists[time_key][i - y])
+                                value = agg_func(value_list, True)
+                                if isNoDataValue(value):
+                                    raise RuntimeError("NoDataValue")
                             except TypeError:
                                 value = None
                                 
