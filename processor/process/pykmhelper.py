@@ -1170,6 +1170,7 @@ class IndicatorCollection:
                 date_with_prefix = getTargetDateWithPropertyPrefix(date)
                 for feature in self.all_su_features:
                     emptyTimeSeries = True
+                    print(feature)
                     if not isNoDataValue(self.indicators[indicator].time_series[feature][date_with_prefix]):
                         emptyTimeSeries = False
                         break
@@ -1180,17 +1181,47 @@ class IndicatorCollection:
 
         return allDates
 
-    def fetch_indicator_feature_time_series(self):
+    def fetch_indicator_feature_time_series(self, validate_lifespan=False):
         """creates a time series which allows direct access to the data using indicator id and su feature id and target date
         """
-        for indicator in self.indicators:
-            su_features = []
-            for feature in self.indicators[indicator].values:
-                id = str(feature["ID"])
-                self.indicators[indicator].time_series[id] = feature
-                su_features.append(id)
+        # dont append a lifespan filter to the indicator values
+        if not validate_lifespan:
+            for indicator in self.indicators:
+                su_features = []
+                for feature in self.indicators[indicator].values:
+                    id = str(feature["ID"])
+                    self.indicators[indicator].time_series[id] = feature
+                    su_features.append(id)
 
-            self.indicators[indicator].applicable_su_features = su_features
+                self.indicators[indicator].applicable_su_features = su_features
+        
+        # append a filter for indicator values whether they are in between the feature lifespan or not (else are set to none)
+        elif validate_lifespan:
+            for indicator in self.indicators:
+                su_features = []
+                for feature in self.indicators[indicator].values:
+                    dict = feature.model_dump()
+                    start = formatStringAsDate(dict.get("valid_start_date"))
+                    end = dict.get("valid_end_date")
+                    if end is None:
+                        end = datetime.date.today()
+                    else:
+                        end = formatStringAsDate(end)
+
+                    for key, value in dict.items():
+                        # filter
+                        if key.startswith("DATE_"):
+                            curr_date = formatStringAsDate(getTargetDate_without_prefix(key))
+
+                            if not start <= curr_date <= end:
+                                dict[key] = None
+                    
+                    id = str(feature["ID"])
+                    self.indicators[indicator].time_series[id] = dict
+                    su_features.append(id)
+
+                self.indicators[indicator].applicable_su_features = su_features
+        
 
         self.intersection_su_features = self.find_intersection_applicable_su_features()
 
@@ -2379,7 +2410,7 @@ API_HELPER_METHODS_STATISTICAL_OPERATIONS
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 
-def convertPropertyArrayToNumberArray(propertyArray):
+def convertPropertyArrayToNumberArray(propertyArray, ignore_nan = False):
     """Takes a property array of arbitrary input objects and returns a valueArray of numeric values which have been converted to a number by. 
     Any property value of the input array, whose conversion results in NaN using the check 'math.isnan(value)' or is boolean will be completely removed from the array
     Thus the resulting array may have fewer entries than the original array.
@@ -2391,13 +2422,22 @@ def convertPropertyArrayToNumberArray(propertyArray):
         Array<Float>: returns the array of all values that were successfully converted to a number. responseArray.length may be smaller than inputArray.length, if inputArray contains boolean items or items whose Number-conversion result in NaN
     """
     numericArray = []
+    
+    if ignore_nan == False:
 
-    for value in propertyArray:
-        try:
-           numericArray.append(float(value))
-        except:
-            throwError(str(value) + " is not convertible to float!")
-
+        for value in propertyArray:
+            try:
+                numericArray.append(float(value))
+            except:
+                throwError(str(value) + " is not convertible to float!")
+                
+    elif ignore_nan == True:
+        for value in propertyArray:
+            if isNoDataValue(value):
+                numericArray.append(numpy.nan)
+            else:
+                numericArray.append(float(value))
+            
     return numericArray
 
 def convertPropertyDictToNumberDict_fromIdValueDict(indicatorIdValueDict):
@@ -2468,7 +2508,7 @@ def max(populationArray):
     populationArray = convertPropertyArrayToNumberArray(populationArray)
     return numpy.max(populationArray)
 
-def min(populationArray):
+def min(populationArray, ignore_nan = False):
     """Encapsulates numpys function 'min' to compute the min value of the submitted value array.
 
     Args:
@@ -2477,8 +2517,12 @@ def min(populationArray):
     Returns:
         Float: returns the min value of the submitted array of numeric values
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
-    return numpy.min(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=ignore_nan)
+        
+    if ignore_nan == False:
+        return numpy.min(populationArray)
+    elif ignore_nan == True:
+        return numpy.nanmin(populationArray)
 
 def minMaxNormalization_singleValue(min, max, value):
     """Implements a min max normalization value of the submitted value using the formula '(value - min) / (max) - (min)'
@@ -2503,15 +2547,18 @@ def minMaxNormalization_wholeValueArray(populationArray):
     Returns:
         Array<Float>: returns the submitted value where each value is normalized
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=True)
 
-    minValue = min(populationArray)
-    maxValue = max(populationArray)
+    minValue = numpy.nanmin(populationArray)
+    maxValue = numpy.nanmax(populationArray)
 
     normalizedArray = []
 
     for value in populationArray:
-        normalizedArray.append(minMaxNormalization_singleValue(minValue, maxValue, value))
+        if isNoDataValue(value):
+            normalizedArray.append(value)
+        else:
+            normalizedArray.append(minMaxNormalization_singleValue(minValue, maxValue, value))
 
     return normalizedArray
 
@@ -2538,15 +2585,18 @@ def minMaxNormalization_wholeValueArray_inverted(populationArray):
     Returns:
         Array<Float>: returns the submitted value where each value is inverted normalized
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=True)
 
-    minValue = min(populationArray)
-    maxValue = max(populationArray)
+    minValue = numpy.nanmin(populationArray)
+    maxValue = numpy.nanmax(populationArray)
 
     invNormalizedArr = []
 
     for value in populationArray:
-        invNormalizedArr.append(minMaxNormalization_inverted_singleValue(minValue, maxValue, value))
+        if isNoDataValue(value):
+            invNormalizedArr.append(value)
+        else:
+            invNormalizedArr.append(minMaxNormalization_inverted_singleValue(minValue, maxValue, value))
 
     return invNormalizedArr
 
@@ -2595,7 +2645,7 @@ def minMaxNormalization_inverted_fromIdValueDict(indicatorIdValueDict):
 
     return invertedDict
 
-def rank(populationArray):
+def rank(populationArray, ignore_nan=False):
     """encapsulates scipy.stats function 'rank' to compute the rank array of the submitted value array
 
     Args:
@@ -2604,7 +2654,7 @@ def rank(populationArray):
     Returns:
         numpy.ndarray<Float>: returns the ranks of the submitted array of numeric values
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=ignore_nan)
     return stats.rankdata(populationArray)
 
 def rank_fromIdValueDict(indicatorIdValueDict):
@@ -2635,7 +2685,7 @@ def rank_fromIdValueDict(indicatorIdValueDict):
     
     return resultDict
 
-def geomean(populationArray):
+def geomean(populationArray, ignore_nan=False):
     """Encapsulates scipy.stats.mstats function 'gmean' to compute the geometric mean value of the submitted value array.
 
     Args:
@@ -2644,10 +2694,10 @@ def geomean(populationArray):
     Returns:
         Float: returns the geometric mean value of the submitted array of numeric values. (If there are zero values in the input the output will be zero)
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=ignore_nan)
     value = stats.mstats.gmean(populationArray)
     
-    if math.isnan(value):
+    if math.isnan(value) and not ignore_nan:
         throwError("Error during calculation of geometric mean. Perhaps negative values exist in the array.")
         value = None  
         
@@ -2692,7 +2742,7 @@ def geomean_fromIdValueDict(indicatorIdValueDictArray):
 
     return resultDict
 
-def mean(populationArray):
+def mean(populationArray, ignore_nan = False):
     """Encapsulates numpys function 'mean' to compute the mean value of the submitted value array
 
     Args:
@@ -2701,8 +2751,11 @@ def mean(populationArray):
     Returns:
         float: returns the mean value of the submitted array of numeric values
     """
-    populationArray = convertPropertyArrayToNumberArray(populationArray)
-    return numpy.mean(populationArray)
+    populationArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=ignore_nan)
+    if ignore_nan == False:
+        return numpy.mean(populationArray)
+    elif ignore_nan == True:
+        return numpy.nanmean(populationArray)
 
 def mean_fromIdValueDict(indicatorIdValueDictArray):
     """Encapsulates numpys function 'mean' to compute the mean value of the submitted array of indicator id and value map objects. Only values for those features will be computed, that have an input value for all entries of the input 'indicatorIdValueMapArray'.
@@ -2940,14 +2993,17 @@ def zScore_normalization_wholeValueArray(populationArray):
     Returns:
         list: returns a list of the zscore for all numerical values in the submitted list.
     """
-    numberArray = convertPropertyArrayToNumberArray(populationArray)
+    numberArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=True)
 
-    meanValue = mean(numberArray)
-    std = standardDeviation(numberArray, False)
+    meanValue = numpy.nanmean(numberArray)
+    std = numpy.nanstd(numberArray)
 
     zScoreArray = []
     for value in numberArray:
-        zScoreArray.append(zScore_byMeanAndStdev(value, meanValue, std))
+        if isNoDataValue(value):
+            zScoreArray.append(value)
+        else:
+            zScoreArray.append(zScore_byMeanAndStdev(value, meanValue, std))
 
     return zScoreArray
 
@@ -2960,14 +3016,17 @@ def zScore_normalization_wholeValueArray_inverted(populationArray):
     Returns:
         list: returns a list of the zscore for all numerical values in the submitted list.
     """
-    numberArray = convertPropertyArrayToNumberArray(populationArray)
+    numberArray = convertPropertyArrayToNumberArray(populationArray, ignore_nan=True)
 
-    meanValue = mean(numberArray)
-    std = standardDeviation(numberArray, False)
+    meanValue = numpy.nanmean(numberArray)
+    std = numpy.nanstd(numberArray)
 
     zScoreArray = []
     for value in numberArray:
-        zScoreArray.append(1 - zScore_byMeanAndStdev(value, meanValue, std))
+        if isNoDataValue(value):
+            zScoreArray.append(value)
+        else:
+            zScoreArray.append(1 - zScore_byMeanAndStdev(value, meanValue, std))
 
     return zScoreArray
 
