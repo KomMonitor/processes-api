@@ -189,7 +189,7 @@ class KmIndicatorSubtract(KommonitorProcess):
                             time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
                             
                             compSum = 0
-                            for indicator in collection.indicators:
+                            for indicator in computation_ids:
                                 if collection.indicators[indicator].type == IndicatorCalculationType.REFERENCE_INDICATOR:
                                     continue
                                 compSum += float(collection.indicators[indicator].time_series[feature][time_with_prefix])
