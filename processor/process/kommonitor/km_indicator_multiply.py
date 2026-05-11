@@ -177,7 +177,7 @@ class KmIndicatorMultiply(KommonitorProcess):
                                 time_with_prefix = pykmhelper.getTargetDateWithPropertyPrefix(targetTime)
                                 
                                 allIndicatorValues = []
-                                for indicator in collection.indicators:
+                                for indicator in computation_ids:
                                     allIndicatorValues.append(float(collection.indicators[indicator].time_series[feature][time_with_prefix]))
                                 
                                 value = math.prod(allIndicatorValues)
