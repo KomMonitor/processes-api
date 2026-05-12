@@ -27,7 +27,7 @@ except ImportError:
 try:
     from ..pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, isNoDataValue
 except ImportError:
-    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType
+    from processor.process.pykmhelper import IndicatorType, IndicatorCollection, IndicatorCalculationType, isNoDataValue
 
 
 
