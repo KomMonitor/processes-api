@@ -236,7 +236,7 @@ class KmIndicatorHeadline(KommonitorProcess):
                 for indicator in collection.indicators:
                     collection.indicators[indicator].get_indicator_by_spatial_unit_id_and_id_without_geometry(indicators_controller, spatial_unit)
 
-                collection.fetch_indicator_feature_time_series(validate_lifespan=True)
+                collection.fetch_indicator_feature_time_series(validate_lifespan=False)
 
                 # get the intersection of all applicable su_features and check for missing spatial unit feature error
                 collection.find_intersection_applicable_su_features()
