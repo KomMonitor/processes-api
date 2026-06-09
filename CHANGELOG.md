@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add git cliff config and changelog ([a980907](https://github.com/KomMonitor/processes-api/commit/a980907c619b0d1a6806ec7a349bd587463faa8d))
 
+### Changed
+
+- Update changelog ([2d25355](https://github.com/KomMonitor/processes-api/commit/2d253555f10831f8d0b5baef76b1633d7847354b))
+
 ### Fixed
 
 - Fix run method signature for spatial unit export process ([a735157](https://github.com/KomMonitor/processes-api/commit/a7351578f0cc3347c56d52db16308f8253b1cd40))
+- Fix public export ([645b648](https://github.com/KomMonitor/processes-api/commit/645b648101992e8d13ab335da2ceaa29091e5fbb))
 
 ## [1.1.1]
 > 28 May 2026

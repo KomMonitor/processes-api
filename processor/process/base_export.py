@@ -63,7 +63,7 @@ class ExportProcess(BasePrefectProcessor):
             if not os.path.isdir(export_dir):
                 os.mkdir(export_dir)
 
-            if "user_id" in execution_request.properties:
+            if "user_id" in execution_request.properties and execution_request.properties["user_id"]:
                 dmc = data_management_client(logger, execution_request, True)
                 run(config=config, logger=logger, data_management_client=dmc, export_dir=export_dir)
                 output = create_response(config.server_url, job_id, flow_id)
