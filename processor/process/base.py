@@ -607,7 +607,6 @@ class KommonitorProcess(BasePrefectProcessor):
             close_logging(logger, handler)
             return result
 
-
     @staticmethod
     @task(cache_policy=NO_CACHE)
     @abc.abstractmethod

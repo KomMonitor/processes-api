@@ -24,6 +24,12 @@ def create_response(server_url: str, job_id: str, flow_id: str) -> dict:
             "title": f"{flow_id}/export_data.zip"
         }}
 
+def create_error_response(e: Exception) -> dict:
+    return {
+        "status": "failed",
+        "error": str(e)
+    }
+
 class ExportProcess(BasePrefectProcessor):
     def __init__(self, processor_def: dict):
         super().__init__(processor_def)
@@ -74,10 +80,9 @@ class ExportProcess(BasePrefectProcessor):
             return result
         except Exception as e:
             logger.error(f"An Error occurred during export: {e}")
-            return {
-                "status": "failed",
-                "error": str(e)
-    }
+            output = create_error_response(e)
+            result = store_output_as_file(flow_id, output, logger)
+            return result
 
     @staticmethod
     @task(cache_policy=NO_CACHE)

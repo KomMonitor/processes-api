@@ -98,8 +98,6 @@ class SpatialUnitExport(ExportProcess):
     def run(config: KommonitorProcessConfig,
             logger: logging.Logger,
             data_management_client: ApiClient,
-            job_id: str,
-            flow_id: str,
             export_dir: str) -> dict[str, str] | None:
         
         logger.debug("Starting execution...")
