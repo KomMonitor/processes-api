@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3]
+> 14 Jul 2026
+
+### Changed
+
+- Update Docker dev setup ([f505699](https://github.com/KomMonitor/processes-api/commit/f505699a3b5ce4ff8bf53369018531983aded988))
+
+### Fixed
+
+- Fix spatial unit export and apply code refinements ([fb7f68b](https://github.com/KomMonitor/processes-api/commit/fb7f68b0e42a06acd56aea9f6d87a41d09aa70d1))
+
 ## [1.1.2]
 >  9 Jun 2026
 
@@ -19,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix run method signature for spatial unit export process ([a735157](https://github.com/KomMonitor/processes-api/commit/a7351578f0cc3347c56d52db16308f8253b1cd40))
-- Fix public export ([645b648](https://github.com/KomMonitor/processes-api/commit/645b648101992e8d13ab335da2ceaa29091e5fbb))
+- Fix public export ([042d87a](https://github.com/KomMonitor/processes-api/commit/042d87af2feb1f1ef0ae7acd937525467fb07682))
 
 ## [1.1.1]
 > 28 May 2026
@@ -313,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove required auth for process descriptions ([679bc78](https://github.com/KomMonitor/processes-api/commit/679bc780a2a83be060ab46a4659f5e98b052281e))
 - Remove unused tests and docs ([96b184f](https://github.com/KomMonitor/processes-api/commit/96b184f459d8f129d6e6fbf7b30e8935a35c053d))
 
+[1.1.3]: https://github.com/KomMonitor/processes-api/compare/v1.1.2..v1.1.3
 [1.1.2]: https://github.com/KomMonitor/processes-api/compare/v1.1.1..v1.1.2
 [1.1.1]: https://github.com/KomMonitor/processes-api/compare/v1.0.1..v1.1.1
 [1.0.1]: https://github.com/KomMonitor/processes-api/tree/v1.0.1
