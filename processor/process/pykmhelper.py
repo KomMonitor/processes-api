@@ -8,24 +8,23 @@ import datetime
 import json
 import math
 import numbers
-import datetime
 import os.path
 import time
-import requests
-from logging import Logger
-from enum import Enum
-from typing import Optional, Tuple, List, Any
 from dataclasses import dataclass, field
-import openpyxl
+from enum import Enum
+from typing import Optional, Tuple, List
+
 import geojson
-import pyproj
 import geopandas as gpd
-import pandas as pd
 import numpy
+import pandas as pd
+import pyproj
+import requests
 import shapely
 from openapi_client import IndicatorOverviewType, ApiException, GeoresourcesPublicApi, IndicatorsPublicApi
 from openapi_client.api import IndicatorsApi, SpatialUnitsApi, GeoresourcesApi
 from openapi_client.exceptions import ForbiddenException
+from pyproj import CRS
 from scipy import stats
 
 from .base import KommonitorJobSummary, DataManagementException
@@ -3864,11 +3863,11 @@ def process_single_export_inputs(data: dict) -> Tuple[str, List[IndicatorExport]
         throwError(f"Error during processing of submitted input-values: {e}")
 
 
-def process_spatial_unit_export_inputs(data: dict) -> Tuple[str, str, list[IndicatorExport]]:
+def process_spatial_unit_export_inputs(data: dict) -> tuple[CRS, list, list[IndicatorExport]] | None:
     try:
         selected_indicators: List[IndicatorExport] = []
         crs = pyproj.CRS.from_user_input(data["spatial_unit"]["crs"]) 
-        format = check_download_data(data["spatial_unit"]["download_format"])
+        exp_format = check_download_data(data["spatial_unit"]["download_format"])
         spatial_unit = data["spatial_unit"]["spatial_unit_id"]
         # 2. compute indicators
         for ind in data["spatial_unit"]["indicators"]:
@@ -3881,11 +3880,11 @@ def process_spatial_unit_export_inputs(data: dict) -> Tuple[str, str, list[Indic
             )
             selected_indicators.append(indicator_obj)
             
-        return crs, format, selected_indicators
+        return crs, exp_format, selected_indicators
     except Exception as e:
         throwError(f"Error during processing of submitted input-values: {e}")
 
-def process_multiple_export_inputs(data: dict) -> Tuple[str, list[IndicatorExport]]:
+def process_multiple_export_inputs(data: dict) -> tuple[CRS, list[IndicatorExport]] | None:
     try:
         selected_indicators: List[IndicatorExport] = []
         crs = pyproj.CRS.from_user_input(data["multiple_export"]["crs"])

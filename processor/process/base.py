@@ -3,19 +3,19 @@ import json
 import logging
 import os
 import sys
-import urllib.parse as urlparse
 import uuid
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
+from typing import Any
 
 import openapi_client
 import requests
 from openapi_client import ApiClient, ApiException
 from openapi_client.exceptions import ForbiddenException
 from prefect import task, get_run_logger, Task, runtime
-from prefect.runtime import flow_run
 from prefect.cache_policies import NO_CACHE
+from prefect.runtime import flow_run
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
@@ -27,7 +27,7 @@ from pygeoapi_prefect.utils import get_storage
 @dataclass
 class KommonitorProcessConfig:
     job_id: str
-    inputs: dict[str, any]
+    inputs: dict[str, Any]
     output_path: str
     server_url: str
 
@@ -153,7 +153,7 @@ def close_logging(logger: Logger, handler: logging.Handler):
     try:
         handler.flush()
         handler.close()
-        logger.logger.removeHandler(handler)
+        logger.removeHandler(handler)
     except Exception as ex:
         sys.stderr.write(f"Warning: Could not close log handler: {ex}\n")
 
@@ -168,7 +168,8 @@ def store_output_as_file(job_id: str, output: dict, logger: Logger) -> dict:
     output_dir = get_storage(storage_type, basepath=job_dir)
     filename = f"result-{job_id}.json"
     result_path = output_dir.write_path(filename, json.dumps(output).encode('utf-8'))
-    logger.info(f"Successfully stored result at: {result_path}")
+    if logger:
+        logger.info(f"Successfully stored result at: {result_path}")
     return {
         'providers': {
             'file_storage_provider': {
@@ -587,8 +588,7 @@ class KommonitorProcess(BasePrefectProcessor):
             indicator_id = inputs["target_indicator_id"]
             for res in result.values:
                 indicators_controller = openapi_client.api.IndicatorsApi(dmc)
-                # res["allowedRoles"] = []
-                print(res)
+                logger.debug(res)
                 try:
                     resp = indicators_controller.update_indicator_as_body_with_http_info(
                         indicator_id=indicator_id,

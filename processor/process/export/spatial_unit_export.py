@@ -105,10 +105,10 @@ class SpatialUnitExport(ExportProcess):
         try:
             # Load inputs
             inputs = config.inputs
-            print(inputs)
+            logger.debug(inputs)
             # Extract all relevant inputs
             # in this case every IndicatorExport item of indicators has only one spatial unit id
-            crs, format, indicators = pykmhelper.process_spatial_unit_export_inputs(inputs)
+            crs, exp_format, indicators = pykmhelper.process_spatial_unit_export_inputs(inputs)
 
             # 3. Generate result || Main Script
             if data_management_client.configuration.access_token:
@@ -121,16 +121,15 @@ class SpatialUnitExport(ExportProcess):
                     for indicator in indicators:
                         indicator.add_geodataframes(indicators_controller)
                         indicator.filter_target_times()
-                        if "GEOPACKAGE" in format:
+                        if "GEOPACKAGE" in exp_format:
                             indicator.export_gpkg_spatial_unit_export(export_dir, crs)
 
-                    if "CSV" in format:
+                    if "CSV" in exp_format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        os.path.join(export_dir, rf"{filename}.csv")
-
-                    if "EXCEL" in format:
+                        merged_gdf.to_csv(os.path.join(export_dir, rf"{filename}.csv"))
+                    if "EXCEL" in exp_format:
                         filename, merged_gdf = pykmhelper.merge_multiple_dataframes(indicators)
-                        os.path.join(export_dir, rf"{filename}.xlsx")
+                        merged_gdf.to_excel(os.path.join(export_dir, rf"{filename}.xlsx"))
             except RuntimeError as e:
                 logger.error(f"A processing-error occurred during spatial unit indicator export: {e}")
                 raise RuntimeError(f"A processing-error occurred during spatial unit indicator export: {e}")

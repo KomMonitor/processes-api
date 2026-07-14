@@ -6,6 +6,7 @@ import shutil
 from openapi_client import ApiClient
 from prefect import task, Task, runtime
 from prefect.cache_policies import NO_CACHE
+from pydantic.v1 import NoneIsAllowedError
 from pygeoapi_prefect import schemas
 from pygeoapi_prefect.process.base import BasePrefectProcessor
 
@@ -51,6 +52,9 @@ class ExportProcess(BasePrefectProcessor):
             execution_request: schemas.ExecuteRequest
     ) -> dict:
         ## Setup
+        logger = None
+        handler = None
+        flow_id = ""
         try:
             flow_id = runtime.flow_run.name
             logger, handler = setup_logging(flow_id)
@@ -79,9 +83,15 @@ class ExportProcess(BasePrefectProcessor):
             close_logging(logger, handler)
             return result
         except Exception as e:
-            logger.error(f"An Error occurred during export: {e}")
-            output = create_error_response(e)
-            result = store_output_as_file(flow_id, output, logger)
+            if logger and handler:
+                logger.error(f"An Error occurred during export: {e}")
+                output = create_error_response(e)
+                result = store_output_as_file(flow_id, output, logger)
+                close_logging(logger, handler)
+            else:
+                logging.error(f"An Error occurred during export: {e}")
+                output = create_error_response(e)
+                result = store_output_as_file(flow_id, output, logger)
             return result
 
     @staticmethod

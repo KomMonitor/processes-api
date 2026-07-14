@@ -103,7 +103,8 @@ class MultipleExport(ExportProcess):
         try:
             # Load inputs
             inputs = config.inputs
-            print(inputs)
+
+            logger.debug(inputs)
             # Extract all relevant inputs
             # in this case every IndicatorExport item of indicators has only one spatial unit id
             crs, indicators = pykmhelper.process_multiple_export_inputs(inputs)
