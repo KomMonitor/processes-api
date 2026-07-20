@@ -22,6 +22,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
+from processor.auth import get_user_token_jwt_bearer_v2
 
 
 @dataclass
@@ -44,22 +45,11 @@ PROCESSES_API_URL = os.getenv('PROCESSES_API_URL', "http://127.0.0.1:8099/api")
 @task(persist_result=False)
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
     if private:
+        user_id = execute_request.properties.get("user_id", "")
+        logger.info(f"Requesting token (V2 Client-Asserted) for user with ID: {user_id}")
 
-        payload = {
-            "client_id": KC_CLIENT_ID,
-            "client_secret": KC_CLIENT_SECRET,
-            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-            "audience": KC_TARGET_CLIENT_ID,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "requested_subject": execute_request.properties.get("user_id", "")
-        }
-
-        logger.info(f"Requesting token for user with ID: {execute_request.properties.get('user_id', '')}")
-
-        http = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
-        a = requests.post(http, data=payload)
-        a = a.json()
-        token = a['access_token']
+        # Hier wird das V2 Token geholt (über RFC 7523 / jwt-bearer)
+        token = get_user_token_jwt_bearer_v2(user_id)
 
         configuration = openapi_client.Configuration(
             host=KOMMONITOR_DATA_MANAGEMENT_URL,
