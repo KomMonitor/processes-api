@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 from typing import Any
+from flask import request, has_request_context
 
 import openapi_client
 import requests
@@ -22,7 +23,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
-from processor.auth import get_user_token_jwt_bearer_v2
+
 
 
 @dataclass
@@ -44,25 +45,59 @@ PROCESSES_API_URL = os.getenv('PROCESSES_API_URL', "http://127.0.0.1:8099/api")
 
 @task(persist_result=False)
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
-    if private:
-        user_id = execute_request.properties.get("user_id", "")
-        logger.info(f"Requesting token (V2 Client-Asserted) for user with ID: {user_id}")
 
-        # Hier wird das V2 Token geholt (über RFC 7523 / jwt-bearer)
-        token = get_user_token_jwt_bearer_v2(user_id)
+    if private:
+        token = None
+
+        # FALL 1: Direkte Ausführung über HTTP-Request (/execution)
+        if has_request_context() and request and "Authorization" in request.headers:
+            try:
+                logger.info("Using token exchange by active request-header")
+                authorization = request.headers.get("Authorization")
+                subject_token = authorization.split(" ")[1]
+
+                payload = {
+                    "client_id": KC_CLIENT_ID,
+                    "client_secret": KC_CLIENT_SECRET,
+                    "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+                    "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
+                    "subject_token": subject_token
+                }
+
+                http_url = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+                resp = requests.post(http_url, data=payload)
+                resp.raise_for_status()
+                token = resp.json().get('access_token')
+
+            except Exception as e:
+                logger.warning(f"Error during Token-Exchange: {e}. Fallback auf Service Account...")
+
+        # FALL 2: Geplante Ausführung (Prefect Worker / Schedule) ohne Request-Kontext
+        if not token:
+            logger.info("Getting Service-Account-Token by client-id and secret.")
+            payload = {
+                "grant_type": "client_credentials",
+                "client_id": KC_CLIENT_ID,
+                "client_secret": KC_CLIENT_SECRET
+            }
+
+            http_url = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+            resp = requests.post(http_url, data=payload)
+            resp.raise_for_status()
+            token = resp.json().get('access_token')
 
         configuration = openapi_client.Configuration(
             host=KOMMONITOR_DATA_MANAGEMENT_URL,
             access_token=token
         )
         return openapi_client.ApiClient(configuration)
+
     else:
-        logger.debug(f"Using Public API without token")
+        logger.debug("Using Public API without token")
         configuration = openapi_client.Configuration(
             host=KOMMONITOR_DATA_MANAGEMENT_URL
         )
         return openapi_client.ApiClient(configuration)
-
 
 @task
 def format_inputs(execution_request: schemas.ExecuteRequest):

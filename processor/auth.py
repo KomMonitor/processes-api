@@ -2,8 +2,10 @@ import os
 import time
 import uuid
 import jwt
-
+from pathlib import Path
 import requests
+import datetime
+
 from authlib.oauth2.rfc6750 import InvalidTokenError
 from authlib.oauth2.rfc7662 import IntrospectTokenValidator, IntrospectionToken
 from flask import g, request as flask_request
@@ -13,6 +15,7 @@ KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
 KC_CLIENT_ID = os.getenv('KC_CLIENT_ID', "kommonitor-processor")
 KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
+KC_TARGET_CLIENT_ID = os.getenv('KC_TARGET_CLIENT_ID', "kommonitor-data-management")
 ALLOWED_ROLES = tuple(os.getenv('ALLOWED_ROLES', "kommonitor-creator").split(","))
 
 PUBLIC_PROCESSES = ["MultipleExport", "SingleExport", "SpatialUnitExport"]
@@ -46,58 +49,6 @@ def check_endpoint_authentication_required(endpoint, view_args):
         return check_process_authentication_required(process_id)
     else:
         return True
-
-
-import os
-import requests
-
-
-def get_user_token_jwt_bearer_v2(user_id: str) -> str:
-    """
-    Holt ein User-Token via Keycloak V2 Token Exchange (RFC 8693)
-    unter Verwendung des Service Accounts der processes-api.
-    """
-    keycloak_url = KC_URL
-    realm = KC_REALM_NAME
-    client_id = KC_CLIENT_ID
-    client_secret = KC_CLIENT_SECRET
-
-    token_endpoint = f"{keycloak_url}/realms/{realm}/protocol/openid-connect/token"
-
-    # --- SCHRITT A: Eigenes Service Account Token der processes-api holen ---
-    sa_payload = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret
-    }
-
-    sa_response = requests.post(token_endpoint, data=sa_payload)
-    if sa_response.status_code != 200:
-        print(f"[ERROR] Service Account Token konnte nicht abgerufen werden: {sa_response.text}")
-        sa_response.raise_for_status()
-
-    sa_token = sa_response.json().get("access_token")
-
-    # --- SCHRITT B: Eigenes Token gegen das User-Token bei Keycloak V2 tauschen ---
-    exchange_payload = {
-        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "subject_token": sa_token,
-        "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
-        "requested_subject": user_id,
-        "requested_token_type": "urn:ietf:params:oauth:token-type:access_token"
-    }
-
-    exchange_response = requests.post(token_endpoint, data=exchange_payload)
-
-    if exchange_response.status_code != 200:
-        print(
-            f"[ERROR Keycloak V2 Exchange] Fehlgeschlagen ({exchange_response.status_code}): {exchange_response.text}")
-        exchange_response.raise_for_status()
-
-    return exchange_response.json().get("access_token")
-
 
 class KomMonitorIntrospectTokenValidator(IntrospectTokenValidator):
     def introspect_token(self, token_string):
