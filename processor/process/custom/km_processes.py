@@ -25,7 +25,16 @@ from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
 from pygeoapi_prefect.process.base import ScheduleNotFoundError
-from flask import send_from_directory, Response, Request, g
+from flask import send_from_directory, Response, Request, g, request as flask_request
+
+try:
+    from ..base import store_offline_token, revoke_and_delete_offline_token
+except ImportError:
+    from process.base import store_offline_token, revoke_and_delete_offline_token
+
+# Header the frontend may use to supply the user's offline refresh token when creating a
+# schedule (obtained via an offline_access login). A body field is also accepted as a fallback.
+OFFLINE_TOKEN_HEADER = "X-KM-Offline-Token"
 
 # class ScheduleNotFoundError(Exception):
 #     pass
@@ -121,6 +130,12 @@ def schedule_process(api: API, request: APIRequest,
 
     requested_response = data.get('response', 'raw')
 
+    # The user's offline refresh token is needed so scheduled runs can access the Data
+    # Management API on behalf of the user under Standard Token Exchange (v2). It is supplied
+    # by the frontend either via a header or in the request body under "properties".
+    offline_token = flask_request.headers.get(OFFLINE_TOKEN_HEADER) \
+        or data.get('properties', {}).get('offline_token')
+
     try:
         logger.debug('Scheduling process')
 
@@ -128,6 +143,20 @@ def schedule_process(api: API, request: APIRequest,
             process_id, data_dict)
 
         schedule_id, mime_type, status = result
+
+        if status not in (JobStatus.failed,):
+            if offline_token:
+                try:
+                    store_offline_token(schedule_id, offline_token)
+                    logger.info(f"Stored offline token for schedule {schedule_id}")
+                except Exception as err:
+                    logger.error(f"Failed to store offline token for schedule {schedule_id}: {err}")
+            else:
+                logger.warning(
+                    f"No offline token supplied for schedule {schedule_id}; scheduled runs "
+                    f"will fail to authenticate against the Data Management API. Provide it via "
+                    f"the '{OFFLINE_TOKEN_HEADER}' header or a 'properties.offline_token' body field."
+                )
 
         if api.manager.is_async:
             headers['Location'] = f'{api.base_url}/schedule/{schedule_id}'
@@ -317,6 +346,13 @@ def delete_schedule(api: API, request: APIRequest, schedule_id) -> Tuple[dict, i
         )
     else:
         if success:
+            # Revoke the stored offline token at Keycloak and remove its Secret block so no
+            # long-lived user credential lingers after the schedule is gone.
+            try:
+                revoke_and_delete_offline_token(schedule_id, logger)
+            except Exception as err:
+                logger.warning(f"Failed to revoke offline token for schedule {schedule_id}: {err}")
+
             http_status = HTTPStatus.OK
             schedules_url = f"{api.base_url}/schedules"
 

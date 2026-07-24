@@ -32,6 +32,36 @@ curl --request POST \
 
 By using this token the endpoints provided by the OGC API Processes can be queried. Refer to the [OGC API - Processes Specification](https://ogcapi.ogc.org/processes/) for a list of available Endpoints and Operations. Note, that not all workflows are currently supported.
 
+#### Requesting an offline token (for scheduling)
+
+Scheduling a process additionally requires an **offline token** so that scheduled runs can act
+on behalf of the user (see [Scheduling Processes](#scheduling-processes)). Request it by adding
+`scope=offline_access` to the token request — the `refresh_token` in the response is the
+offline token:
+
+```bash
+curl --request POST \
+  --url https://keycloak:8080/realms/kommonitor/protocol/openid-connect/token \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data grant_type=password \
+  --data username=<username> \
+  --data password=<password> \
+  --data client_id=kommonitor-web-client \
+  --data scope=offline_access
+```
+
+The response contains both an `access_token` (for regular requests) and a `refresh_token`
+(the offline token to pass when scheduling):
+
+```json
+{
+  "access_token": "<access_token>",
+  "refresh_token": "<offline_token>",
+  "token_type": "Bearer",
+  "scope": "offline_access ..."
+}
+```
+
 ### Example Requests
 
 - Query Jobs
@@ -86,6 +116,8 @@ The application is packaged as an executable `app.py` script. Configuration is b
 | KC_CLIENT_ID                   | Identifier of pygeopai client in Keycloak                       |
 | KC_CLIENT_SECRET               | Secret of pygeopai client in Keycloak                           |
 | KC_TARGET_CLIENT_ID            | Identifier of Data Management API client in Keycloak            |
+| KC_OFFLINE_CLIENT_ID           | Client the user's offline token is bound to (frontend/web client); used to refresh stored offline tokens for scheduled runs |
+| KC_OFFLINE_CLIENT_SECRET       | Secret for `KC_OFFLINE_CLIENT_ID` (leave empty for a public client) |
 | KC_HOSTNAME                    | Hostname of Keycloak Server (e.g. `keycloak:8080`)              |
 | KC_HOSTNAME_PATH               | Subpath of Keycloak Hostname (e.g. `/keycloak`)                 |
 | KC_URL_PROTOCOL                | Whether to use 'http' (only for development purpose) or 'https' |
@@ -99,9 +131,74 @@ After these variables are set run the app via
 python3 app.py
 ```
 
+### Authenticating against the Data Management API
+
+When a process accesses the Data Management API, the Processes API obtains a **user-scoped**
+token from Keycloak using **Standard Token Exchange (v2,RFC 8693)**.
+
+- **On-demand execution** (`POST /processes/<id>/execution`): the caller's own access token
+  (from the `Authorization` header) is exchanged for a token scoped to the Data Management API
+  audience. No impersonation.
+- **Scheduled execution** (Prefect cron / manual trigger): there is no live user token, and v2
+  cannot mint one from service credentials. Instead, the schedule stores the user's **offline
+  refresh token**; at run time it is refreshed (rotating tokens are persisted back) and the
+  resulting user access token is exchanged to the Data Management API audience.
+
+The processor client must have **Standard Token Exchange enabled** in Keycloak
+(`standard.token.exchange.enabled=true`).
+
 ### Scheduling Processes
 Our pygeoapi server comes with a custom scheduling endpoint that enables scheduling processes
 by creating a scheduled Prefect deployment. For this purpose you must have a running Prefect instance.
+
+Because scheduled runs act on behalf of the user who created the schedule, the frontend must
+supply the user's **offline refresh token** (obtained by requesting `scope=offline_access` at
+login) when calling `POST /processes/<id>/schedule`, via either:
+
+- the `X-KM-Offline-Token` request header, or
+- a `properties.offline_token` field in the JSON request body.
+
+Example — schedule `aggregate_sum` to run every day at midnight, passing the offline token via
+the header (see [Requesting an offline token](#requesting-an-offline-token-for-scheduling)):
+
+```bash
+curl --request POST \
+  --url https://<localhost>/processor/processes/aggregate_sum/schedule \
+  --header 'Authorization: Bearer <access_token>' \
+  --header 'X-KM-Offline-Token: <offline_token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "inputs": {
+    "georesource_id": "8e216371-874f-4e8b-8a60-fe5bdce6ca96",
+    "spatial_unit_id": "4f8f3a04-cc57-48d3-a801-d6b4b00fd315",
+    "target_date": "2000-01-01",
+    "execution_interval": { "cron": "0 0 * * *" }
+  }
+}'
+```
+
+Alternatively, supply the token in the request body instead of the header:
+
+```bash
+curl --request POST \
+  --url https://<localhost>/processor/processes/aggregate_sum/schedule \
+  --header 'Authorization: Bearer <access_token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "inputs": {
+    "georesource_id": "8e216371-874f-4e8b-8a60-fe5bdce6ca96",
+    "spatial_unit_id": "4f8f3a04-cc57-48d3-a801-d6b4b00fd315",
+    "target_date": "2000-01-01",
+    "execution_interval": { "cron": "0 0 * * *" }
+  },
+  "properties": { "offline_token": "<offline_token>" }
+}'
+```
+
+The token is stored in a Prefect `Secret` block (`km-offline-token-<schedule_id>`), refreshed
+on every run, and revoked + deleted when the schedule is deleted. If no offline token is
+supplied, scheduled runs that access the Data Management API will fail with a clear error.
+
 To start Prefect, run the command listed below in your virtual Python environment:
 ```commandline
 prefect server start

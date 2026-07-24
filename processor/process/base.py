@@ -11,6 +11,7 @@ from typing import Any
 
 import openapi_client
 import requests
+from flask import has_request_context, request
 from openapi_client import ApiClient, ApiException
 from openapi_client.exceptions import ForbiddenException
 from prefect import task, get_run_logger, Task, runtime
@@ -37,41 +38,174 @@ KC_CLIENT_SECRET = os.getenv('KC_CLIENT_SECRET', "processor-secret")
 KC_TARGET_CLIENT_ID = os.getenv('KC_TARGET_CLIENT_ID', "kommonitor-data-management")
 KC_URL = os.getenv('KC_URL', "https://keycloak:8443")
 KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
+# Client that the user's offline refresh token is bound to (the frontend/web client that
+# performed the offline_access login). Defaults to the processor client for setups where the
+# offline token is issued to it directly. If the client is confidential, provide its secret.
+KC_OFFLINE_CLIENT_ID = os.getenv('KC_OFFLINE_CLIENT_ID', KC_CLIENT_ID)
+KC_OFFLINE_CLIENT_SECRET = os.getenv('KC_OFFLINE_CLIENT_SECRET', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
 PROCESSES_API_URL = os.getenv('PROCESSES_API_URL', "http://127.0.0.1:8099/api")
 
+KC_TOKEN_ENDPOINT = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
+KC_LOGOUT_ENDPOINT = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/logout"
+
+# Prefix for the Prefect Secret blocks that hold a schedule's offline refresh token.
+OFFLINE_TOKEN_BLOCK_PREFIX = "km-offline-token-"
+
+
+def _kc_token_request(payload: dict) -> dict:
+    """POST a grant request to the Keycloak token endpoint and return the JSON response."""
+    resp = requests.post(KC_TOKEN_ENDPOINT, data=payload)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def exchange_token_v2(subject_token: str) -> str:
+    """Keycloak Standard Token Exchange (RFC 8693 / v2).
+
+    Exchanges a valid *user* access token for a token scoped to the Data Management API
+    audience. This is a proper on-behalf-of exchange of the caller's own token - it does
+    NOT use ``requested_subject`` impersonation (a deprecated v1-only feature).
+    """
+    payload = {
+        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+        "client_id": KC_CLIENT_ID,
+        "client_secret": KC_CLIENT_SECRET,
+        "subject_token": subject_token,
+        "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
+        "audience": KC_TARGET_CLIENT_ID,
+    }
+    return _kc_token_request(payload)["access_token"]
+
+
+def refresh_user_token(refresh_token: str) -> dict:
+    """Redeem an (offline) refresh token for a fresh user access token.
+
+    Returns the full token response, which may contain a rotated ``refresh_token``.
+    """
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": KC_OFFLINE_CLIENT_ID,
+        "refresh_token": refresh_token,
+    }
+    if KC_OFFLINE_CLIENT_SECRET:
+        payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
+    return _kc_token_request(payload)
+
+
+def _offline_token_block_name(schedule_id: str) -> str:
+    return f"{OFFLINE_TOKEN_BLOCK_PREFIX}{schedule_id}"
+
+
+def store_offline_token(schedule_id: str, offline_token: str) -> None:
+    """Persist a schedule's offline refresh token in a Prefect Secret block."""
+    from prefect.blocks.system import Secret
+    Secret(value=offline_token).save(name=_offline_token_block_name(schedule_id), overwrite=True)
+
+
+def _load_offline_token(schedule_id: str) -> str | None:
+    from prefect.blocks.system import Secret
+    try:
+        return Secret.load(_offline_token_block_name(schedule_id)).get()
+    except Exception:
+        return None
+
+
+def revoke_and_delete_offline_token(schedule_id: str, logger: Logger = None) -> None:
+    """Revoke a schedule's offline token at Keycloak and delete its Secret block.
+
+    Best-effort: failures are logged but not raised, so schedule deletion still succeeds.
+    """
+    from prefect.blocks.system import Secret
+    offline_token = _load_offline_token(schedule_id)
+    if offline_token is None:
+        return
+    try:
+        payload = {"client_id": KC_OFFLINE_CLIENT_ID, "refresh_token": offline_token}
+        if KC_OFFLINE_CLIENT_SECRET:
+            payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
+        requests.post(KC_LOGOUT_ENDPOINT, data=payload)
+    except Exception as e:
+        if logger:
+            logger.warning(f"Could not revoke offline token for schedule '{schedule_id}': {e}")
+    try:
+        Secret.delete(_offline_token_block_name(schedule_id))
+    except Exception as e:
+        if logger:
+            logger.warning(f"Could not delete offline token block for schedule '{schedule_id}': {e}")
+
+
+def _current_schedule_id() -> str | None:
+    """Resolve the schedule id for the currently running scheduled flow.
+
+    Scheduled (cron) and manually-triggered runs execute via a Prefect deployment whose
+    name encodes the schedule id (``pygeoapi_schedule_<schedule_id>``). Returns ``None``
+    when there is no deployment context (e.g. an ad-hoc/interactive run).
+    """
+    from pygeoapi_prefect.manager import DEPLOY_NAME_PREFIX
+    deploy_name = runtime.deployment.name
+    if not deploy_name:
+        return None
+    return deploy_name.replace(DEPLOY_NAME_PREFIX, "")
+
+
+def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
+    """Obtain a Data-Management-audience user token for a scheduled run.
+
+    Loads the stored offline token, refreshes it (persisting any rotated token back), then
+    exchanges the resulting user access token to the Data Management API audience via v2.
+    """
+    offline_token = _load_offline_token(schedule_id)
+    if offline_token is None:
+        raise RuntimeError(
+            f"No offline token stored for schedule '{schedule_id}'. The scheduled process "
+            f"cannot access the Data Management API on behalf of the user. Re-create the "
+            f"schedule while logged in so the frontend can supply an offline token."
+        )
+
+    token_resp = refresh_user_token(offline_token)
+
+    # Keycloak rotates refresh tokens on use - persist the new one for the next run.
+    new_refresh = token_resp.get("refresh_token")
+    if new_refresh and new_refresh != offline_token:
+        store_offline_token(schedule_id, new_refresh)
+        logger.debug(f"Rotated offline token for schedule '{schedule_id}'.")
+
+    return exchange_token_v2(token_resp["access_token"])
+
+
 @task(persist_result=False)
 def data_management_client(logger: Logger, execute_request: schemas.ExecuteRequest, private: bool = False) -> ApiClient:
-    if private:
-
-        payload = {
-            "client_id": KC_CLIENT_ID,
-            "client_secret": KC_CLIENT_SECRET,
-            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-            "audience": KC_TARGET_CLIENT_ID,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "requested_subject": execute_request.properties.get("user_id", "")
-        }
-
-        logger.info(f"Requesting token for user with ID: {execute_request.properties.get('user_id', '')}")
-
-        http = f"{KC_URL}/realms/{KC_REALM_NAME}/protocol/openid-connect/token"
-        a = requests.post(http, data=payload)
-        a = a.json()
-        token = a['access_token']
-
-        configuration = openapi_client.Configuration(
-            host=KOMMONITOR_DATA_MANAGEMENT_URL,
-            access_token=token
+    if not private:
+        logger.debug("Using Public API without token")
+        return openapi_client.ApiClient(
+            openapi_client.Configuration(host=KOMMONITOR_DATA_MANAGEMENT_URL)
         )
-        return openapi_client.ApiClient(configuration)
+
+    token = None
+    if has_request_context() and request and "Authorization" in request.headers:
+        # Interactive execution: exchange the caller's own access token (v2, no impersonation).
+        logger.info("Requesting Data Management token via standard token exchange (interactive request).")
+        subject_token = request.headers["Authorization"].split(" ")[1]
+        token = exchange_token_v2(subject_token)
     else:
-        logger.debug(f"Using Public API without token")
-        configuration = openapi_client.Configuration(
-            host=KOMMONITOR_DATA_MANAGEMENT_URL
-        )
-        return openapi_client.ApiClient(configuration)
+        # Scheduled / worker execution: use the offline token stored for this schedule.
+        schedule_id = _current_schedule_id()
+        if not schedule_id:
+            raise RuntimeError(
+                "Scheduled execution without a resolvable schedule id (no request context and "
+                "no Prefect deployment context); cannot obtain a user token for the Data "
+                "Management API."
+            )
+        logger.info(f"Requesting Data Management token via stored offline token for schedule '{schedule_id}'.")
+        token = _get_dm_token_for_schedule(schedule_id, logger)
+
+    configuration = openapi_client.Configuration(
+        host=KOMMONITOR_DATA_MANAGEMENT_URL,
+        access_token=token
+    )
+    return openapi_client.ApiClient(configuration)
 
 
 @task

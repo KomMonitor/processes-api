@@ -14,7 +14,11 @@ services:
       - ./storage/keycloak-db/data:/opt/keycloak/data/h2
     command:
       - --import-realm
-      - --features=admin-fine-grained-authz:v1,scripts,token-exchange:v1
+      # Standard Token Exchange (token-exchange-standard:v2) is enabled by default in
+      # Keycloak 26.2+. The deprecated legacy token-exchange:v1 feature has been removed;
+      # admin-fine-grained-authz:v1 is retained for the data-management client's authorization
+      # services.
+      - --features=admin-fine-grained-authz:v1,scripts
     expose:
       - 8080
     ports:

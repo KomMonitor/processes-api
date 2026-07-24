@@ -1274,7 +1274,7 @@
         "oidc.ciba.grant.enabled": "false",
         "client.secret.creation.time": "1766129658",
         "backchannel.logout.session.required": "true",
-        "standard.token.exchange.enabled": "false",
+        "standard.token.exchange.enabled": "true",
         "post.logout.redirect.uris": "+",
         "oauth2.device.authorization.grant.enabled": "false",
         "backchannel.logout.revoke.offline.tokens": "false"
