@@ -74,7 +74,7 @@ def exchange_token_v2(subject_token: str) -> str:
         "client_secret": KC_CLIENT_SECRET,
         "subject_token": subject_token,
         "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
-        "audience": KC_TARGET_CLIENT_ID,
+        # "audience": KC_TARGET_CLIENT_ID,
     }
     return _kc_token_request(payload)["access_token"]
 
@@ -86,11 +86,13 @@ def refresh_user_token(refresh_token: str) -> dict:
     """
     payload = {
         "grant_type": "refresh_token",
-        "client_id": KC_OFFLINE_CLIENT_ID,
+        "client_id": KC_CLIENT_ID,
+        "client_secret": KC_CLIENT_SECRET,
         "refresh_token": refresh_token,
     }
-    if KC_OFFLINE_CLIENT_SECRET:
-        payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
+    # if KC_OFFLINE_CLIENT_SECRET:
+    #     payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
+
     return _kc_token_request(payload)
 
 
@@ -143,7 +145,7 @@ def _current_schedule_id() -> str | None:
     name encodes the schedule id (``pygeoapi_schedule_<schedule_id>``). Returns ``None``
     when there is no deployment context (e.g. an ad-hoc/interactive run).
     """
-    from pygeoapi_prefect.manager import DEPLOY_NAME_PREFIX
+    DEPLOY_NAME_PREFIX = "pygeoapi_schedule_"
     deploy_name = runtime.deployment.name
     if not deploy_name:
         return None
