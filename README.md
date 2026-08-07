@@ -199,6 +199,24 @@ The token is stored in a Prefect `Secret` block (`km-offline-token-<schedule_id>
 on every run, and revoked + deleted when the schedule is deleted. If no offline token is
 supplied, scheduled runs that access the Data Management API will fail with a clear error.
 
+#### Re-authorizing an existing schedule
+
+Schedules created by a previous version (which used Token Exchange v1 impersonation) have **no**
+stored offline token and will fail their scheduled runs after upgrading. Such schedules do not
+have to be recreated — attach an offline token to the existing schedule via:
+
+```bash
+curl --request POST \
+  --url https://<localhost>/processor/schedules/<schedule_id>/offline-token \
+  --header 'Authorization: Bearer <access_token>' \
+  --header 'X-KM-Offline-Token: <offline_token>'
+```
+
+The token may alternatively be supplied in the body as `{ "offline_token": "<offline_token>" }`.
+Only the user who created the schedule may re-authorize it. The schedule listing
+(`GET /schedules`) reports an `offlineTokenRegistered` flag per schedule so a client can detect
+which schedules still need re-authorization.
+
 To start Prefect, run the command listed below in your virtual Python environment:
 ```commandline
 prefect server start

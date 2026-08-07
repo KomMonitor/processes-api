@@ -143,6 +143,13 @@ def schedule_execution(schedule_id):
                               schedule_id)
 
 
+@APP.post('/schedules/<schedule_id>/offline-token', endpoint=API_SET_OFFLINE_TOKEN)
+@require_oauth()
+def set_offline_token(schedule_id):
+    return flask_app.execute_from_flask(km_processes.set_offline_token, request,
+                              schedule_id)
+
+
 @APP.get('/jobs')
 @APP.route('/jobs/<job_id>',
            methods=['GET', 'DELETE'],

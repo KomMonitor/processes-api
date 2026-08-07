@@ -23,6 +23,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
+from pygeoapi_prefect.manager import DEPLOY_NAME_PREFIX
 
 
 @dataclass
@@ -112,6 +113,11 @@ def _load_offline_token(schedule_id: str) -> str | None:
         return Secret.load(_offline_token_block_name(schedule_id)).get()
     except Exception:
         return None
+
+
+def has_offline_token(schedule_id: str) -> bool:
+    """Whether an offline token is stored for the given schedule."""
+    return _load_offline_token(schedule_id) is not None
 
 
 def revoke_and_delete_offline_token(schedule_id: str, logger: Logger = None) -> None:

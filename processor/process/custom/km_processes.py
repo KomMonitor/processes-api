@@ -25,12 +25,14 @@ from pygeoapi_prefect.schemas import (
     RequestedProcessExecutionMode,
 )
 from pygeoapi_prefect.process.base import ScheduleNotFoundError
+from pygeoapi_prefect.manager import _get_prefect_deployment
 from flask import send_from_directory, Response, Request, g, request as flask_request
+import anyio
 
 try:
-    from ..base import store_offline_token, revoke_and_delete_offline_token
+    from ..base import store_offline_token, revoke_and_delete_offline_token, has_offline_token
 except ImportError:
-    from process.base import store_offline_token, revoke_and_delete_offline_token
+    from process.base import store_offline_token, revoke_and_delete_offline_token, has_offline_token
 
 # Header the frontend may use to supply the user's offline refresh token when creating a
 # schedule (obtained via an offline_access login). A body field is also accepted as a fallback.
@@ -191,6 +193,77 @@ def schedule_process(api: API, request: APIRequest,
     return headers, http_status, response2
 
 
+def set_offline_token(api: API, request: APIRequest, schedule_id) -> Tuple[dict, int, str]:
+    """
+    Attach (or replace) the offline token of an existing schedule.
+
+    This re-authorizes a schedule - notably schedules created by a previous version that used
+    Token Exchange v1 and therefore have no stored offline token - without recreating it, so its
+    id, cron and run history are preserved. The caller must be the owner of the schedule.
+
+    :param request: A request object
+    :param schedule_id: id of the schedule to re-authorize
+
+    :returns: tuple of headers, status code, content
+    """
+    headers = request.get_response_headers(SYSTEM_LOCALE, **api.api_headers)
+
+    # 1. Verify the schedule exists and fetch its owner (stored user_id) from the deployment.
+    deploy_name = api.manager._schedule_id_to_deploy_name(schedule_id)
+    try:
+        deploy_details = anyio.run(_get_prefect_deployment, deploy_name)
+    except Exception as err:
+        logger.error(f"Could not fetch deployment for schedule {schedule_id}: {err}")
+        deploy_details = None
+    if not deploy_details:
+        return api.get_exception(
+            HTTPStatus.NOT_FOUND, headers, request.format, 'NoSuchSchedule', schedule_id)
+
+    deployment = deploy_details[0]
+    try:
+        owner_id = deployment.parameters['execution_request']['properties']['user_id']
+    except (KeyError, TypeError):
+        owner_id = None
+
+    # 2. Ownership check: only the user who created the schedule may re-authorize it.
+    current_user_id = g.get('user_id')
+    if owner_id and current_user_id and owner_id != current_user_id:
+        return api.get_exception(
+            HTTPStatus.FORBIDDEN, headers, request.format,
+            'Forbidden', 'You are not the owner of this schedule.')
+
+    # 3. Read the offline token from the header or the request body.
+    offline_token = flask_request.headers.get(OFFLINE_TOKEN_HEADER)
+    if not offline_token:
+        try:
+            body = json.loads(request.data.decode()) if request.data else {}
+        except (json.decoder.JSONDecodeError, TypeError, AttributeError, UnicodeDecodeError):
+            body = {}
+        offline_token = body.get('offline_token') \
+            or body.get('properties', {}).get('offline_token')
+    if not offline_token:
+        return api.get_exception(
+            HTTPStatus.BAD_REQUEST, headers, request.format, 'MissingParameterValue',
+            f"Missing offline token. Provide it via the '{OFFLINE_TOKEN_HEADER}' header or an "
+            f"'offline_token' body field.")
+
+    # 4. Store the offline token for this schedule.
+    try:
+        store_offline_token(schedule_id, offline_token)
+    except Exception as err:
+        logger.error(f"Failed to store offline token for schedule {schedule_id}: {err}")
+        return api.get_exception(
+            HTTPStatus.INTERNAL_SERVER_ERROR, headers, request.format, 'InternalError', schedule_id)
+
+    logger.info(f"Stored offline token for schedule {schedule_id} (re-authorization)")
+    response = {
+        'scheduleID': schedule_id,
+        'status': 'AUTHORIZED',
+        'message': 'Offline token stored for schedule'
+    }
+    return headers, HTTPStatus.OK, to_json(response, api.pretty_print)
+
+
 def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict, int, str]:
     """
     Get process schedules
@@ -279,7 +352,10 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
             'scheduleUpdated': schedule_['updated'],
             'scheduleActive': schedule_['active'],
             'scheduleCron': schedule_['cron'],
-            'inputs': schedule_['inputs'] if 'inputs' in schedule_ else ''
+            'inputs': schedule_['inputs'] if 'inputs' in schedule_ else '',
+            # False for legacy (v1) schedules that still need to be re-authorized with an
+            # offline token before their scheduled runs can access the Data Management API.
+            'offlineTokenRegistered': has_offline_token(schedule_['schedule_id'])
         }
 
         serialized_schedules['schedules'].append(schedule2)
