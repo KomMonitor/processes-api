@@ -23,7 +23,7 @@ from pygeoapi_prefect.process.base import BasePrefectProcessor
 from pygeoapi_prefect.schemas import ProcessInput, ProcessIOSchema, ProcessIOType, ProcessIOFormat, ProcessOutput, \
     ExecutionQualifiedInputValue, ExecutionInputValueNoObject, ExecutionInputValueNoObjectArray
 from pygeoapi_prefect.utils import get_storage
-from pygeoapi_prefect.manager import DEPLOY_NAME_PREFIX
+from pygeoapi_prefect.manager import PrefectManager
 
 
 @dataclass
@@ -151,11 +151,11 @@ def _current_schedule_id() -> str | None:
     name encodes the schedule id (``pygeoapi_schedule_<schedule_id>``). Returns ``None``
     when there is no deployment context (e.g. an ad-hoc/interactive run).
     """
-    DEPLOY_NAME_PREFIX = "pygeoapi_schedule_"
+
     deploy_name = runtime.deployment.name
     if not deploy_name:
         return None
-    return deploy_name.replace(DEPLOY_NAME_PREFIX, "")
+    return deploy_name.replace(PrefectManager._deploy_name_prefix, "")
 
 
 def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
