@@ -2,6 +2,7 @@ from authlib.oauth2.rfc6750 import InsufficientScopeError
 from pygeoapi.api import (
     SYSTEM_LOCALE, apply_gzip
 )
+import jwt
 import json
 import logging
 import urllib.parse
@@ -100,6 +101,11 @@ def schedule_process(api: API, request: APIRequest,
             request.format, 'NoSuchProcess', msg)
 
     data = request.data
+
+    subject_token = request.headers["Authorization"].split(" ")[1]
+    decoded = jwt.decode(subject_token, options={"verify_signature": False})
+    user_id = decoded.get("sub")
+
     if not data:
         # TODO not all processes require input, e.g. time-dependent or
         #      random value generators
@@ -125,6 +131,7 @@ def schedule_process(api: API, request: APIRequest,
             'InvalidParameterValue', msg)
 
     data_dict = data.get('inputs', {})
+    data_dict['user_id'] = user_id
     logger.debug(data_dict)
 
     requested_outputs = data.get('outputs')
@@ -342,6 +349,8 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
     for schedule_ in schedules:
         logger.debug("schedule data model:")
         logger.debug(schedule_)
+
+        print(schedule_)
         schedule2 = {
             'type': 'process',
             'processID': schedule_['process_id'],
