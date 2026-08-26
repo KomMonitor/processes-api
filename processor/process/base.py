@@ -42,7 +42,7 @@ KC_REALM_NAME = os.getenv('KC_REALM_NAME', "kommonitor-demo")
 # Client that the user's offline refresh token is bound to (the frontend/web client that
 # performed the offline_access login). Defaults to the processor client for setups where the
 # offline token is issued to it directly. If the client is confidential, provide its secret.
-KC_OFFLINE_CLIENT_ID = os.getenv('KC_OFFLINE_CLIENT_ID', KC_CLIENT_ID)
+KC_OFFLINE_CLIENT_ID = os.getenv('KC_OFFLINE_CLIENT_ID', "kommonitor-web-client")
 KC_OFFLINE_CLIENT_SECRET = os.getenv('KC_OFFLINE_CLIENT_SECRET', "")
 KOMMONITOR_DATA_MANAGEMENT_URL = os.getenv('KOMMONITOR_DATA_MANAGEMENT_URL', "http://localhost:8085/management/")
 PROCESS_RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', "/tmp")
@@ -80,19 +80,20 @@ def exchange_token_v2(subject_token: str) -> str:
     return _kc_token_request(payload)["access_token"]
 
 
-def refresh_user_token(refresh_token: str) -> dict:
+def refresh_user_token(refresh_token: str, logger: Logger = None) -> dict:
     """Redeem an (offline) refresh token for a fresh user access token.
 
     Returns the full token response, which may contain a rotated ``refresh_token``.
     """
     payload = {
         "grant_type": "refresh_token",
-        "client_id": KC_CLIENT_ID,
-        "client_secret": KC_CLIENT_SECRET,
+        "client_id": KC_OFFLINE_CLIENT_ID,
         "refresh_token": refresh_token,
     }
-    # if KC_OFFLINE_CLIENT_SECRET:
-    #     payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
+
+    #logger.info(payload)
+    #if KC_OFFLINE_CLIENT_SECRET:
+    #    payload["client_secret"] = KC_OFFLINE_CLIENT_SECRET
 
     return _kc_token_request(payload)
 
@@ -172,10 +173,11 @@ def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
             f"schedule while logged in so the frontend can supply an offline token."
         )
 
-    token_resp = refresh_user_token(offline_token)
+    token_resp = refresh_user_token(offline_token, logger)
 
     # Keycloak rotates refresh tokens on use - persist the new one for the next run.
     new_refresh = token_resp.get("refresh_token")
+    #logger.info(new_refresh)
     if new_refresh and new_refresh != offline_token:
         store_offline_token(schedule_id, new_refresh)
         logger.debug(f"Rotated offline token for schedule '{schedule_id}'.")
