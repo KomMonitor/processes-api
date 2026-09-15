@@ -347,6 +347,7 @@ def get_schedules(api: API, request: APIRequest, schedule_id=None) -> Tuple[dict
             'processID': schedule_['process_id'],
             'scheduleID': schedule_['schedule_id'],
             'jobIDs': schedule_['job_ids'],
+            'user_id': schedule_['user_id'],
             'status': schedule_['status'],
             'scheduleCreated': schedule_['created'],
             'scheduleUpdated': schedule_['updated'],
