@@ -608,6 +608,11 @@
       "realmRoles": [
         "default-roles-kommonitor"
       ],
+      "clientRoles": {
+        "realm-management": [
+          "impersonation"
+        ]
+      },
       "notBefore": 0,
       "groups": []
     },

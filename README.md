@@ -118,6 +118,11 @@ The application is packaged as an executable `app.py` script. Configuration is b
 | KC_TARGET_CLIENT_ID            | Identifier of Data Management API client in Keycloak            |
 | KC_OFFLINE_CLIENT_ID           | Client the user's offline token is bound to (frontend/web client); used to refresh stored offline tokens for scheduled runs |
 | KC_OFFLINE_CLIENT_SECRET       | Secret for `KC_OFFLINE_CLIENT_ID` (leave empty for a public client) |
+| KC_ADMIN_CLIENT_ID             | Service account used by the offline-token bootstrap to impersonate users (needs the realm-management `impersonation` role) |
+| KC_ADMIN_CLIENT_SECRET         | Secret for `KC_ADMIN_CLIENT_ID`                                 |
+| KC_OFFLINE_REDIRECT_URI        | A redirect URI registered on `KC_OFFLINE_CLIENT_ID` (used by the bootstrap auth-code flow) |
+| OFFLINE_TOKEN_REFRESH_ENABLED  | Enable the cron that refreshes stored offline tokens (default True) |
+| OFFLINE_TOKEN_REFRESH_CRON     | Cron for the refresh job; must be shorter than Keycloak's `offlineSessionIdleTimeout` (default `0 3 * * *`) |
 | KC_HOSTNAME                    | Hostname of Keycloak Server (e.g. `keycloak:8080`)              |
 | KC_HOSTNAME_PATH               | Subpath of Keycloak Hostname (e.g. `/keycloak`)                 |
 | KC_URL_PROTOCOL                | Whether to use 'http' (only for development purpose) or 'https' |
@@ -216,6 +221,45 @@ The token may alternatively be supplied in the body as `{ "offline_token": "<off
 Only the user who created the schedule may re-authorize it. The schedule listing
 (`GET /schedules`) reports an `offlineTokenRegistered` flag per schedule so a client can detect
 which schedules still need re-authorization.
+
+#### Bootstrapping offline tokens for existing schedules (admin, one-off)
+
+Instead of asking every user to re-authorize manually, schedules that already exist (e.g. created
+by the previous v1 version) can be bootstrapped in bulk via the Keycloak **admin impersonation
+endpoint** — no `token-exchange:v1` required. `scripts/bootstrap_offline_tokens.py` enumerates all
+schedule deployments, impersonates each schedule's owner, performs an `offline_access`
+authorization-code flow, and stores the resulting offline token for the schedule.
+
+Keycloak prerequisites (per target realm):
+- A service account (`KC_ADMIN_CLIENT_ID`) holding the realm-management **`impersonation`** role.
+- `KC_OFFLINE_REDIRECT_URI` registered on `KC_OFFLINE_CLIENT_ID`, which must have
+  `consentRequired=false`; target users must have the default `offline_access` role.
+- `offlineSessionMaxLifespanEnabled` should be `false` (otherwise offline tokens eventually expire
+  regardless of refresh).
+- The old v1 token-exchange impersonation policies on the data-management client
+  (`kommonitor-processor-impersonator`, `admin-impersonating.permission.users`) are no longer used
+  and can be removed; keep the realm-management `impersonation` role the bootstrap relies on.
+
+First confirm feasibility against the target Keycloak, then run the bootstrap:
+```bash
+# Step 0 — prove impersonation yields a genuine offline token (typ="Offline") for one user
+python scripts/spike_offline_token.py <keycloak_user_id>
+
+# Step 1 — mint + store offline tokens for every schedule (idempotent; --dry-run to preview)
+python scripts/bootstrap_offline_tokens.py --dry-run
+python scripts/bootstrap_offline_tokens.py
+```
+Schedules whose token cannot be minted (disabled/deleted user, missing role) are listed; their
+owners re-authorize via the endpoint above, or the schedules are deleted.
+
+#### Keeping offline tokens alive
+
+Offline tokens idle out after Keycloak's `offlineSessionIdleTimeout` (default 30 days). Frequent
+schedules refresh their own token on every run; for infrequent or paused schedules, a cron
+deployment (`pygeoapi_offline_token_refresh`) refreshes **all** stored offline tokens on a schedule
+set by `OFFLINE_TOKEN_REFRESH_CRON` (must be shorter than the idle timeout). It is created on startup
+when `OFFLINE_TOKEN_REFRESH_ENABLED` is true. A token that can no longer be refreshed is logged as
+needing re-authorization.
 
 To start Prefect, run the command listed below in your virtual Python environment:
 ```commandline

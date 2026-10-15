@@ -2,9 +2,18 @@ import httpx
 import pendulum
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
+from prefect.client.orchestration import get_client
 from prefect.exceptions import ObjectNotFound
 from pygeoapi.util import JobStatus
 from pygeoapi_prefect import manager
+
+# `base` holds the Keycloak token helpers and the offline-token Secret-block convention.
+# Import it the same resilient way the process modules do (package context when loaded as
+# `process.utils`, flat import when Prefect loads this file standalone on the worker).
+try:
+    from . import base
+except ImportError:
+    from process import base
 
 
 @flow()
@@ -28,6 +37,52 @@ def get_jobs():
     job_status_list = [JobStatus.successful, JobStatus.failed, JobStatus.dismissed]
     flow_runs = manager.get_flow_runs(job_status_list)
     return flow_runs
+
+
+@flow()
+async def refresh_offline_tokens_flow():
+    """Refresh every stored schedule offline token so it never idles out.
+
+    Each scheduled run already rotates its own offline token, so this flow is the safety net
+    for schedules that run less often than the Keycloak offline-session idle timeout (or are
+    paused). It redeems every stored offline token for a fresh one and persists the rotated
+    token back. A token that can no longer be refreshed (revoked / idled out / user disabled)
+    is reported so the schedule can be re-authorized.
+    """
+    logger = get_run_logger()
+    prefix = base.OFFLINE_TOKEN_BLOCK_PREFIX
+    async with get_client() as client:
+        block_documents = await client.read_block_documents(include_secrets=True)
+    offline_blocks = [
+        d for d in block_documents
+        if d.name and d.name.startswith(prefix) and d.block_type_name == "Secret"
+    ]
+    logger.info(f"Found {len(offline_blocks)} stored offline token(s) to refresh.")
+
+    refreshed = 0
+    failed = []
+    for doc in offline_blocks:
+        schedule_id = doc.name[len(prefix):]
+        token = (doc.data or {}).get("value")
+        if not token:
+            logger.warning(f"Offline token block for schedule '{schedule_id}' has no value; skipping.")
+            failed.append(schedule_id)
+            continue
+        try:
+            token_resp = base.refresh_user_token(token)
+            new_refresh = token_resp.get("refresh_token")
+            if new_refresh and new_refresh != token:
+                base.store_offline_token(schedule_id, new_refresh)
+            refreshed += 1
+            logger.debug(f"Refreshed offline token for schedule '{schedule_id}'.")
+        except Exception as e:
+            logger.error(
+                f"Could not refresh offline token for schedule '{schedule_id}' "
+                f"(it may be revoked, idled out, or the user disabled) - the schedule needs "
+                f"re-authorization: {e}"
+            )
+            failed.append(schedule_id)
+    logger.info(f"Offline token refresh done: {refreshed} refreshed, {len(failed)} failed {failed}.")
 
 
 @task(cache_policy=NO_CACHE)

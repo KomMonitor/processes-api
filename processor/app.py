@@ -32,11 +32,16 @@ JOB_STORAGE_DURATION = os.getenv('JOB_STORAGE_DURATION', "P30D")
 JOB_CLEAN_ENABLED = os.getenv('JOB_CLEAN_ENABLED', "False")
 JOB_CLEAN_CRON = os.getenv('JOB_CLEAN_CRON', "0 0 * * *")
 RESULTS_DIR = os.getenv('PROCESS_RESULTS_DIR', '/tmp')
+# Periodically refresh stored schedule offline tokens so they never idle out. The cron interval
+# MUST be shorter than Keycloak's offlineSessionIdleTimeout.
+OFFLINE_TOKEN_REFRESH_ENABLED = os.getenv('OFFLINE_TOKEN_REFRESH_ENABLED', "True")
+OFFLINE_TOKEN_REFRESH_CRON = os.getenv('OFFLINE_TOKEN_REFRESH_CRON', "0 3 * * *")
 
 from pygeoapi import flask_app
 from pygeoapi.flask_app import STATIC_FOLDER, API_RULES, CONFIG, api_, processes_api, execute_from_flask
 
 JOB_CLEAN_NAME = "pygeoapi_job_clean"
+OFFLINE_TOKEN_REFRESH_NAME = "pygeoapi_offline_token_refresh"
 
 require_oauth = ResourceProtector()
 require_oauth.register_token_validator(KomMonitorIntrospectTokenValidator())
@@ -250,6 +255,33 @@ async def init_job_clean():
         await deploy_job_clean()
 
 
+async def deploy_offline_token_refresh():
+    source_name = os.path.dirname(os.path.abspath(utils.__file__))
+    module_name = os.path.basename(utils.__file__)
+    entrypoint = str.join(":", [module_name, "refresh_offline_tokens_flow"])
+
+    try:
+        deployment = await asyncio.wait_for(
+            utils.refresh_offline_tokens_flow.from_source(source=source_name, entrypoint=entrypoint,), timeout=10
+        )
+        deploy_id = await deployment.deploy(
+            name=OFFLINE_TOKEN_REFRESH_NAME,
+            cron=OFFLINE_TOKEN_REFRESH_CRON,
+            work_pool_name="kommonitor-work-pool"
+        )
+        logger.info(f'Successfully created deployment for offline token refresh {deploy_id}')
+    except httpx.ConnectError as err:
+        logger.info(f"Could not connect to prefect server to create deployment for offline token refresh: {str(err)}")
+
+
+async def init_offline_token_refresh():
+    deployment_exists = await check_deployment_exists(OFFLINE_TOKEN_REFRESH_NAME)
+    if deployment_exists:
+        logger.info("Deployment for offline token refresh already exists.")
+    else:
+        await deploy_offline_token_refresh()
+
+
 async def init():
     # Scan for available processes
     parse_processes("kommonitor")
@@ -258,6 +290,9 @@ async def init():
 
     if JOB_CLEAN_ENABLED:
         await init_job_clean()
+
+    if OFFLINE_TOKEN_REFRESH_ENABLED.lower() in ("true", "1", "yes"):
+        await init_offline_token_refresh()
     pass
 
 asyncio.run(init())
