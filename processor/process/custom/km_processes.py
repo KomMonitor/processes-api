@@ -79,7 +79,7 @@ def execute_from_flask_custom(api_function, request: Request, *args,
 
 
 
-def schedule_process(api: API, request: APIRequest,
+async def schedule_process(api: API, request: APIRequest,
                     process_id) -> Tuple[dict, int, str]:
     """
     Execute process
@@ -149,7 +149,7 @@ def schedule_process(api: API, request: APIRequest,
         if status not in (JobStatus.failed,):
             if offline_token:
                 try:
-                    store_offline_token(schedule_id, offline_token)
+                    await store_offline_token(schedule_id, offline_token)
                     logger.info(f"Stored offline token for schedule {schedule_id}")
                 except Exception as err:
                     logger.error(f"Failed to store offline token for schedule {schedule_id}: {err}")
@@ -193,7 +193,7 @@ def schedule_process(api: API, request: APIRequest,
     return headers, http_status, response2
 
 
-def set_offline_token(api: API, request: APIRequest, schedule_id) -> Tuple[dict, int, str]:
+async def set_offline_token(api: API, request: APIRequest, schedule_id) -> Tuple[dict, int, str]:
     """
     Attach (or replace) the offline token of an existing schedule.
 
@@ -249,7 +249,7 @@ def set_offline_token(api: API, request: APIRequest, schedule_id) -> Tuple[dict,
 
     # 4. Store the offline token for this schedule.
     try:
-        store_offline_token(schedule_id, offline_token)
+        await store_offline_token(schedule_id, offline_token)
     except Exception as err:
         logger.error(f"Failed to store offline token for schedule {schedule_id}: {err}")
         return api.get_exception(

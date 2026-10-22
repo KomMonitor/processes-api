@@ -72,7 +72,7 @@ async def refresh_offline_tokens_flow():
             token_resp = base.refresh_user_token(token)
             new_refresh = token_resp.get("refresh_token")
             if new_refresh and new_refresh != token:
-                base.store_offline_token(schedule_id, new_refresh)
+                await base.store_offline_token(schedule_id, new_refresh)
             refreshed += 1
             logger.debug(f"Refreshed offline token for schedule '{schedule_id}'.")
         except Exception as e:

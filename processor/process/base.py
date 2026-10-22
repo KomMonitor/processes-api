@@ -102,11 +102,10 @@ def _offline_token_block_name(schedule_id: str) -> str:
     return f"{OFFLINE_TOKEN_BLOCK_PREFIX}{schedule_id}"
 
 
-def store_offline_token(schedule_id: str, offline_token: str) -> None:
+async def store_offline_token(schedule_id: str, offline_token: str) -> None:
     """Persist a schedule's offline refresh token in a Prefect Secret block."""
     from prefect.blocks.system import Secret
-    Secret(value=offline_token).save(name=_offline_token_block_name(schedule_id), overwrite=True)
-
+    await Secret(value=offline_token).save(name=_offline_token_block_name(schedule_id), overwrite=True)
 
 def _load_offline_token(schedule_id: str) -> str | None:
     from prefect.blocks.system import Secret
@@ -159,7 +158,7 @@ def _current_schedule_id() -> str | None:
     return deploy_name.replace(PrefectManager._deploy_name_prefix, "")
 
 
-def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
+async def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
     """Obtain a Data-Management-audience user token for a scheduled run.
 
     Loads the stored offline token, refreshes it (persisting any rotated token back), then
@@ -179,7 +178,7 @@ def _get_dm_token_for_schedule(schedule_id: str, logger: Logger) -> str:
     new_refresh = token_resp.get("refresh_token")
     #logger.info(new_refresh)
     if new_refresh and new_refresh != offline_token:
-        store_offline_token(schedule_id, new_refresh)
+        await store_offline_token(schedule_id, new_refresh)
         logger.debug(f"Rotated offline token for schedule '{schedule_id}'.")
 
     return exchange_token_v2(token_resp["access_token"])
