@@ -13,7 +13,7 @@ from pygeoapi_prefect import manager
 try:
     from . import base
 except ImportError:
-    from process import base
+    from processor.process import base
 
 
 @flow()
