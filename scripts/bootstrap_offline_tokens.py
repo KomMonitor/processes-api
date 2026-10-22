@@ -26,7 +26,7 @@ sys.path.insert(0, _PROCESSOR_DIR)
 from prefect.client.orchestration import get_client
 from prefect.server.schemas import filters
 
-from offline_token_mint import MintError, mint_offline_token, get_admin_token, jwt_header_typ
+from offline_token_mint import MintError, mint_offline_token, get_admin_token, jwt_payload_typ
 from process.base import store_offline_token, has_offline_token  # noqa: E402
 
 # Must match pygeoapi_prefect.manager.DEPLOY_NAME_PREFIX.
@@ -79,7 +79,7 @@ async def main() -> int:
 
         try:
             token = mint_offline_token(user_id, admin_token=admin_token)
-            if jwt_header_typ(token) != "Offline":
+            if jwt_payload_typ(token) != "Offline":
                 raise MintError("minted token is not of type 'Offline' (run the Step 0 spike first)")
             store_offline_token(schedule_id, token)
             minted += 1

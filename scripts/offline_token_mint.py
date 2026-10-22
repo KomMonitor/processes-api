@@ -41,13 +41,13 @@ class MintError(RuntimeError):
     """Raised when an offline token could not be minted for a user."""
 
 
-def jwt_header_typ(token: str) -> str | None:
-    """Return the ``typ`` field of a JWT header without verifying the signature."""
+def jwt_payload_typ(token: str) -> str | None:
+    """Return the ``typ`` field of a JWT Payload without verifying the signature. Offline Typ is stored in payload and not in header."""
     try:
-        header_b64 = token.split(".")[0]
-        header_b64 += "=" * (-len(header_b64) % 4)  # pad to a multiple of 4
-        header = json.loads(base64.urlsafe_b64decode(header_b64))
-        return header.get("typ")
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)  # pad to a multiple of 4
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return payload.get("typ")
     except Exception:
         return None
 

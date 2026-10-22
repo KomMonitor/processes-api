@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import requests
 from offline_token_mint import (
-    MintError, mint_offline_token, jwt_header_typ,
+    MintError, mint_offline_token, jwt_payload_typ,
     TOKEN_ENDPOINT, KC_OFFLINE_CLIENT_ID, KC_OFFLINE_CLIENT_SECRET,
 )
 
@@ -33,7 +33,7 @@ def main() -> int:
         print(f"FAIL: {e}")
         return 1
 
-    typ = jwt_header_typ(token)
+    typ = jwt_payload_typ(token)
     print(f"Minted refresh token for user {user_id}: typ={typ!r}")
     if typ != "Offline":
         print("FAIL: token is NOT an offline token (expected typ='Offline'). An online refresh "
